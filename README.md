@@ -607,7 +607,3 @@ For issues and questions:
 - Open a GitHub issue
 - Check Temporal documentation: https://docs.temporal.io
 - Review Gmail API docs: https://developers.google.com/gmail/api
-
----
-
-**Built with ❤️ using Temporal, TypeScript, and AI**
