@@ -16,6 +16,9 @@ import {
   OpenAIClient
 } from '../../temporal-workflows/src/activities';
 
+// Import constants
+import { GMAIL_SYNC_TASK_QUEUE } from '../../temporal-workflows/src/shared/constants';
+
 async function run() {
   logger.info('🚀 Starting Temporal Worker...');
 
@@ -100,7 +103,7 @@ async function run() {
     const gmailSyncWorker = await Worker.create({
       connection,
       namespace: config.temporal.namespace,
-      taskQueue: 'gmail-sync-queue',
+      taskQueue: GMAIL_SYNC_TASK_QUEUE,
       workflowsPath: require.resolve('../../temporal-workflows/src/workflows'),
       activities,
       maxConcurrentActivityTaskExecutions: 10,
@@ -108,7 +111,7 @@ async function run() {
     });
 
     logger.info('✅ Gmail Sync worker created successfully', {
-      taskQueue: 'gmail-sync-queue',
+      taskQueue: GMAIL_SYNC_TASK_QUEUE,
       maxConcurrentActivities: 10,
       maxConcurrentWorkflows: 20
     });
