@@ -1,0 +1,32 @@
+{
+  "name": "mywallet",
+  "version": "1.0.0",
+  "description": "Expense tracking system with Temporal orchestration",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=@mywallet/backend-apis",
+    "dev:worker": "npm run dev --workspace=@mywallet/temporal-worker",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:worker\"",
+    "build": "npm run build --workspaces",
+    "lint": "eslint packages --ext .ts",
+    "test": "jest",
+    "setup:gmail": "tsx scripts/setup-gmail-oauth.ts",
+    "seed:patterns": "tsx scripts/seed-email-patterns.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.54.0",
+    "jest": "^29.7.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

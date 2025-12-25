@@ -1,0 +1,25 @@
+// MongoDB Initialization Script
+// This script runs when the MongoDB container first starts
+
+db = db.getSiblingDB('mywallet');
+
+// Create collections
+db.createCollection('transactions');
+db.createCollection('email_patterns');
+db.createCollection('budgets');
+
+// Create indexes for transactions
+db.transactions.createIndex({ emailId: 1 }, { unique: true });
+db.transactions.createIndex({ transactionDate: -1, category: 1 });
+db.transactions.createIndex({ workflowId: 1 });
+db.transactions.createIndex({ bankName: 1, accountNumber: 1 });
+
+// Create indexes for email_patterns
+db.email_patterns.createIndex({ name: 1 }, { unique: true });
+db.email_patterns.createIndex({ isActive: 1, priority: -1 });
+db.email_patterns.createIndex({ bankName: 1 });
+
+// Create indexes for budgets
+db.budgets.createIndex({ year: 1, month: 1 }, { unique: true });
+
+print('MongoDB initialization completed successfully');

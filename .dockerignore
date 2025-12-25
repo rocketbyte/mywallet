@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.*
+
+# Build artifacts
+dist/
+build/
+
+# Documentation
+*.md
+docs/
+
+# Tests
+**/*.test.ts
+**/*.spec.ts
+__tests__/
+coverage/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Misc
+.DS_Store

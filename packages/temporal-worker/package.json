@@ -1,0 +1,26 @@
+{
+  "name": "@mywallet/temporal-worker",
+  "version": "1.0.0",
+  "description": "Temporal worker for MyWallet",
+  "private": true,
+  "main": "dist/worker.js",
+  "scripts": {
+    "dev": "tsx watch src/worker.ts",
+    "build": "tsc",
+    "start": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@mywallet/temporal-workflows": "*",
+    "@temporalio/worker": "^1.10.0",
+    "googleapis": "^128.0.0",
+    "google-auth-library": "^9.4.1",
+    "mongoose": "^8.0.3",
+    "openai": "^4.20.1",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0"
+  }
+}
