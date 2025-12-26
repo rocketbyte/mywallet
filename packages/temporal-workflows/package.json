@@ -9,13 +9,15 @@
     "build:watch": "tsc --watch"
   },
   "dependencies": {
-    "@temporalio/workflow": "^1.10.0",
     "@temporalio/activity": "^1.10.0",
     "@temporalio/common": "^1.10.0",
-    "googleapis": "^128.0.0",
+    "@temporalio/workflow": "^1.10.0",
     "google-auth-library": "^9.4.1",
+    "googleapis": "^128.0.0",
     "mongoose": "^8.0.3",
-    "openai": "^4.20.1"
+    "openai": "^4.20.1",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

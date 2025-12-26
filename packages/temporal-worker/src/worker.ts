@@ -1,10 +1,19 @@
+// IMPORTANT: Must be first import for decorator support
+import 'reflect-metadata';
+
 import { Worker, NativeConnection } from '@temporalio/worker';
 import { OAuth2Client } from 'google-auth-library';
 import mongoose from 'mongoose';
 import { config, validateConfig } from './config/environment';
 import { logger } from './utils/logger';
 
-// Import activity creators and clients
+// Clean Architecture - DI Container
+import { DIContainer } from '../../temporal-workflows/src/infrastructure/config/di-container';
+
+// New Activities (Clean Architecture - Controllers)
+import { createActivities as createCleanActivities } from '../../temporal-workflows/src/presentation/temporal/activities.index';
+
+// Legacy activity creators and clients (kept temporarily for backward compatibility)
 import {
   createGmailActivities,
   createOpenAIActivities,
@@ -43,15 +52,44 @@ async function run() {
     oauth2Client.setCredentials({
       refresh_token: config.gmail.refreshToken
     });
-    const gmailClient = new GmailClient(oauth2Client);
     logger.info('✅ Gmail client initialized');
 
-    // Initialize OpenAI Client
-    logger.info('🤖 Initializing OpenAI client...');
-    const openaiClient = new OpenAIClient(config.openai.apiKey);
-    logger.info('✅ OpenAI client initialized');
+    // ==================== CLEAN ARCHITECTURE SETUP ====================
+    logger.info('🔧 Setting up Clean Architecture DI Container...');
+    logger.info(`📧 Email Provider: ${config.providers.email}`);
+    logger.info(`🤖 AI Provider: ${config.providers.ai}`);
 
-    // Create activities with dependency injection
+    // Setup DI Container with provider configuration
+    DIContainer.setup({
+      emailProvider: config.providers.email as 'gmail',
+      aiProvider: config.providers.ai as 'openai' | 'ollama',
+      mongoConnection: mongoose.connection,
+
+      // Gmail configuration
+      gmailOAuth2Client: oauth2Client,
+
+      // OpenAI configuration
+      openaiApiKey: config.openai.apiKey,
+      openaiModel: config.openai.model,
+      openaiEndpoint: config.openai.endpoint,
+
+      // Ollama configuration
+      ollamaEndpoint: config.ollama.endpoint,
+      ollamaModel: config.ollama.model
+    });
+
+    const container = DIContainer.getContainer();
+    logger.info('✅ DI Container initialized');
+
+    // Create new Clean Architecture activities
+    const cleanActivities = createCleanActivities(container);
+    logger.info('✅ Clean Architecture activities created');
+
+    // ==================== LEGACY ACTIVITIES (Temporary) ====================
+    // Keep old activities for gradual migration
+    const gmailClient = new GmailClient(oauth2Client);
+    const openaiClient = new OpenAIClient(config.openai.apiKey);
+
     const gmailActivities = createGmailActivities(gmailClient);
     const openaiActivities = createOpenAIActivities(openaiClient);
     const mongodbActivities = createMongoDBActivities(mongoose.connection);
@@ -59,16 +97,18 @@ async function run() {
     const scheduleActivities = createScheduleActivities(mongoose.connection);
     const gmailSyncActivities = createGmailSyncActivities(mongoose.connection);
 
+    // Merge new and legacy activities
     const activities = {
-      ...gmailActivities,
-      ...openaiActivities,
-      ...mongodbActivities,
-      ...emailActivities,
-      ...scheduleActivities,
-      ...gmailSyncActivities
+      ...cleanActivities,        // New Clean Architecture activities (will override legacy)
+      ...gmailActivities,         // Legacy Gmail activities
+      ...openaiActivities,        // Legacy OpenAI activities
+      ...mongodbActivities,       // Legacy MongoDB activities
+      ...emailActivities,         // Legacy Email activities
+      ...scheduleActivities,      // Legacy Schedule activities
+      ...gmailSyncActivities      // Legacy Gmail Sync activities
     };
 
-    logger.info('✅ All activities registered');
+    logger.info('✅ All activities registered (Clean + Legacy)');
 
     // Connect to Temporal
     logger.info('⏰ Connecting to Temporal...', {
@@ -124,6 +164,7 @@ async function run() {
         gmailSyncWorker.shutdown()
       ]);
       await mongoose.disconnect();
+      DIContainer.reset();  // Clean up DI Container
       logger.info('👋 Workers shut down gracefully');
       process.exit(0);
     };
