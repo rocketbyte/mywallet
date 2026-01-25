@@ -174,7 +174,8 @@ mongodb:
 app:
   # Gmail configuration
   gmail:
-    pubSubTopic: "projects/YOUR_PROJECT/topics/gmail-notifications"
+    pubSubTopic: "projects/mywallet-481322/topics/gmail-notifications"
+    redirectUri: "https://rocketbyte.duckdns.org/api/auth/gmail/callback"
     # OAuth credentials are set in values-secrets.yaml
 
   # AI configuration

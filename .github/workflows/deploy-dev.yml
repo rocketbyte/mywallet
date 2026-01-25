@@ -1,0 +1,102 @@
+name: Deploy to Raspberry Pi (Dev)
+
+on:
+  push:
+    branches:
+      - dev
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BACKEND: ghcr.io/${{ github.repository_owner }}/mywallet-backend-api
+  IMAGE_WORKER: ghcr.io/${{ github.repository_owner }}/mywallet-temporal-worker
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: self-hosted  # This runs on your Raspberry Pi
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend API
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_BACKEND }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=dev-
+            type=raw,value=latest,enable=true
+
+      - name: Build and push Backend API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: packages/backend-apis/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Temporal Worker
+        id: meta-worker
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_WORKER }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=dev-
+            type=raw,value=latest,enable=true
+
+      - name: Build and push Temporal Worker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: packages/temporal-worker/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta-worker.outputs.tags }}
+          labels: ${{ steps.meta-worker.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Kubernetes
+        run: |
+          echo "🚀 Deploying to Kubernetes..."
+          kubectl rollout restart deployment/mywallet-backend-api -n wallet
+          kubectl rollout restart deployment/mywallet-temporal-worker -n wallet
+
+          echo "⏳ Waiting for deployments..."
+          kubectl rollout status deployment/mywallet-backend-api -n wallet --timeout=5m
+          kubectl rollout status deployment/mywallet-temporal-worker -n wallet --timeout=5m
+
+          echo "✅ Deployment complete!"
+
+      - name: Verify deployment
+        run: |
+          echo "📊 Deployment Status:"
+          kubectl get pods -n wallet
+
+          echo ""
+          echo "🖼️ Current Images:"
+          echo "Backend API:"
+          kubectl get deployment mywallet-backend-api -n wallet -o jsonpath='{.spec.template.spec.containers[0].image}'
+          echo ""
+          echo "Temporal Worker:"
+          kubectl get deployment mywallet-temporal-worker -n wallet -o jsonpath='{.spec.template.spec.containers[0].image}'
