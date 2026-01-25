@@ -1,8 +1,11 @@
 import { Schema, model, Document } from 'mongoose';
 
 export interface IScheduleConfig extends Document {
+  // Tenant Identifier
+  userId: string;             // Tenant/User identifier (owner of this schedule)
+
   // Schedule Identity
-  scheduleId: string;         // Temporal schedule ID
+  scheduleId: string;         // Temporal schedule ID (globally unique)
   name: string;               // User-friendly name
   description?: string;
 
@@ -31,10 +34,11 @@ export interface IScheduleConfig extends Document {
 }
 
 const ScheduleConfigSchema = new Schema<IScheduleConfig>({
+  userId: { type: String, required: true, index: true },
   scheduleId: {
     type: String,
     required: true,
-    unique: true,
+    unique: true,  // Keep: Temporal schedule IDs are globally unique
     index: true
   },
   name: { type: String, required: true },
@@ -71,5 +75,8 @@ const ScheduleConfigSchema = new Schema<IScheduleConfig>({
   timestamps: true,
   collection: 'schedule_configs'
 });
+
+// Index for querying user's schedules
+ScheduleConfigSchema.index({ userId: 1, isActive: 1 });
 
 export const ScheduleConfig = model<IScheduleConfig>('ScheduleConfig', ScheduleConfigSchema);

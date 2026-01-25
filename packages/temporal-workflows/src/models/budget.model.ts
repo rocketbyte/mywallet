@@ -1,6 +1,9 @@
 import { Schema, model, Document } from 'mongoose';
 
 export interface IBudget extends Document {
+  // Tenant Identifier
+  userId: string;            // Tenant/User identifier for multi-tenancy
+
   // Period
   month: number;
   year: number;
@@ -24,6 +27,7 @@ export interface IBudget extends Document {
 }
 
 const BudgetSchema = new Schema<IBudget>({
+  userId: { type: String, required: true, index: true },
   month: { type: Number, required: true, min: 1, max: 12 },
   year: { type: Number, required: true },
 
@@ -43,6 +47,7 @@ const BudgetSchema = new Schema<IBudget>({
   collection: 'budgets'
 });
 
-BudgetSchema.index({ year: 1, month: 1 }, { unique: true });
+// Compound unique index for per-tenant budgets (one budget per month/year per tenant)
+BudgetSchema.index({ userId: 1, year: 1, month: 1 }, { unique: true });
 
 export const Budget = model<IBudget>('Budget', BudgetSchema);

@@ -6,7 +6,8 @@ import {
   SavedEmail,
   UpdateEmailProcessingInput,
   GetUnprocessedEmailsInput,
-  EmailQueryInput
+  EmailQueryInput,
+  GetEmailsByIdsInput
 } from '../../shared/types';
 
 export const createEmailActivities = (mongoConnection: Connection) => {
@@ -17,8 +18,11 @@ export const createEmailActivities = (mongoConnection: Connection) => {
     async saveEmail(input: SaveEmailInput): Promise<SavedEmail> {
       Context.current().heartbeat();
 
-      // Check if email already exists (idempotency by emailId)
-      const existing = await Email.findOne({ emailId: input.emailId });
+      // Check if email already exists for THIS tenant (per-tenant deduplication)
+      const existing = await Email.findOne({
+        userId: input.userId,
+        emailId: input.emailId
+      });
       if (existing) {
         console.log('Email already exists:', input.emailId);
         return {
@@ -31,8 +35,9 @@ export const createEmailActivities = (mongoConnection: Connection) => {
         };
       }
 
-      // Create new email document
+      // Create new email document with userId
       const email = new Email({
+        userId: input.userId,
         emailId: input.emailId,
         threadId: input.threadId,
         from: input.from,
@@ -68,7 +73,10 @@ export const createEmailActivities = (mongoConnection: Connection) => {
       Context.current().heartbeat();
 
       await Email.findOneAndUpdate(
-        { emailId: input.emailId },
+        {
+          userId: input.userId,
+          emailId: input.emailId
+        },
         {
           isProcessed: input.isProcessed,
           processedAt: input.processedAt,
@@ -90,7 +98,10 @@ export const createEmailActivities = (mongoConnection: Connection) => {
     async getUnprocessedEmails(input: GetUnprocessedEmailsInput): Promise<SavedEmail[]> {
       Context.current().heartbeat();
 
-      const query: any = { isProcessed: false };
+      const query: any = {
+        userId: input.userId,
+        isProcessed: false
+      };
 
       if (input.fromAddress) {
         query.from = { $regex: input.fromAddress, $options: 'i' };
@@ -121,7 +132,9 @@ export const createEmailActivities = (mongoConnection: Connection) => {
     async queryEmails(input: EmailQueryInput) {
       Context.current().heartbeat();
 
-      const query: any = {};
+      const query: any = {
+        userId: input.userId  // Always filter by tenant
+      };
 
       if (input.isProcessed !== undefined) {
         query.isProcessed = input.isProcessed;
@@ -175,10 +188,13 @@ export const createEmailActivities = (mongoConnection: Connection) => {
     },
 
     /**
-     * Get email by ID
+     * Get email by ID (with tenant isolation)
      */
-    async getEmailById(emailId: string) {
-      const email = await Email.findOne({ emailId });
+    async getEmailById(userId: string, emailId: string) {
+      const email = await Email.findOne({
+        userId,
+        emailId
+      });
       if (!email) return null;
 
       return {
@@ -205,6 +221,27 @@ export const createEmailActivities = (mongoConnection: Connection) => {
         createdAt: email.createdAt,
         updatedAt: email.updatedAt
       };
+    },
+
+    /**
+     * Get emails by IDs (for sync workflow processing)
+     */
+    async getEmailsByIds(input: GetEmailsByIdsInput): Promise<SavedEmail[]> {
+      Context.current().heartbeat();
+
+      const emails = await Email.find({
+        userId: input.userId,
+        emailId: { $in: input.emailIds }
+      });
+
+      return emails.map(email => ({
+        id: email._id.toString(),
+        emailId: email.emailId,
+        subject: email.subject,
+        from: email.from,
+        date: email.date,
+        isProcessed: email.isProcessed
+      }));
     }
   };
 };

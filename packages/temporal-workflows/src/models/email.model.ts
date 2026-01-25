@@ -1,8 +1,11 @@
 import { Schema, model, Document } from 'mongoose';
 
 export interface IEmail extends Document {
+  // Tenant Identifier
+  userId: string;            // Tenant/User identifier for multi-tenancy
+
   // Gmail Identifiers
-  emailId: string;           // Gmail message ID (unique)
+  emailId: string;           // Gmail message ID (unique per tenant)
   threadId: string;          // Gmail thread ID
 
   // Email Headers
@@ -40,11 +43,15 @@ export interface IEmail extends Document {
 }
 
 const EmailSchema = new Schema<IEmail>({
+  userId: {
+    type: String,
+    required: true,
+    index: true
+  },
   emailId: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    index: true  // Removed unique: true - will use compound unique index instead
   },
   threadId: {
     type: String,
@@ -80,9 +87,12 @@ const EmailSchema = new Schema<IEmail>({
   collection: 'emails'
 });
 
-// Compound indexes for efficient queries
-EmailSchema.index({ isProcessed: 1, date: -1 });
-EmailSchema.index({ from: 1, isProcessed: 1 });
+// Compound unique index for per-tenant deduplication
+EmailSchema.index({ userId: 1, emailId: 1 }, { unique: true });
+
+// Compound indexes for efficient queries (with userId prefix for tenant isolation)
+EmailSchema.index({ userId: 1, isProcessed: 1, date: -1 });
+EmailSchema.index({ userId: 1, from: 1, isProcessed: 1 });
 EmailSchema.index({ subject: 'text', body: 'text' }); // Text search index
 
 export const Email = model<IEmail>('Email', EmailSchema);

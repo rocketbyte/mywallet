@@ -20,6 +20,16 @@ export class ScheduleController {
    */
   async createSchedule(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
       const {
         name,
         description,
@@ -38,11 +48,12 @@ export class ScheduleController {
 
       const client = await getTemporalClient();
 
-      // Generate unique schedule ID
-      const scheduleId = `email-processing-schedule-${Date.now()}`;
+      // Generate unique schedule ID with userId
+      const scheduleId = `email-processing-schedule-${userId}-${Date.now()}`;
 
       // Create schedule configuration in MongoDB
       await this.scheduleActivities.createScheduleConfig({
+        userId,
         scheduleId,
         name,
         description,
@@ -63,6 +74,7 @@ export class ScheduleController {
           workflowType: scheduledEmailProcessingWorkflow,
           taskQueue: TASK_QUEUES.EMAIL_PROCESSING,
           args: [{
+            userId,
             scheduleId,
             searchQuery,
             maxResults,
@@ -77,6 +89,7 @@ export class ScheduleController {
       });
 
       logger.info('Created email processing schedule', {
+        userId,
         scheduleId,
         name,
         searchQuery,
@@ -84,6 +97,7 @@ export class ScheduleController {
       });
 
       res.status(201).json({
+        userId,
         scheduleId: handle.scheduleId,
         name,
         description,
@@ -109,7 +123,26 @@ export class ScheduleController {
    */
   async deleteSchedule(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
       const { scheduleId } = req.params;
+
+      // Verify schedule belongs to this user
+      const config = await this.scheduleActivities.getScheduleConfig(scheduleId);
+      if (!config || config.userId !== userId) {
+        return res.status(404).json({
+          error: 'Schedule not found',
+          message: `No schedule found with ID: ${scheduleId}`
+        });
+      }
 
       const client = await getTemporalClient();
       const handle = client.schedule.getHandle(scheduleId);
@@ -120,9 +153,10 @@ export class ScheduleController {
       // Delete configuration from MongoDB
       await this.scheduleActivities.deleteScheduleConfig(scheduleId);
 
-      logger.info('Deleted schedule', { scheduleId });
+      logger.info('Deleted schedule', { userId, scheduleId });
 
       res.json({
+        userId,
         scheduleId,
         status: 'deleted',
         message: 'Schedule deleted successfully'
@@ -143,13 +177,17 @@ export class ScheduleController {
    */
   async getSchedule(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
       const { scheduleId } = req.params;
-
-      const client = await getTemporalClient();
-      const handle = client.schedule.getHandle(scheduleId);
-
-      // Get schedule description from Temporal
-      const description = await handle.describe();
 
       // Get configuration from MongoDB
       const config = await this.scheduleActivities.getScheduleConfig(scheduleId);
@@ -161,7 +199,22 @@ export class ScheduleController {
         });
       }
 
+      // Verify schedule belongs to this user
+      if (config.userId !== userId) {
+        return res.status(404).json({
+          error: 'Schedule not found',
+          message: `No schedule found with ID: ${scheduleId}`
+        });
+      }
+
+      const client = await getTemporalClient();
+      const handle = client.schedule.getHandle(scheduleId);
+
+      // Get schedule description from Temporal
+      const description = await handle.describe();
+
       res.json({
+        userId,
         scheduleId: description.scheduleId,
         name: config.name,
         description: config.description,
@@ -198,8 +251,18 @@ export class ScheduleController {
    */
   async listSchedules(req: Request, res: Response) {
     try {
-      // Get all configurations from MongoDB
-      const configs = await this.scheduleActivities.getAllScheduleConfigs();
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
+      // Get schedules for this user only
+      const configs = await ScheduleConfig.find({ userId });
 
       const client = await getTemporalClient();
 
@@ -242,6 +305,7 @@ export class ScheduleController {
       );
 
       res.json({
+        userId,
         schedules,
         total: schedules.length
       });
@@ -261,7 +325,26 @@ export class ScheduleController {
    */
   async pauseSchedule(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
       const { scheduleId } = req.params;
+
+      // Verify schedule belongs to this user
+      const config = await ScheduleConfig.findOne({ scheduleId, userId });
+      if (!config) {
+        return res.status(404).json({
+          error: 'Schedule not found',
+          message: `No schedule found with ID: ${scheduleId}`
+        });
+      }
 
       const client = await getTemporalClient();
       const handle = client.schedule.getHandle(scheduleId);
@@ -270,13 +353,14 @@ export class ScheduleController {
 
       // Update MongoDB config
       await ScheduleConfig.findOneAndUpdate(
-        { scheduleId },
+        { scheduleId, userId },
         { isActive: false }
       );
 
-      logger.info('Paused schedule', { scheduleId });
+      logger.info('Paused schedule', { userId, scheduleId });
 
       res.json({
+        userId,
         scheduleId,
         status: 'paused',
         message: 'Schedule paused successfully'
@@ -297,7 +381,26 @@ export class ScheduleController {
    */
   async unpauseSchedule(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
       const { scheduleId } = req.params;
+
+      // Verify schedule belongs to this user
+      const config = await ScheduleConfig.findOne({ scheduleId, userId });
+      if (!config) {
+        return res.status(404).json({
+          error: 'Schedule not found',
+          message: `No schedule found with ID: ${scheduleId}`
+        });
+      }
 
       const client = await getTemporalClient();
       const handle = client.schedule.getHandle(scheduleId);
@@ -306,13 +409,14 @@ export class ScheduleController {
 
       // Update MongoDB config
       await ScheduleConfig.findOneAndUpdate(
-        { scheduleId },
+        { scheduleId, userId },
         { isActive: true }
       );
 
-      logger.info('Unpaused schedule', { scheduleId });
+      logger.info('Unpaused schedule', { userId, scheduleId });
 
       res.json({
+        userId,
         scheduleId,
         status: 'active',
         message: 'Schedule resumed successfully'
@@ -333,6 +437,16 @@ export class ScheduleController {
    */
   async updateSchedule(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
       const { scheduleId } = req.params;
       const { name, description, searchQuery, maxResults, afterDate } = req.body;
 
@@ -345,7 +459,7 @@ export class ScheduleController {
       if (afterDate !== undefined) updateData.afterDate = afterDate ? new Date(afterDate) : null;
 
       const config = await ScheduleConfig.findOneAndUpdate(
-        { scheduleId },
+        { scheduleId, userId },
         updateData,
         { new: true }
       );
@@ -357,9 +471,10 @@ export class ScheduleController {
         });
       }
 
-      logger.info('Updated schedule configuration', { scheduleId, updateData });
+      logger.info('Updated schedule configuration', { userId, scheduleId, updateData });
 
       res.json({
+        userId,
         scheduleId,
         name: config.name,
         description: config.description,

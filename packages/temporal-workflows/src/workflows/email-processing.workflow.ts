@@ -42,7 +42,12 @@ const emailActivities = proxyActivities<EmailActivities>({
 export async function emailProcessingWorkflow(
   input: EmailProcessingInput
 ): Promise<EmailProcessingResult> {
-  log.info('Starting email processing workflow', { input });
+  log.info('Starting email processing workflow', {
+    userId: input.userId,
+    workflowId: input.workflowId,
+    searchQuery: input.searchQuery,
+    emailIds: input.emailIds
+  });
 
   const result: EmailProcessingResult = {
     totalEmails: 0,
@@ -53,19 +58,35 @@ export async function emailProcessingWorkflow(
   };
 
   try {
-    // Step 1: Fetch emails from Gmail
-    log.info('Fetching emails from Gmail');
-    const emails = await gmailActivities.fetchEmails({
-      query: input.searchQuery,
-      maxResults: input.maxResults || 50,
-      afterDate: input.afterDate
-    });
+    // Step 1: Fetch emails (either from Gmail search OR by specific IDs)
+    let emails;
+
+    if (input.emailIds && input.emailIds.length > 0) {
+      // NEW: Process specific emails (from Gmail sync workflow)
+      log.info(`Fetching ${input.emailIds.length} specific emails by ID`);
+      emails = await emailActivities.getEmailsByIds({
+        userId: input.userId,
+        emailIds: input.emailIds
+      });
+    } else if (input.searchQuery) {
+      // Existing: Fetch via Gmail search
+      log.info('Fetching emails from Gmail via search');
+      emails = await gmailActivities.fetchEmails({
+        userId: input.userId,
+        query: input.searchQuery,
+        maxResults: input.maxResults || 50,
+        afterDate: input.afterDate
+      });
+    } else {
+      log.warn('No searchQuery or emailIds provided');
+      return result;
+    }
 
     result.totalEmails = emails.length;
-    log.info(`Fetched ${emails.length} emails`);
+    log.info(`Processing ${emails.length} emails for user ${input.userId}`);
 
     if (emails.length === 0) {
-      log.info('No emails found matching query');
+      log.info('No emails to process');
       return result;
     }
 
@@ -77,8 +98,9 @@ export async function emailProcessingWorkflow(
           from: email.from
         });
 
-        // Save raw email to database first
+        // Save raw email to database first (with userId)
         await emailActivities.saveEmail({
+          userId: input.userId,
           emailId: email.id,
           threadId: email.threadId,
           from: email.from,
@@ -152,8 +174,9 @@ export async function emailProcessingWorkflow(
           continue;
         }
 
-        // Save transaction to MongoDB
+        // Save transaction to MongoDB (with userId)
         const transaction = await mongoActivities.saveTransaction({
+          userId: input.userId,
           emailId: email.id,
           emailSubject: email.subject,
           emailDate: email.date,
@@ -173,8 +196,9 @@ export async function emailProcessingWorkflow(
         // Mark email as processed
         await gmailActivities.markEmailAsProcessed(email.id);
 
-        // Update email processing status in database
+        // Update email processing status in database (with userId)
         await emailActivities.updateEmailProcessing({
+          userId: input.userId,
           emailId: email.id,
           isProcessed: true,
           processedAt: new Date(),
@@ -205,9 +229,10 @@ export async function emailProcessingWorkflow(
           error: errorMessage
         });
 
-        // Update email with error status
+        // Update email with error status (with userId)
         try {
           await emailActivities.updateEmailProcessing({
+            userId: input.userId,
             emailId: email.id,
             isProcessed: false,
             processedAt: new Date(),

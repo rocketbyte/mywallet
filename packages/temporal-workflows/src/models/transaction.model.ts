@@ -1,6 +1,9 @@
 import { Schema, model, Document } from 'mongoose';
 
 export interface ITransaction extends Document {
+  // Tenant Identifier
+  userId: string;            // Tenant/User identifier for multi-tenancy
+
   // Source Information
   emailId: string;
   emailSubject: string;
@@ -38,7 +41,8 @@ export interface ITransaction extends Document {
 }
 
 const TransactionSchema = new Schema<ITransaction>({
-  emailId: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, required: true, index: true },
+  emailId: { type: String, required: true, index: true },  // Removed unique: true
   emailSubject: { type: String, required: true },
   emailDate: { type: Date, required: true },
   emailFrom: { type: String, required: true },
@@ -68,9 +72,12 @@ const TransactionSchema = new Schema<ITransaction>({
   collection: 'transactions'
 });
 
-// Indexes for common queries
-TransactionSchema.index({ transactionDate: -1, category: 1 });
-TransactionSchema.index({ workflowId: 1 });
-TransactionSchema.index({ bankName: 1, accountNumber: 1 });
+// Compound unique index for per-tenant deduplication (one transaction per email per tenant)
+TransactionSchema.index({ userId: 1, emailId: 1 }, { unique: true });
+
+// Indexes for common queries (with userId prefix for tenant isolation)
+TransactionSchema.index({ userId: 1, transactionDate: -1, category: 1 });
+TransactionSchema.index({ userId: 1, workflowId: 1 });
+TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 });
 
 export const Transaction = model<ITransaction>('Transaction', TransactionSchema);

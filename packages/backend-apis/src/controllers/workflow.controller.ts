@@ -8,6 +8,16 @@ import { logger } from '../utils/logger';
 export class WorkflowController {
   async startEmailProcessing(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'userId is required. Provide via authentication or x-user-id header.'
+        });
+      }
+
       const { searchQuery, maxResults, afterDate } = req.body;
 
       if (!searchQuery) {
@@ -18,12 +28,13 @@ export class WorkflowController {
 
       const client = await getTemporalClient();
 
-      const workflowId = `${WORKFLOW_IDS.EMAIL_PROCESSING_PREFIX}${Date.now()}`;
+      const workflowId = `${WORKFLOW_IDS.EMAIL_PROCESSING_PREFIX}${userId}-${Date.now()}`;
 
       const handle = await client.workflow.start(emailProcessingWorkflow, {
         taskQueue: TASK_QUEUES.EMAIL_PROCESSING,
         workflowId,
         args: [{
+          userId,
           workflowId,
           workflowRunId: '',
           searchQuery,
@@ -32,9 +43,10 @@ export class WorkflowController {
         } as EmailProcessingInput]
       });
 
-      logger.info('Started email processing workflow', { workflowId });
+      logger.info('Started email processing workflow', { workflowId, userId });
 
       res.status(202).json({
+        userId,
         workflowId: handle.workflowId,
         runId: handle.firstExecutionRunId,
         status: 'started',

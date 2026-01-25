@@ -8,6 +8,7 @@ import {
   continueAsNew
 } from '@temporalio/workflow';
 import type { GmailSyncActivities } from '../activities/gmail-sync/gmail-sync.activities';
+import type { WorkflowStarterActivities } from '../activities/workflow/workflow-starter.activities';
 import {
   GmailSubscriptionInput,
   GmailSubscriptionResult,
@@ -25,6 +26,11 @@ import {
 const gmailSyncActivities = proxyActivities<GmailSyncActivities>({
   startToCloseTimeout: GMAIL_SYNC_TIMEOUTS.RENEW_WATCH,
   retry: GMAIL_SYNC_RETRY_POLICIES.GMAIL_API
+});
+
+const workflowStarterActivities = proxyActivities<WorkflowStarterActivities>({
+  startToCloseTimeout: GMAIL_SYNC_TIMEOUTS.DB_OPERATION,
+  retry: GMAIL_SYNC_RETRY_POLICIES.DB_OPERATION
 });
 
 // Define signals
@@ -140,6 +146,23 @@ export async function gmailSubscriptionWorkflow(
           });
 
           currentHistoryId = changes.newHistoryId;
+
+          // NEW: Trigger email processing workflow for new messages
+          if (changes.messages.length > 0) {
+            const emailIds = changes.messages.map(m => m.id);
+
+            log.info('Starting email processing workflow for new messages', {
+              emailCount: emailIds.length
+            });
+
+            await workflowStarterActivities.startEmailProcessingWorkflow({
+              userId: input.userId,
+              emailIds,
+              workflowIdPrefix: `email-processing-from-sync-${input.userId}-`
+            });
+
+            log.info('Email processing workflow started successfully');
+          }
 
           log.info('Processed Gmail changes', {
             messagesCount: changes.messages.length,

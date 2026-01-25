@@ -17,6 +17,16 @@ export class EmailController {
    */
   async getAllEmails(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      // if (!userId) {
+      //   return res.status(401).json({
+      //     error: 'Unauthorized',
+      //     message: 'userId is required. Provide via authentication or x-user-id header.'
+      //   });
+      // }
+
       const {
         limit = '50',
         offset = '0',
@@ -27,6 +37,7 @@ export class EmailController {
       } = req.query;
 
       const queryInput = {
+        userId,
         limit: parseInt(limit as string),
         offset: parseInt(offset as string),
         isProcessed: isProcessed === 'true' ? true : isProcessed === 'false' ? false : undefined,
@@ -38,6 +49,7 @@ export class EmailController {
       const result = await this.emailActivities.queryEmails(queryInput);
 
       res.json({
+        userId,
         emails: result.emails,
         pagination: {
           total: result.total,
@@ -62,9 +74,19 @@ export class EmailController {
    */
   async getEmailById(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      // if (!userId) {
+      //   return res.status(401).json({
+      //     error: 'Unauthorized',
+      //     message: 'userId is required. Provide via authentication or x-user-id header.'
+      //   });
+      // }
+
       const { id } = req.params;
 
-      const email = await this.emailActivities.getEmailById(id);
+      const email = await this.emailActivities.getEmailById(userId, id);
 
       if (!email) {
         return res.status(404).json({
@@ -73,7 +95,7 @@ export class EmailController {
         });
       }
 
-      res.json({ email });
+      res.json({ userId, email });
 
     } catch (error) {
       logger.error('Failed to get email by ID', { error });
@@ -90,6 +112,16 @@ export class EmailController {
    */
   async searchEmails(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      // if (!userId) {
+      //   return res.status(401).json({
+      //     error: 'Unauthorized',
+      //     message: 'userId is required. Provide via authentication or x-user-id header.'
+      //   });
+      // }
+
       const {
         q: searchTerm,
         limit = '50',
@@ -104,12 +136,14 @@ export class EmailController {
       }
 
       const result = await this.emailActivities.queryEmails({
+        userId,
         searchTerm,
         limit: parseInt(limit as string),
         offset: parseInt(offset as string)
       });
 
       res.json({
+        userId,
         emails: result.emails,
         pagination: {
           total: result.total,
@@ -135,13 +169,24 @@ export class EmailController {
    */
   async getEmailStats(req: Request, res: Response) {
     try {
+      // Extract userId from auth or header
+      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+
+      // if (!userId) {
+      //   return res.status(401).json({
+      //     error: 'Unauthorized',
+      //     message: 'userId is required. Provide via authentication or x-user-id header.'
+      //   });
+      // }
+
       const [total, processed, unprocessed] = await Promise.all([
-        Email.countDocuments(),
-        Email.countDocuments({ isProcessed: true }),
-        Email.countDocuments({ isProcessed: false })
+        Email.countDocuments({ userId }),
+        Email.countDocuments({ userId, isProcessed: true }),
+        Email.countDocuments({ userId, isProcessed: false })
       ]);
 
       res.json({
+        userId,
         stats: {
           total,
           processed,

@@ -91,12 +91,16 @@ export const createGmailSyncActivities = (mongoConnection: Connection) => {
         input.startHistoryId
       );
 
-      // Save new messages to database
+      // Save new messages to database with userId for tenant isolation
       for (const message of messages) {
         try {
           await Email.findOneAndUpdate(
-            { emailId: message.id },
             {
+              userId: input.userId,
+              emailId: message.id
+            },
+            {
+              userId: input.userId,
               emailId: message.id,
               threadId: message.threadId,
               from: message.from,

@@ -17,8 +17,11 @@ export const createMongoDBActivities = (mongoConnection: Connection) => {
     async saveTransaction(input: SaveTransactionInput): Promise<SavedTransaction> {
       Context.current().heartbeat();
 
-      // Check if transaction already exists (idempotency)
-      const existing = await Transaction.findOne({ emailId: input.emailId });
+      // Check if transaction already exists for THIS tenant (per-tenant deduplication)
+      const existing = await Transaction.findOne({
+        userId: input.userId,
+        emailId: input.emailId
+      });
       if (existing) {
         console.log('Transaction already exists for email:', input.emailId);
         return {
@@ -32,6 +35,7 @@ export const createMongoDBActivities = (mongoConnection: Connection) => {
       }
 
       const transaction = new Transaction({
+        userId: input.userId,
         emailId: input.emailId,
         emailSubject: input.emailSubject,
         emailDate: input.emailDate,

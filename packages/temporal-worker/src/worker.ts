@@ -2,6 +2,7 @@
 import 'reflect-metadata';
 
 import { Worker, NativeConnection } from '@temporalio/worker';
+import { Client } from '@temporalio/client';
 import { OAuth2Client } from 'google-auth-library';
 import mongoose from 'mongoose';
 import { config, validateConfig } from './config/environment';
@@ -21,6 +22,7 @@ import {
   createEmailActivities,
   createScheduleActivities,
   createGmailSyncActivities,
+  createWorkflowStarterActivities,
   GmailClient,
   OpenAIClient
 } from '../../temporal-workflows/src/activities';
@@ -85,6 +87,26 @@ async function run() {
     const cleanActivities = createCleanActivities(container);
     logger.info('✅ Clean Architecture activities created');
 
+    // Connect to Temporal first (needed for workflow starter activities)
+    logger.info('⏰ Connecting to Temporal...', {
+      address: config.temporal.address,
+      namespace: config.temporal.namespace
+    });
+
+    const connection = await NativeConnection.connect({
+      address: config.temporal.address
+    });
+
+    logger.info('✅ Connected to Temporal');
+
+    // Create Temporal client for workflow starter activities
+    const temporalClient = new Client({
+      connection,
+      namespace: config.temporal.namespace
+    });
+
+    logger.info('✅ Temporal client created');
+
     // ==================== LEGACY ACTIVITIES (Temporary) ====================
     // Keep old activities for gradual migration
     const gmailClient = new GmailClient(oauth2Client);
@@ -97,6 +119,9 @@ async function run() {
     const scheduleActivities = createScheduleActivities(mongoose.connection);
     const gmailSyncActivities = createGmailSyncActivities(mongoose.connection);
 
+    // Create workflow starter activities (allows workflows to start other workflows)
+    const workflowStarterActivities = createWorkflowStarterActivities(temporalClient);
+
     // Merge new and legacy activities
     const activities = {
       ...cleanActivities,        // New Clean Architecture activities (will override legacy)
@@ -105,22 +130,11 @@ async function run() {
       ...mongodbActivities,       // Legacy MongoDB activities
       ...emailActivities,         // Legacy Email activities
       ...scheduleActivities,      // Legacy Schedule activities
-      ...gmailSyncActivities      // Legacy Gmail Sync activities
+      ...gmailSyncActivities,     // Legacy Gmail Sync activities
+      ...workflowStarterActivities // Workflow starter activities
     };
 
-    logger.info('✅ All activities registered (Clean + Legacy)');
-
-    // Connect to Temporal
-    logger.info('⏰ Connecting to Temporal...', {
-      address: config.temporal.address,
-      namespace: config.temporal.namespace
-    });
-
-    const connection = await NativeConnection.connect({
-      address: config.temporal.address
-    });
-
-    logger.info('✅ Connected to Temporal');
+    logger.info('✅ All activities registered (Clean + Legacy + Workflow Starter)');
 
     // Create main worker
     const worker = await Worker.create({

@@ -1,8 +1,10 @@
 // Workflow Inputs/Outputs
 export interface EmailProcessingInput {
+  userId: string;            // NEW: Tenant identifier
   workflowId: string;
   workflowRunId: string;
-  searchQuery: string;
+  searchQuery?: string;      // Optional: for manual triggers
+  emailIds?: string[];       // NEW: Process specific emails (from sync)
   maxResults?: number;
   afterDate?: Date;
 }
@@ -23,6 +25,7 @@ export interface EmailProcessingResult {
 
 // Gmail Activities
 export interface FetchEmailsInput {
+  userId: string;            // NEW: Tenant identifier
   query: string;
   maxResults?: number;
   afterDate?: Date;
@@ -62,6 +65,7 @@ export interface ExtractedTransaction {
 
 // MongoDB Activities
 export interface SaveTransactionInput {
+  userId: string;            // NEW: Tenant identifier
   emailId: string;
   emailSubject: string;
   emailDate: Date;
@@ -134,6 +138,7 @@ export interface CategoryStats {
 
 // Email Storage Types
 export interface SaveEmailInput {
+  userId: string;            // NEW: Tenant identifier
   emailId: string;
   threadId: string;
   from: string;
@@ -156,6 +161,7 @@ export interface SavedEmail {
 }
 
 export interface UpdateEmailProcessingInput {
+  userId: string;            // NEW: Tenant identifier
   emailId: string;
   isProcessed: boolean;
   processedAt: Date;
@@ -168,12 +174,14 @@ export interface UpdateEmailProcessingInput {
 }
 
 export interface GetUnprocessedEmailsInput {
+  userId: string;            // NEW: Tenant identifier
   limit?: number;
   fromAddress?: string;
   afterDate?: Date;
 }
 
 export interface EmailQueryInput {
+  userId: string;            // NEW: Tenant identifier (required)
   limit?: number;
   offset?: number;
   isProcessed?: boolean;
@@ -185,6 +193,7 @@ export interface EmailQueryInput {
 
 // Scheduled Workflow Types
 export interface ScheduledEmailProcessingInput {
+  userId: string;            // NEW: Tenant identifier
   scheduleId: string;
   searchQuery: string;
   maxResults: number;
@@ -348,4 +357,23 @@ export interface GmailWebhookPayload {
 export interface DecodedGmailNotification {
   emailAddress: string;
   historyId: string;
+}
+
+// NEW: Email Query by IDs (for sync workflow)
+export interface GetEmailsByIdsInput {
+  userId: string;
+  emailIds: string[];
+}
+
+// NEW: Workflow Starter Activity (for triggering email processing from sync)
+export interface StartEmailProcessingWorkflowInput {
+  userId: string;
+  emailIds: string[];
+  workflowIdPrefix: string;
+}
+
+export interface StartEmailProcessingWorkflowOutput {
+  workflowId: string;
+  runId: string;
+  emailCount: number;
 }

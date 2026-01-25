@@ -13,7 +13,6 @@
     "build": "npm run build --workspaces",
     "lint": "eslint packages --ext .ts",
     "test": "jest",
-    "setup:gmail": "tsx scripts/setup-gmail-oauth.ts",
     "seed:patterns": "tsx scripts/seed-email-patterns.ts"
   },
   "devDependencies": {

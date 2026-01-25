@@ -50,6 +50,7 @@ export async function scheduledEmailProcessingWorkflow(
   const runTimestamp = new Date();
 
   log.info('Starting scheduled email processing', {
+    userId: input.userId,
     scheduleId: input.scheduleId,
     searchQuery: input.searchQuery,
     runTimestamp
@@ -74,8 +75,9 @@ export async function scheduledEmailProcessingWorkflow(
 
     log.info('Using search query', { searchQuery });
 
-    // Step 1: Fetch emails from Gmail
+    // Step 1: Fetch emails from Gmail (with userId)
     const emails = await gmailActivities.fetchEmails({
+      userId: input.userId,
       query: searchQuery,
       maxResults: input.maxResults,
       afterDate: input.afterDate
@@ -100,6 +102,7 @@ export async function scheduledEmailProcessingWorkflow(
     for (const email of emails) {
       try {
         const savedEmail = await emailActivities.saveEmail({
+          userId: input.userId,
           emailId: email.id,
           threadId: email.threadId,
           from: email.from,
