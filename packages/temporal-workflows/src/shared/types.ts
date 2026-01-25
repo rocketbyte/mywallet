@@ -43,6 +43,7 @@ export interface Email {
 
 // OpenAI Activities
 export interface ExtractTransactionInput {
+  emailId?: string;
   emailContent: string;
   emailSubject: string;
   emailFrom: string;
@@ -57,6 +58,7 @@ export interface ExtractedTransaction {
   amount: number;
   currency: string;
   category: string;
+  subcategory?: string;
   transactionType: 'debit' | 'credit';
   accountNumber: string;
   confidence: number;
@@ -140,13 +142,13 @@ export interface CategoryStats {
 export interface SaveEmailInput {
   userId: string;            // NEW: Tenant identifier
   emailId: string;
-  threadId: string;
+  threadId?: string;
   from: string;
   to: string;
   subject: string;
   date: Date;
-  body: string;
-  snippet: string;
+  body?: string;
+  snippet?: string;
   rawHtml?: string;
   fetchedBy: string;
 }
@@ -157,6 +159,9 @@ export interface SavedEmail {
   subject: string;
   from: string;
   date: Date;
+  body?: string;
+  threadId?: string;
+  snippet?: string;
   isProcessed: boolean;
 }
 

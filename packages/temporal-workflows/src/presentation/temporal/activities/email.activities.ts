@@ -110,9 +110,11 @@ export function createEmailActivities(container: DependencyContainer) {
         input.emailId,
         input.from,
         input.subject,
-        input.body,
+        input.body || '',
         input.date,
-        input.threadId
+        input.threadId || '',
+        input.to,
+        input.snippet
       );
 
       // Save through repository

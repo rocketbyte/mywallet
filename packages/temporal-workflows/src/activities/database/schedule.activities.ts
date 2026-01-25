@@ -45,6 +45,7 @@ export const createScheduleActivities = (mongoConnection: Connection) => {
      * Create schedule configuration
      */
     async createScheduleConfig(input: {
+      userId: string;
       scheduleId: string;
       name: string;
       description?: string;

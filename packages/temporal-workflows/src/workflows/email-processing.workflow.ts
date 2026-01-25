@@ -116,7 +116,7 @@ export async function emailProcessingWorkflow(
         const pattern = await mongoActivities.matchEmailPattern({
           from: email.from,
           subject: email.subject,
-          body: email.body
+          body: email.body || ''
         });
 
         if (!pattern) {
@@ -136,7 +136,7 @@ export async function emailProcessingWorkflow(
 
         // Extract transaction data using OpenAI
         const extractedData = await openaiActivities.extractTransactionFromEmail({
-          emailContent: email.body,
+          emailContent: email.body || '',
           emailSubject: email.subject,
           emailFrom: email.from,
           emailDate: email.date,
@@ -181,7 +181,7 @@ export async function emailProcessingWorkflow(
           emailSubject: email.subject,
           emailDate: email.date,
           emailFrom: email.from,
-          rawEmailText: email.body,
+          rawEmailText: email.body || '',
           extractedData,
           workflowId: input.workflowId,
           workflowRunId: input.workflowRunId

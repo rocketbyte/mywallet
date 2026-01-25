@@ -134,6 +134,7 @@ export async function scheduledEmailProcessingWorkflow(
 
     // Step 3: Get unprocessed emails and process them
     const unprocessedEmails = await emailActivities.getUnprocessedEmails({
+      userId: input.userId,
       limit: input.maxResults
     });
 
@@ -163,6 +164,7 @@ export async function scheduledEmailProcessingWorkflow(
         if (!pattern) {
           log.warn('No matching pattern found', { emailId: emailRecord.emailId });
           await emailActivities.updateEmailProcessing({
+            userId: input.userId,
             emailId: emailRecord.emailId,
             isProcessed: false,
             processedAt: new Date(),
@@ -198,6 +200,7 @@ export async function scheduledEmailProcessingWorkflow(
           });
 
           await emailActivities.updateEmailProcessing({
+            userId: input.userId,
             emailId: emailRecord.emailId,
             isProcessed: false,
             processedAt: new Date(),
@@ -217,6 +220,7 @@ export async function scheduledEmailProcessingWorkflow(
 
         // Save transaction
         const transaction = await mongoActivities.saveTransaction({
+          userId: input.userId,
           emailId: emailRecord.emailId,
           emailSubject: emailRecord.subject,
           emailDate: emailRecord.date,
@@ -238,6 +242,7 @@ export async function scheduledEmailProcessingWorkflow(
 
         // Update email processing status
         await emailActivities.updateEmailProcessing({
+          userId: input.userId,
           emailId: emailRecord.emailId,
           isProcessed: true,
           processedAt: new Date(),
@@ -265,6 +270,7 @@ export async function scheduledEmailProcessingWorkflow(
 
         try {
           await emailActivities.updateEmailProcessing({
+            userId: input.userId,
             emailId: emailRecord.emailId,
             isProcessed: false,
             processedAt: new Date(),
