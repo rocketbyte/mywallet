@@ -4,11 +4,13 @@ on:
   push:
     branches:
       - main
+      - dev
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
+      - dev
 
 env:
   REGISTRY: ghcr.io
@@ -136,3 +138,54 @@ jobs:
           echo "### Status:" >> $GITHUB_STEP_SUMMARY
           echo "- Backend API: ${{ needs.build-backend-api.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Temporal Worker: ${{ needs.build-temporal-worker.result }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy-to-raspberry-pi:
+    name: Deploy to Raspberry Pi
+    runs-on: ubuntu-latest
+    needs: [build-backend-api, build-temporal-worker]
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          mkdir -p $HOME/.kube
+          echo "$KUBE_CONFIG" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Verify cluster connection
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Restart deployments to pull new images
+        run: |
+          kubectl rollout restart deployment/mywallet-backend-api -n wallet
+          kubectl rollout restart deployment/mywallet-temporal-worker -n wallet
+
+          echo "⏳ Waiting for deployments to complete..."
+          kubectl rollout status deployment/mywallet-backend-api -n wallet --timeout=5m
+          kubectl rollout status deployment/mywallet-temporal-worker -n wallet --timeout=5m
+
+      - name: Verify deployment
+        run: |
+          echo "## Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n wallet >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Images:" >> $GITHUB_STEP_SUMMARY
+          kubectl get deployment mywallet-backend-api -n wallet -o jsonpath='{.spec.template.spec.containers[0].image}' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          kubectl get deployment mywallet-temporal-worker -n wallet -o jsonpath='{.spec.template.spec.containers[0].image}' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY

@@ -136,7 +136,7 @@ MongoDB fullname
 MongoDB connection string
 */}}
 {{- define "mywallet.mongodb.connectionString" -}}
-{{- printf "mongodb://%s:%s@%s:%d/%s" .Values.mongodb.auth.rootUsername "${MONGODB_ROOT_PASSWORD}" (include "mywallet.mongodb.fullname" .) (.Values.mongodb.service.port | int) .Values.mongodb.auth.database }}
+{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=admin" .Values.mongodb.auth.rootUsername (urlquery .Values.secrets.mongodb.rootPassword) (include "mywallet.mongodb.fullname" .) (.Values.mongodb.service.port | int) .Values.mongodb.auth.database }}
 {{- end }}
 
 {{/*
