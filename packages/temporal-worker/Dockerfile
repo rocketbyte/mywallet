@@ -4,11 +4,11 @@ FROM node:20-slim
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
 COPY packages/temporal-worker/package.json ./packages/temporal-worker/
 COPY packages/temporal-workflows/package.json ./packages/temporal-workflows/
 
-# Install dependencies
+# Install dependencies (using npm install as package-lock.json is gitignored)
 RUN npm install --workspace=@mywallet/temporal-worker --workspace=@mywallet/temporal-workflows --omit=dev
 
 # Copy source code
