@@ -8,7 +8,7 @@ COPY packages/backend-apis/package.json ./packages/backend-apis/
 COPY packages/temporal-workflows/package.json ./packages/temporal-workflows/
 
 # Install dependencies (using npm install as package-lock.json is gitignored)
-RUN npm install --workspace=@mywallet/backend-apis --workspace=@mywallet/temporal-workflows --omit=dev
+RUN npm install --workspace=@mywallet/backend-apis --workspace=@mywallet/temporal-workflows
 
 # Copy source code
 COPY packages/backend-apis ./packages/backend-apis
