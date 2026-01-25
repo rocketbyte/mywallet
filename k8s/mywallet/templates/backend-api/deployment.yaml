@@ -1,0 +1,78 @@
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mywallet.backend.fullname" . }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "mywallet.backend.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mywallet.backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mywallet.backend.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.backend.securityContext | nindent 8 }}
+      initContainers:
+        # Wait for MongoDB to be ready
+        - name: wait-for-mongodb
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MongoDB at {{ include "mywallet.mongodb.fullname" . }}:{{ .Values.mongodb.service.port }}..."
+              until nc -z {{ include "mywallet.mongodb.fullname" . }} {{ .Values.mongodb.service.port }}; do
+                echo "MongoDB is unavailable - sleeping"
+                sleep 2
+              done
+              echo "MongoDB is up - continuing"
+        # Wait for Temporal to be ready
+        - name: wait-for-temporal
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Temporal at temporal-frontend.rocket.svc.cluster.local:7233..."
+              until nc -z temporal-frontend.rocket.svc.cluster.local 7233; do
+                echo "Temporal is unavailable - sleeping"
+                sleep 2
+              done
+              echo "Temporal is up - continuing"
+      containers:
+        - name: backend-api
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.targetPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "mywallet.fullname" . }}-config
+            - secretRef:
+                name: {{ include "mywallet.fullname" . }}-secrets
+          livenessProbe:
+            {{- toYaml .Values.backend.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.backend.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+{{- end }}

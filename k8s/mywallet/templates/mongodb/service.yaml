@@ -1,0 +1,19 @@
+{{- if .Values.mongodb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mywallet.mongodb.fullname" . }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "mywallet.mongodb.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.mongodb.service.type }}
+  clusterIP: None  # Headless service for StatefulSet
+  ports:
+    - port: {{ .Values.mongodb.service.port }}
+      targetPort: 27017
+      protocol: TCP
+      name: mongodb
+  selector:
+    {{- include "mywallet.mongodb.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -49,3 +49,9 @@ docker-compose.override.yml
 # OAuth credentials (keep example, ignore actual)
 gmail-credentials.json
 oauth-token.json
+
+# this is temp until docs are fully reviewed
+docs
+
+# Kubernetes secrets
+k8s/mywallet/values-secrets.yaml

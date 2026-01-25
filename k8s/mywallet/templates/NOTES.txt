@@ -1,0 +1,65 @@
+MyWallet has been installed successfully! 🎉
+
+Release name: {{ .Release.Name }}
+Namespace: {{ .Values.global.namespace }}
+
+1. Get the application status:
+
+   kubectl get pods -n {{ .Values.global.namespace }}
+
+2. Check the deployment status:
+
+   kubectl rollout status deployment/{{ include "mywallet.backend.fullname" . }} -n {{ .Values.global.namespace }}
+   kubectl rollout status deployment/{{ include "mywallet.worker.fullname" . }} -n {{ .Values.global.namespace }}
+
+3. View application logs:
+
+   # Backend API logs
+   kubectl logs -n {{ .Values.global.namespace }} -l app.kubernetes.io/name=backend-api -f
+
+   # Temporal Worker logs
+   kubectl logs -n {{ .Values.global.namespace }} -l app.kubernetes.io/name=temporal-worker -f
+
+   # MongoDB logs
+   kubectl logs -n {{ .Values.global.namespace }} {{ include "mywallet.mongodb.fullname" . }}-0 -f
+
+4. Access the API:
+
+{{- if .Values.backend.ingress.enabled }}
+   External URL: https://{{ .Values.global.domain }}/api/health
+
+   Test the health endpoint:
+   curl https://{{ .Values.global.domain }}/api/health
+{{- else }}
+   Port-forward to access the API:
+   kubectl port-forward -n {{ .Values.global.namespace }} svc/{{ include "mywallet.backend.fullname" . }} 3000:3000
+
+   Then access: http://localhost:3000/api/health
+{{- end }}
+
+5. Access Temporal UI:
+
+   kubectl port-forward -n rocket svc/temporal-ui 8080:8080
+
+   Then visit: http://localhost:8080
+
+6. Connect to MongoDB:
+
+   kubectl exec -it {{ include "mywallet.mongodb.fullname" . }}-0 -n {{ .Values.global.namespace }} -- \
+     mongosh -u {{ .Values.mongodb.auth.rootUsername }} -p
+
+   Enter the MongoDB root password when prompted.
+
+7. Monitor resources:
+
+   kubectl top pods -n {{ .Values.global.namespace }}
+
+For more information, visit:
+- Documentation: https://github.com/starlingilcruz/mywallet
+- Temporal UI: http://localhost:8080 (after port-forward)
+
+To uninstall:
+   helm uninstall {{ .Release.Name }} -n {{ .Values.global.namespace }}
+
+Note: Uninstalling will not delete PersistentVolumeClaims.
+To delete data, run: kubectl delete pvc -n {{ .Values.global.namespace }} --all

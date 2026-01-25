@@ -1,0 +1,191 @@
+# MyWallet Helm Chart Values
+
+# Global configuration
+global:
+  namespace: wallet
+  domain: rocketbyte.duckdns.org
+  storageClass: local-path
+
+  # Node selector for Raspberry Pi cluster
+  nodeSelector:
+    kubernetes.io/arch: arm64
+
+  # Image pull secrets
+  imagePullSecrets:
+    - name: ghcr-secret
+
+# External Temporal configuration (existing in rocket namespace)
+temporal:
+  external: true
+  address: "temporal-frontend.rocket.svc.cluster.local:7233"
+  namespace: "default"
+  taskQueue: "email-processing-queue"
+
+# Backend API configuration
+backend:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/starlingilcruz/mywallet-backend-api
+    tag: "latest"
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    hosts:
+      - host: rocketbyte.duckdns.org
+        paths:
+          - path: /api
+            pathType: Prefix
+    tls:
+      - hosts:
+          - rocketbyte.duckdns.org
+        secretName: ssl-cert-prod
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # Health check configuration
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  # Environment variables
+  env:
+    NODE_ENV: production
+    PORT: "3000"
+    LOG_LEVEL: info
+
+# Temporal Worker configuration
+worker:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/starlingilcruz/mywallet-temporal-worker
+    tag: "latest"
+    pullPolicy: Always
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # Environment variables
+  env:
+    NODE_ENV: production
+    LOG_LEVEL: info
+
+# MongoDB configuration
+mongodb:
+  enabled: true
+
+  image:
+    repository: mongo
+    tag: "7.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 27017
+
+  auth:
+    rootUsername: admin
+    database: mywallet
+    # rootPassword is set in values-secrets.yaml
+
+  persistence:
+    enabled: true
+    storageClass: local-path
+    accessMode: ReadWriteOnce
+    size: 10Gi
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    fsGroup: 999
+
+  # MongoDB configuration
+  config:
+    # Additional MongoDB configuration can be added here
+    storageEngine: wiredTiger
+
+# Application configuration
+app:
+  # Gmail configuration
+  gmail:
+    pubSubTopic: "projects/YOUR_PROJECT/topics/gmail-notifications"
+    # OAuth credentials are set in values-secrets.yaml
+
+  # AI configuration
+  ai:
+    provider: openai
+    model: gpt-4
+    # API key is set in values-secrets.yaml
+
+# Labels to apply to all resources
+labels:
+  app.kubernetes.io/name: mywallet
+  app.kubernetes.io/instance: mywallet
+  app.kubernetes.io/version: "1.0.0"
+  app.kubernetes.io/managed-by: Helm

@@ -1,0 +1,15 @@
+apiVersion: v2
+name: mywallet
+description: Automated expense tracking with Temporal workflows
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - expense-tracking
+  - temporal
+  - gmail
+  - ai
+maintainers:
+  - name: MyWallet Team
+sources:
+  - https://github.com/starlingilcruz/mywallet
