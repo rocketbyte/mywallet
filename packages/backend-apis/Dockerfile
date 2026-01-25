@@ -19,8 +19,8 @@ COPY tsconfig.base.json ./
 RUN npm run build --workspace=@mywallet/temporal-workflows
 RUN npm run build --workspace=@mywallet/backend-apis
 
-# Create symlink so src imports can find dist (temporary workaround)
-RUN cd packages/temporal-workflows && ln -sf dist src
+# Copy dist to src so relative imports work (temporary workaround)
+RUN cp -r packages/temporal-workflows/dist/* packages/temporal-workflows/src/
 
 # Set memory limit
 ENV NODE_OPTIONS="--max-old-space-size=1600"
