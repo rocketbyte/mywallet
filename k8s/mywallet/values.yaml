@@ -27,7 +27,7 @@ backend:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/starlingilcruz/mywallet-backend-api
+    repository: ghcr.io/rocketbyte/mywallet-backend-api
     tag: "latest"
     pullPolicy: Always
 
@@ -101,7 +101,7 @@ worker:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/starlingilcruz/mywallet-temporal-worker
+    repository: ghcr.io/rocketbyte/mywallet-temporal-worker
     tag: "latest"
     pullPolicy: Always
 
@@ -133,7 +133,7 @@ mongodb:
 
   image:
     repository: mongo
-    tag: "7.0"
+    tag: "4.4.18"
     pullPolicy: IfNotPresent
 
   service:
