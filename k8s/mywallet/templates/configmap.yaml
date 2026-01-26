@@ -28,6 +28,7 @@ data:
 
   # Gmail configuration
   GMAIL_PUBSUB_TOPIC: {{ .Values.app.gmail.pubSubTopic | quote }}
+  GMAIL_REDIRECT_URI: {{ .Values.app.gmail.redirectUri | quote }}
 
   # AI configuration
   AI_PROVIDER: {{ .Values.app.ai.provider | quote }}
