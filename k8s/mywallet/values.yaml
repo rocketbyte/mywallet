@@ -180,9 +180,10 @@ app:
 
   # AI configuration
   ai:
-    provider: openai
+    provider: openai  # Options: openai, ollama
     model: gpt-4
-    # API key is set in values-secrets.yaml
+    endpoint: ""  # For Ollama: http://ollama.ai.svc.cluster.local:11434
+    # API key (OpenAI) is set in values-secrets.yaml
 
 # Labels to apply to all resources
 labels:

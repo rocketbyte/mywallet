@@ -10,9 +10,10 @@ import {
 import { GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX, GMAIL_SIGNALS, GMAIL_SYNC_TASK_QUEUE } from '../../../temporal-workflows/src/shared/constants';
 import { GmailAccount } from '../../../temporal-workflows/src/models/gmail-account.model';
 import { logger } from '../utils/logger';
+import { json } from 'stream/consumers';
 
 export class GmailWebhookController {
-  constructor(private mongoConnection: Connection) {}
+  constructor(private mongoConnection: Connection) { }
 
   /**
    * POST /api/gmail/webhook
@@ -20,11 +21,27 @@ export class GmailWebhookController {
    */
   async handleWebhook(req: Request, res: Response): Promise<void> {
     try {
+
+      logger.info('Received Gmail webhook', req.body);
+
       const payload: GmailWebhookPayload = req.body;
 
       // Decode base64 message data
       const decodedData = Buffer.from(payload.message.data, 'base64').toString('utf-8');
-      const notification: DecodedGmailNotification = JSON.parse(decodedData);
+
+      logger.info(decodedData);
+
+      let notification: DecodedGmailNotification;
+      try {
+        notification = JSON.parse(decodedData);
+      } catch (error) {
+        logger.error('Error parsing Gmail webhook', { error });
+        res.status(200).json({
+          error: 'webhook_processing_failed',
+          message: (error as Error).message
+        });
+        return;
+      }
 
       logger.info('Received Gmail webhook', {
         emailAddress: notification.emailAddress,

@@ -1,27 +1,30 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import { GmailMessage } from '../../shared/types';
+import { injectable, inject } from 'tsyringe';
+import { IMailSyncGateway } from '../../../../application/interfaces/gateways/imail-sync-gateway';
+import {
+  FetchGmailChangesInput,
+  FetchGmailChangesOutput,
+  RefreshGmailTokenInput,
+  RefreshGmailTokenOutput,
+  RenewGmailWatchInput,
+  RenewGmailWatchOutput,
+  GmailMessage
+} from '../../../../shared/types';
 
-export class GmailSyncClient {
-  private oauth2Client: OAuth2Client;
+/**
+ * Gmail Sync Gateway (Layer 3 & 4)
+ * Implements IMailSyncGateway for Gmail specifically.
+ */
+@injectable()
+export class GmailSyncGateway implements IMailSyncGateway {
+  constructor(
+    @inject('OAuth2Client') private oauth2Client: OAuth2Client
+  ) {}
 
-  constructor() {
-    this.oauth2Client = new google.auth.OAuth2(
-      process.env.GMAIL_CLIENT_ID,
-      process.env.GMAIL_CLIENT_SECRET,
-      process.env.GMAIL_REDIRECT_URI
-    );
-  }
-
-  /**
-   * Refresh access token using refresh token
-   */
-  async refreshAccessToken(refreshToken: string): Promise<{
-    accessToken: string;
-    expiresAt: Date;
-  }> {
+  async refreshAccessToken(input: RefreshGmailTokenInput): Promise<RefreshGmailTokenOutput> {
     this.oauth2Client.setCredentials({
-      refresh_token: refreshToken
+      refresh_token: input.refreshToken
     });
 
     const { credentials } = await this.oauth2Client.refreshAccessToken();
@@ -38,22 +41,16 @@ export class GmailSyncClient {
     };
   }
 
-  /**
-   * Set up Gmail watch() to receive push notifications
-   */
-  async setupWatch(
-    accessToken: string,
-    pubSubTopicName: string
-  ): Promise<{ historyId: string; expiration: Date }> {
-    this.oauth2Client.setCredentials({ access_token: accessToken });
+  async renewWatch(input: RenewGmailWatchInput): Promise<RenewGmailWatchOutput> {
+    this.oauth2Client.setCredentials({ access_token: input.accessToken });
 
     const gmail = google.gmail({ version: 'v1', auth: this.oauth2Client });
 
     const response = await gmail.users.watch({
       userId: 'me',
       requestBody: {
-        topicName: pubSubTopicName,
-        labelIds: ['INBOX']  // Watch INBOX only (adjust as needed)
+        topicName: input.topicName,
+        labelIds: ['INBOX']
       }
     });
 
@@ -67,9 +64,6 @@ export class GmailSyncClient {
     };
   }
 
-  /**
-   * Stop Gmail watch subscription
-   */
   async stopWatch(accessToken: string): Promise<void> {
     this.oauth2Client.setCredentials({ access_token: accessToken });
 
@@ -78,27 +72,20 @@ export class GmailSyncClient {
     await gmail.users.stop({ userId: 'me' });
   }
 
-  /**
-   * Fetch history changes since last historyId
-   */
-  async fetchHistory(
-    accessToken: string,
-    startHistoryId: string
-  ): Promise<{ messages: GmailMessage[]; newHistoryId: string }> {
-    this.oauth2Client.setCredentials({ access_token: accessToken });
+  async fetchChanges(input: FetchGmailChangesInput): Promise<FetchGmailChangesOutput> {
+    this.oauth2Client.setCredentials({ access_token: input.accessToken });
 
     const gmail = google.gmail({ version: 'v1', auth: this.oauth2Client });
 
     const response = await gmail.users.history.list({
       userId: 'me',
-      startHistoryId,
-      historyTypes: ['messageAdded']  // Only new messages
+      startHistoryId: input.startHistoryId,
+      historyTypes: ['messageAdded']
     });
 
     const messages: GmailMessage[] = [];
     const history = response.data.history || [];
 
-    // Extract message IDs from history
     const messageIds = new Set<string>();
     for (const record of history) {
       if (record.messagesAdded) {
@@ -110,10 +97,9 @@ export class GmailSyncClient {
       }
     }
 
-    // Fetch full message details
     for (const messageId of messageIds) {
       try {
-        const message = await this.fetchMessage(accessToken, messageId);
+        const message = await this.fetchMessage(input.accessToken, messageId);
         messages.push(message);
       } catch (error) {
         console.error(`Failed to fetch message ${messageId}:`, error);
@@ -122,13 +108,11 @@ export class GmailSyncClient {
 
     return {
       messages,
-      newHistoryId: response.data.historyId || startHistoryId
+      newHistoryId: response.data.historyId || input.startHistoryId,
+      changesCount: messages.length
     };
   }
 
-  /**
-   * Fetch a single message by ID
-   */
   private async fetchMessage(
     accessToken: string,
     messageId: string
@@ -145,12 +129,10 @@ export class GmailSyncClient {
 
     const message = response.data;
 
-    // Parse headers
     const headers = message.payload?.headers || [];
     const getHeader = (name: string) =>
       headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
 
-    // Parse body
     let body = '';
     if (message.payload?.parts) {
       const textPart = message.payload.parts.find(

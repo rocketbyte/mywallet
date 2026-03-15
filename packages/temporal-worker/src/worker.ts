@@ -12,7 +12,7 @@ import { logger } from './utils/logger';
 import { DIContainer } from '../../temporal-workflows/src/infrastructure/config/di-container';
 
 // New Activities (Clean Architecture - Controllers)
-import { createActivities as createCleanActivities } from '../../temporal-workflows/src/presentation/temporal/activities.index';
+import { createActivities as createCleanActivities } from '../../temporal-workflows/src/infrastructure/temporal/activities.index';
 
 // Legacy activity creators and clients (kept temporarily for backward compatibility)
 import {
@@ -21,7 +21,6 @@ import {
   createMongoDBActivities,
   createEmailActivities,
   createScheduleActivities,
-  createGmailSyncActivities,
   createWorkflowStarterActivities,
   GmailClient,
   OpenAIClient
@@ -117,7 +116,6 @@ async function run() {
     const mongodbActivities = createMongoDBActivities(mongoose.connection);
     const emailActivities = createEmailActivities(mongoose.connection);
     const scheduleActivities = createScheduleActivities(mongoose.connection);
-    const gmailSyncActivities = createGmailSyncActivities(mongoose.connection);
 
     // Create workflow starter activities (allows workflows to start other workflows)
     const workflowStarterActivities = createWorkflowStarterActivities(temporalClient);
@@ -130,7 +128,6 @@ async function run() {
       ...mongodbActivities,       // Legacy MongoDB activities
       ...emailActivities,         // Legacy Email activities
       ...scheduleActivities,      // Legacy Schedule activities
-      ...gmailSyncActivities,     // Legacy Gmail Sync activities
       ...workflowStarterActivities // Workflow starter activities
     };
 
@@ -193,13 +190,19 @@ async function run() {
       gmailSyncWorker.run()
     ]);
 
-  } catch (err) {
-    logger.error('❌ Worker failed', { error: err });
+  } catch (err: any) {
+    logger.error('❌ Worker failed', { 
+      error: err.message || err, 
+      stack: err.stack 
+    });
     process.exit(1);
   }
 }
 
-run().catch((err) => {
-  logger.error('❌ Unhandled error in worker', { error: err });
+run().catch((err: any) => {
+  logger.error('❌ Unhandled error in worker', { 
+    error: err.message || err,
+    stack: err.stack 
+  });
   process.exit(1);
 });

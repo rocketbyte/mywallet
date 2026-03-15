@@ -7,7 +7,7 @@ import {
   condition,
   continueAsNew
 } from '@temporalio/workflow';
-import type { GmailSyncActivities } from '../activities/gmail-sync/gmail-sync.activities';
+import type { SyncActivities } from '../infrastructure/temporal/activities/sync.activities';
 import type { WorkflowStarterActivities } from '../activities/workflow/workflow-starter.activities';
 import {
   GmailSubscriptionInput,
@@ -23,7 +23,7 @@ import {
 } from '../shared/constants';
 
 // Proxy activities with appropriate timeouts
-const gmailSyncActivities = proxyActivities<GmailSyncActivities>({
+const gmailSyncActivities = proxyActivities<SyncActivities>({
   startToCloseTimeout: GMAIL_SYNC_TIMEOUTS.RENEW_WATCH,
   retry: GMAIL_SYNC_RETRY_POLICIES.GMAIL_API
 });

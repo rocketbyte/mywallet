@@ -1,8 +1,19 @@
+/**
+ * Sync Activities (Layer 3 - Interface Adapters / Controllers)
+ * Handle Mail sync operations (token refresh, watch renewal, etc.)
+ */
 import { Context } from '@temporalio/activity';
+import { DependencyContainer } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { GmailSyncClient } from './gmail-sync-client';
-import { GmailAccount } from '../../models/gmail-account.model';
-import { Email } from '../../models/email.model';
+
+// Application Interfaces
+import { IMailSyncGateway } from '../../../application/interfaces/gateways/imail-sync-gateway';
+
+// Domain Models (Mongoose)
+import { GmailAccount } from '../../../models/gmail-account.model';
+import { Email } from '../../../models/email.model';
+
+// Shared Types
 import {
   RefreshGmailTokenInput,
   RefreshGmailTokenOutput,
@@ -14,85 +25,86 @@ import {
   UpdateGmailAccountInput,
   GetGmailAccountInput,
   DeactivateGmailAccountInput
-} from '../../shared/types';
+} from '../../../shared/types';
 
-export const createGmailSyncActivities = (mongoConnection: Connection) => {
-  const client = new GmailSyncClient();
+/**
+ * Create Sync Activities using DI Container
+ *
+ * @param container - DI Container
+ */
+export function createSyncActivities(container: DependencyContainer) {
+  const mailSyncGateway = container.resolve<IMailSyncGateway>('IMailSyncGateway');
+  // Resolve MongoConnection to ensure it's loaded, but don't force a type assignment since Mongoose handles it globally
+  container.resolve('MongoConnection');
 
   return {
     /**
-     * Activity: Refresh Gmail Access Token
+     * Refresh Gmail Access Token
      */
-    async refreshGmailToken(
-      input: RefreshGmailTokenInput
-    ): Promise<RefreshGmailTokenOutput> {
+    async refreshGmailToken(input: RefreshGmailTokenInput): Promise<RefreshGmailTokenOutput> {
       Context.current().heartbeat({ userId: input.userId });
-
       console.log(`[Activity] Refreshing token for user: ${input.userId}`);
 
-      const { accessToken, expiresAt } = await client.refreshAccessToken(
-        input.refreshToken
-      );
+      const result = await mailSyncGateway.refreshAccessToken({
+        userId: input.userId,
+        refreshToken: input.refreshToken
+      });
 
       // Update in database
       await GmailAccount.findOneAndUpdate(
         { userId: input.userId },
         {
-          currentAccessToken: accessToken,
-          accessTokenExpiresAt: expiresAt,
+          currentAccessToken: result.accessToken,
+          accessTokenExpiresAt: result.expiresAt,
           lastError: null
         }
       );
 
-      return { accessToken, expiresAt };
+      return result;
     },
 
     /**
-     * Activity: Renew Gmail Watch Subscription
+     * Renew Gmail Watch Subscription
      */
-    async renewGmailWatch(
-      input: RenewGmailWatchInput
-    ): Promise<RenewGmailWatchOutput> {
+    async renewGmailWatch(input: RenewGmailWatchInput): Promise<RenewGmailWatchOutput> {
       Context.current().heartbeat({ userId: input.userId });
-
       console.log(`[Activity] Renewing Gmail watch for user: ${input.userId}`);
 
-      const { historyId, expiration } = await client.setupWatch(
-        input.accessToken,
-        input.topicName
-      );
+      const result = await mailSyncGateway.renewWatch({
+        userId: input.userId,
+        accessToken: input.accessToken,
+        topicName: input.topicName
+      });
 
       // Update in database
       await GmailAccount.findOneAndUpdate(
         { userId: input.userId },
         {
-          watchExpiration: expiration,
-          historyId,
+          watchExpiration: result.expiration,
+          historyId: result.historyId,
           lastError: null,
           errorCount: 0
         }
       );
 
-      return { historyId, expiration };
+      return result;
     },
 
     /**
-     * Activity: Fetch Gmail Changes via History API
+     * Fetch Gmail Changes via History API
      */
-    async fetchGmailChanges(
-      input: FetchGmailChangesInput
-    ): Promise<FetchGmailChangesOutput> {
+    async fetchGmailChanges(input: FetchGmailChangesInput): Promise<FetchGmailChangesOutput> {
       Context.current().heartbeat({ userId: input.userId, historyId: input.startHistoryId });
-
       console.log(`[Activity] Fetching changes for user: ${input.userId}`);
 
-      const { messages, newHistoryId } = await client.fetchHistory(
-        input.accessToken,
-        input.startHistoryId
-      );
+      const result = await mailSyncGateway.fetchChanges({
+        userId: input.userId,
+        accessToken: input.accessToken,
+        startHistoryId: input.startHistoryId
+      });
 
       // Save new messages to database with userId for tenant isolation
-      for (const message of messages) {
+      for (const message of result.messages) {
         try {
           await Email.findOneAndUpdate(
             {
@@ -124,21 +136,17 @@ export const createGmailSyncActivities = (mongoConnection: Connection) => {
       await GmailAccount.findOneAndUpdate(
         { userId: input.userId },
         {
-          historyId: newHistoryId,
+          historyId: result.newHistoryId,
           lastSyncAt: new Date(),
-          $inc: { totalEmailsSynced: messages.length }
+          $inc: { totalEmailsSynced: result.messages.length }
         }
       );
 
-      return {
-        messages,
-        newHistoryId,
-        changesCount: messages.length
-      };
+      return result;
     },
 
     /**
-     * Activity: Save Gmail Account
+     * Save Gmail Account
      */
     async saveGmailAccount(input: SaveGmailAccountInput): Promise<void> {
       Context.current().heartbeat({ userId: input.userId });
@@ -160,7 +168,7 @@ export const createGmailSyncActivities = (mongoConnection: Connection) => {
     },
 
     /**
-     * Activity: Update Gmail Account
+     * Update Gmail Account
      */
     async updateGmailAccount(input: UpdateGmailAccountInput): Promise<void> {
       Context.current().heartbeat({ userId: input.userId });
@@ -187,7 +195,7 @@ export const createGmailSyncActivities = (mongoConnection: Connection) => {
     },
 
     /**
-     * Activity: Get Gmail Account
+     * Get Gmail Account
      */
     async getGmailAccount(input: GetGmailAccountInput) {
       Context.current().heartbeat({ userId: input.userId });
@@ -203,7 +211,7 @@ export const createGmailSyncActivities = (mongoConnection: Connection) => {
     },
 
     /**
-     * Activity: Deactivate Gmail Account
+     * Deactivate Gmail Account
      */
     async deactivateGmailAccount(input: DeactivateGmailAccountInput): Promise<void> {
       Context.current().heartbeat({ userId: input.userId });
@@ -213,7 +221,7 @@ export const createGmailSyncActivities = (mongoConnection: Connection) => {
 
       if (account && account.currentAccessToken) {
         try {
-          await client.stopWatch(account.currentAccessToken);
+          await mailSyncGateway.stopWatch(account.currentAccessToken);
         } catch (error) {
           console.error('Failed to stop watch:', error);
         }
@@ -230,6 +238,6 @@ export const createGmailSyncActivities = (mongoConnection: Connection) => {
       console.log(`[Activity] Deactivated Gmail account for user: ${input.userId}`);
     }
   };
-};
+}
 
-export type GmailSyncActivities = ReturnType<typeof createGmailSyncActivities>;
+export type SyncActivities = ReturnType<typeof createSyncActivities>;
