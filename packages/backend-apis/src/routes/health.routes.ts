@@ -3,6 +3,17 @@ import { getTemporalClient } from '../config/temporal-client';
 
 const router = Router();
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     summary: Basic health check
+ *     description: Returns the status of the API server.
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Server is online.
+ */
 router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -11,6 +22,19 @@ router.get('/health', (req, res) => {
   });
 });
 
+/**
+ * @openapi
+ * /health/deep:
+ *   get:
+ *     summary: Deep health check
+ *     description: Checks connections to external services like Temporal.
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: All services healthy.
+ *       503:
+ *         description: One or more services are down.
+ */
 router.get('/health/deep', async (req, res) => {
   const checks: any = {
     api: 'ok'

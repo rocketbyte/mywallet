@@ -5,27 +5,67 @@ const router = Router();
 const controller = new WorkflowController();
 
 /**
- * POST /api/workflows/email-processing
- * Start a new email processing workflow
- *
- * Body:
- * {
- *   "searchQuery": "from:no-reply@chase.com subject:transaction",
- *   "maxResults": 50,
- *   "afterDate": "2024-01-01"
- * }
+ * @openapi
+ * /workflows/email-processing:
+ *   post:
+ *     summary: Start email processing workflow
+ *     description: Manually triggers the Temporal workflow to scan and process emails.
+ *     tags: [Workflows]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               searchQuery:
+ *                 type: string
+ *               maxResults:
+ *                 type: integer
+ *               afterDate:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       200:
+ *         description: Workflow started.
  */
 router.post('/email-processing', controller.startEmailProcessing.bind(controller));
 
 /**
- * GET /api/workflows/:workflowId
- * Get workflow status and result
+ * @openapi
+ * /workflows/{workflowId}:
+ *   get:
+ *     summary: Get workflow status
+ *     description: Returns the execution status and result of a specific Temporal workflow.
+ *     tags: [Workflows]
+ *     parameters:
+ *       - in: path
+ *         name: workflowId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Status returned.
  */
 router.get('/:workflowId', controller.getWorkflowStatus.bind(controller));
 
 /**
- * POST /api/workflows/:workflowId/cancel
- * Cancel a running workflow
+ * @openapi
+ * /workflows/{workflowId}/cancel:
+ *   post:
+ *     summary: Cancel workflow
+ *     description: Cancels a running Temporal workflow.
+ *     tags: [Workflows]
+ *     parameters:
+ *       - in: path
+ *         name: workflowId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Workflow cancelled.
  */
 router.post('/:workflowId/cancel', controller.cancelWorkflow.bind(controller));
 
