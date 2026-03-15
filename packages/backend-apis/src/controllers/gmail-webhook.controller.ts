@@ -36,7 +36,7 @@ export class GmailWebhookController {
         notification = JSON.parse(decodedData);
       } catch (error) {
         logger.error('Error parsing Gmail webhook', { error });
-        res.status(200).json({
+        res.status(500).json({
           error: 'webhook_processing_failed',
           message: (error as Error).message
         });

@@ -17,6 +17,7 @@ import { Email } from '../../../models/email.model';
 import {
   RefreshGmailTokenInput,
   RefreshGmailTokenOutput,
+  RefreshGmailTokenWithContextInput,
   RenewGmailWatchInput,
   RenewGmailWatchOutput,
   FetchGmailChangesInput,
@@ -26,6 +27,7 @@ import {
   GetGmailAccountInput,
   DeactivateGmailAccountInput
 } from '../../../shared/types';
+import { TOKEN_REFRESH_CONFIG } from '../../../shared/constants';
 
 /**
  * Create Sync Activities using DI Container
@@ -39,7 +41,7 @@ export function createSyncActivities(container: DependencyContainer) {
 
   return {
     /**
-     * Refresh Gmail Access Token
+     * Refresh Gmail Access Token (basic, always refreshes)
      */
     async refreshGmailToken(input: RefreshGmailTokenInput): Promise<RefreshGmailTokenOutput> {
       Context.current().heartbeat({ userId: input.userId });
@@ -50,7 +52,7 @@ export function createSyncActivities(container: DependencyContainer) {
         refreshToken: input.refreshToken
       });
 
-      // Update in database
+      // Persist to database so the access token survives worker restarts
       await GmailAccount.findOneAndUpdate(
         { userId: input.userId },
         {
@@ -61,6 +63,105 @@ export function createSyncActivities(container: DependencyContainer) {
       );
 
       return result;
+    },
+
+    /**
+     * Proactively check if the current access token needs refreshing and,
+     * if so, fetch a new one from Google.
+     *
+     * This is the primary token management activity used by the subscription
+     * workflow. It:
+     *  - Skips the OAuth call when the token still has adequate time remaining
+     *    (unless `forceRefresh` is set, e.g. after a forceTokenRefresh signal).
+     *  - Always persists the updated token and expiry to MongoDB so worker
+     *    restarts can resume without re-authenticating.
+     *  - Propagates `invalid_grant` and similar revocation errors verbatim so
+     *    the workflow can detect them as non-retryable and deactivate the account.
+     *
+     * @throws {Error} With message containing a TOKEN_REFRESH_CONFIG.REVOCATION_ERROR_TYPES
+     *   string when the refresh token has been permanently revoked.
+     */
+    async checkAndRefreshToken(
+      input: RefreshGmailTokenWithContextInput
+    ): Promise<RefreshGmailTokenOutput> {
+      Context.current().heartbeat({ userId: input.userId });
+
+      if (!input.forceRefresh) {
+        // Check if existing token is still valid with enough buffer
+        const account = await GmailAccount.findOne({ userId: input.userId })
+          .select('+currentAccessToken accessTokenExpiresAt');
+
+        if (account?.accessTokenExpiresAt && account.currentAccessToken) {
+          const minutesRemaining =
+            (account.accessTokenExpiresAt.getTime() - Date.now()) / 60_000;
+
+          if (minutesRemaining > TOKEN_REFRESH_CONFIG.REFRESH_BEFORE_EXPIRY_MINUTES) {
+            console.log(
+              `[Activity] Token still valid for ${minutesRemaining.toFixed(1)} min, skipping refresh`,
+              { userId: input.userId }
+            );
+            return {
+              accessToken: account.currentAccessToken,
+              expiresAt: account.accessTokenExpiresAt
+            };
+          }
+        }
+      }
+
+      console.log(
+        `[Activity] Refreshing token for user: ${input.userId}`,
+        { forced: !!input.forceRefresh }
+      );
+
+      // Call the OAuth endpoint — let revocation errors propagate naturally
+      const result = await mailSyncGateway.refreshAccessToken({
+        userId: input.userId,
+        refreshToken: input.refreshToken
+      });
+
+      // Persist fresh token and clear any previous errors
+      await GmailAccount.findOneAndUpdate(
+        { userId: input.userId },
+        {
+          currentAccessToken: result.accessToken,
+          accessTokenExpiresAt: result.expiresAt,
+          lastError: null
+        }
+      );
+
+      console.log(
+        `[Activity] Token refreshed, expires at ${result.expiresAt.toISOString()}`,
+        { userId: input.userId }
+      );
+
+      return result;
+    },
+
+    /**
+     * Mark a Gmail account as inactive due to a permanently revoked token.
+     *
+     * Called by the workflow when `checkAndRefreshToken` throws an
+     * `invalid_grant` error (or equivalent). Sets `isActive: false` and
+     * records the revocation reason in `lastError` so the user can be
+     * notified out-of-band (e.g. via a push notification or email).
+     */
+    async updateGmailAccountTokenRevoked(
+      input: { userId: string; reason: string }
+    ): Promise<void> {
+      Context.current().heartbeat({ userId: input.userId });
+      console.error(
+        `[Activity] Token revoked for user ${input.userId}: ${input.reason}`
+      );
+
+      await GmailAccount.findOneAndUpdate(
+        { userId: input.userId },
+        {
+          isActive: false,
+          lastError: `token_revoked: ${input.reason}`,
+          // Reset watch so a re-link flow must call gmail.users.watch again
+          watchExpiration: null
+        }
+      );
     },
 
     /**
