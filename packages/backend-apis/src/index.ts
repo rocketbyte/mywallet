@@ -5,6 +5,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import { createGunzip } from 'zlib';
 import { config } from './config/environment';
 import routes from './routes';
 import { errorHandler } from './middleware/error-handler';
@@ -26,6 +27,32 @@ async function connectMongoDB() {
 // Security & parsing middleware
 app.use(helmet());
 app.use(cors());
+
+// Handle gzip-compressed bodies (Google Pub/Sub sends compressed payloads in some cases)
+app.use((req, res, next) => {
+  if (req.headers['content-encoding'] === 'gzip') {
+    const gunzip = createGunzip();
+    req.pipe(gunzip);
+    const chunks: Buffer[] = [];
+    gunzip.on('data', (chunk) => chunks.push(chunk));
+    gunzip.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf-8');
+      try {
+        req.body = JSON.parse(body);
+      } catch {
+        req.body = body;
+      }
+      next();
+    });
+    gunzip.on('error', (err) => {
+      logger.error('Failed to decompress gzip body', { err });
+      next(err);
+    });
+  } else {
+    next();
+  }
+});
+
 app.use(express.json());
 
 // Request logging

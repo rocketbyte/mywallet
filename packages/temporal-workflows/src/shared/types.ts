@@ -278,6 +278,39 @@ export interface RefreshGmailTokenOutput {
   expiresAt: Date;
 }
 
+/**
+ * Extended input for the proactive token refresh activity.
+ * Supports an optional `forceRefresh` flag to bypass the expiry check
+ * and always fetch a new token (e.g. after receiving a forceTokenRefresh signal).
+ */
+export interface RefreshGmailTokenWithContextInput {
+  userId: string;
+  refreshToken: string;
+  /** If true, skip the expiry check and always call the OAuth endpoint. */
+  forceRefresh?: boolean;
+}
+
+/**
+ * Payload for the `forceTokenRefresh` signal.
+ * Allows external callers (Temporal UI, admin endpoints) to trigger
+ * an immediate token refresh, for example after the user re-authorizes.
+ */
+export interface ForceTokenRefreshSignal {
+  /** Human-readable reason for the forced refresh, used in logs. */
+  reason: string;
+}
+
+/**
+ * Result of an in-workflow token validity check.
+ * Used to decide whether a proactive refresh is needed.
+ */
+export interface TokenValidityResult {
+  isValid: boolean;
+  expiresAt: Date | null;
+  minutesRemaining: number | null;
+}
+
+
 export interface RenewGmailWatchInput {
   userId: string;
   accessToken: string;

@@ -95,6 +95,29 @@ export const GMAIL_SYNC_TIMEOUTS = {
   DB_OPERATION: '30 seconds'
 } as const;
 
+/**
+ * Token refresh configuration.
+ *
+ * Access tokens issued by Google last ~60 minutes. We refresh proactively
+ * every PROACTIVE_REFRESH_INTERVAL_MINUTES and also whenever fewer than
+ * REFRESH_BEFORE_EXPIRY_MINUTES remain on the current token.
+ *
+ * REVOCATION_ERROR_TYPES are treated as non-retryable — when they occur the
+ * refresh token has been permanently revoked by the user or by Google.
+ */
+export const TOKEN_REFRESH_CONFIG = {
+  /** Refresh the token when fewer than this many minutes remain */
+  REFRESH_BEFORE_EXPIRY_MINUTES: 10,
+  /** Proactively refresh every N minutes regardless of expiry */
+  PROACTIVE_REFRESH_INTERVAL_MINUTES: 45,
+  /** Error message substrings that indicate a permanently revoked token */
+  REVOCATION_ERROR_TYPES: [
+    'invalid_grant',
+    'InvalidGrantError',
+    'Token has been expired or revoked'
+  ]
+} as const;
+
 // Retry Policies for Gmail Sync
 export const GMAIL_SYNC_RETRY_POLICIES = {
   GMAIL_API: {
@@ -123,5 +146,7 @@ export const GMAIL_WATCH_CONFIG = {
 // Signal Names
 export const GMAIL_SIGNALS = {
   INCOMING_WEBHOOK: 'incomingWebhook',
-  STOP_SYNC: 'stopSync'
+  STOP_SYNC: 'stopSync',
+  /** Force an immediate token refresh from outside the workflow (e.g. after re-auth) */
+  FORCE_TOKEN_REFRESH: 'forceTokenRefresh'
 } as const;

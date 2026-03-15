@@ -11,6 +11,7 @@ import { Connection } from 'mongoose';
 // Layer 2 - Application Interfaces (Gateways)
 import { IEmailGateway } from '../../application/interfaces/gateways/iemail-gateway';
 import { IAIGateway, ITransactionExtractorGateway } from '../../application/interfaces/gateways/iai-gateway';
+import { IMailSyncGateway } from '../../application/interfaces/gateways/imail-sync-gateway';
 
 // Layer 2 - Application Interfaces (Repositories)
 import { ITransactionRepository } from '../../application/interfaces/repositories/itransaction-repository';
@@ -20,6 +21,7 @@ import { IPatternRepository } from '../../application/interfaces/repositories/ip
 // Layer 3 & 4 - Gmail Implementations
 import { GmailGateway } from '../external/email/gmail/gmail.gateway';
 import { GmailMapper } from '../external/email/gmail/gmail.mapper';
+import { GmailSyncGateway } from '../external/email/gmail/gmail-sync.gateway';
 
 // Layer 3 & 4 - OpenAI Implementations
 import { OpenAIGateway } from '../external/ai/openai/openai.gateway';
@@ -91,6 +93,11 @@ export class DIContainer {
       // Register Gmail Gateway as IEmailGateway implementation
       container.register<IEmailGateway>('IEmailGateway', {
         useClass: GmailGateway
+      });
+
+      // Register Gmail Sync Gateway
+      container.register<IMailSyncGateway>('IMailSyncGateway', {
+        useClass: GmailSyncGateway
       });
     }
     // Future: Add Outlook provider registration here

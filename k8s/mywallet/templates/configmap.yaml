@@ -32,4 +32,11 @@ data:
 
   # AI configuration
   AI_PROVIDER: {{ .Values.app.ai.provider | quote }}
-  AI_MODEL: {{ .Values.app.ai.model | quote }}
+  OPENAI_MODEL: {{ .Values.app.ai.model | quote }}
+  OLLAMA_MODEL: {{ .Values.app.ai.model | quote }}
+  {{- if and .Values.app.ai.endpoint (eq .Values.app.ai.provider "ollama") }}
+  OLLAMA_ENDPOINT: {{ .Values.app.ai.endpoint | quote }}
+  {{- end }}
+  {{- if and .Values.app.ai.endpoint (eq .Values.app.ai.provider "openai") }}
+  OPENAI_ENDPOINT: {{ .Values.app.ai.endpoint | quote }}
+  {{- end }}
