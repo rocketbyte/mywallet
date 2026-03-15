@@ -4,7 +4,7 @@ import { AuthController } from '../controllers/auth.controller';
 const router = Router();
 const controller = new AuthController();
 
-/** 
+/**
  * GET /api/auth/gmail
  * Step 1: Get OAuth authorization URL
  *
