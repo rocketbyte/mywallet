@@ -10,8 +10,14 @@ import { config } from './config/environment';
 import routes from './routes';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
+import { swaggerSpec } from './config/swagger';
+import { redocMiddleware } from './middleware/redoc';
 
 const app = express();
+
+// Helper to bypass TypeScript's transpilation of dynamic import() to require()
+// This ensures we can load ESM-only modules in a CommonJS environment
+const esmImport = new Function('path', 'return import(path)');
 
 // Connect to MongoDB
 async function connectMongoDB() {
@@ -25,10 +31,25 @@ async function connectMongoDB() {
 }
 
 // Security & parsing middleware
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Essential for loading assets like Redoc/Scalar from CDNs
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net', 'https://cdn.redoc.ly', 'https://unpkg.com'],
+        'style-src': ["'self'", "'unsafe-inline'", 'fonts.googleapis.com', 'cdn.jsdelivr.net', 'https://cdn.redoc.ly'],
+        'img-src': ["'self'", 'data:', 'https://cdn.redoc.ly', 'https://scalar.com', 'https://avatars.githubusercontent.com'],
+        'font-src': ["'self'", 'fonts.gstatic.com', 'https://cdn.redoc.ly', 'data:'],
+        'connect-src': ["'self'", 'https://cdn.redoc.ly', 'https://unpkg.com'],
+        'worker-src': ["'self'", 'blob:'],
+      },
+    },
+  })
+);
 app.use(cors());
 
-// Handle gzip-compressed bodies (Google Pub/Sub sends compressed payloads in some cases)
+// Handle gzip-compressed bodies
 app.use((req, res, next) => {
   if (req.headers['content-encoding'] === 'gzip') {
     const gunzip = createGunzip();
@@ -66,6 +87,47 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api', routes);
+
+// Documentation
+app.get('/docs/openapi.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
+app.get(
+  '/docs/reference',
+  redocMiddleware({
+    title: 'MyWallet API Reference',
+    spec: swaggerSpec,
+  })
+);
+
+
+app.use(
+  '/docs/playground',
+  async (req, res, next) => {
+    try {
+      const { apiReference } = await esmImport('@scalar/express-api-reference');
+      return apiReference({
+        spec: {
+          content: swaggerSpec,
+        },
+        theme: 'deepSpace',
+        showSidebar: true,
+        customCss: `
+          :root {
+            --scalar-font-header: 'Outfit', sans-serif;
+            --scalar-font-body: 'Outfit', sans-serif;
+            --scalar-font-code: 'Fira Code', monospace;
+            --scalar-primary: #6B46C1;
+          }
+        `
+      })(req, res, next);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // Error handling
 app.use(errorHandler);
