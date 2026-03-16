@@ -1,3 +1,5 @@
+# This is intented to run on self-hosted runner
+
 name: Deploy to Raspberry Pi (Dev)
 
 on:

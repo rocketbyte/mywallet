@@ -13,10 +13,10 @@ Welcome to the **MyWallet Developer Hub**.
 This API provides powerful tools to interact with your financial data, automate transaction extraction from Gmail, and monitor your wallet's health in real-time.
 
 ### Key Capabilities:
-*   🔑 **Smart Sync**: Proactive Gmail OAuth token management.
-*   📬 **Auto-Matching**: Real-time webhook processing for bank notifications.
-*   📊 **Financial Insights**: Detailed email statistics and filtered transaction history.
-*   ⚙️ **Temporal Orchestration**: Durable, reliable background workflows.
+*  **Smart Sync**: Proactive Gmail OAuth token management.
+*  **Auto-Matching**: Real-time webhook processing for bank notifications.
+*  **Financial Insights**: Detailed email statistics and filtered transaction history.
+*  **Temporal Orchestration**: Durable, reliable background workflows.
       `,
       contact: {
         name: 'MyWallet Developer Team',

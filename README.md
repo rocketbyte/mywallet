@@ -4,17 +4,17 @@ An intelligent expense tracking system that uses Temporal workflows to orchestra
 
 ## Features
 
-- 📧 **Gmail Integration**: Automatically fetch and process bank transaction emails
-- 🔔 **Real-time Gmail Sync** ✨ NEW: Push notifications via Google Cloud Pub/Sub for instant email syncing
-- ⏰ **Scheduled Processing**: Temporal cron runs every minute to process new emails
-- 🤖 **AI-Powered Extraction**: Use OpenAI to extract transaction details from email text
-- 🔄 **Durable Workflows**: Temporal orchestrates all operations with automatic retries
-- 💾 **MongoDB Storage**: Persist transactions with powerful querying capabilities
-- 🎯 **Pattern Matching**: Configurable email patterns for different banks
-- 📊 **REST API**: Query transactions, emails, and manage schedules via HTTP endpoints
-- 🔍 **Email Query API**: Search and filter stored emails with pagination
-- 🛡️ **Duplicate Prevention**: Emails are deduplicated by Gmail message ID
-- 🔐 **OAuth Token Management**: Automatic refresh token handling for Gmail API
+- **Gmail Integration**: Automatically fetch and process bank transaction emails
+- **Real-time Gmail Sync**: Push notifications via Google Cloud Pub/Sub for instant email syncing
+- **Scheduled Processing**: Temporal cron runs every minute to process new emails
+- **AI-Powered Extraction**: Use OpenAI to extract transaction details from email text
+- **Durable Workflows**: Temporal orchestrates all operations with automatic retries
+- **MongoDB Storage**: Persist transactions with powerful querying capabilities
+- **Pattern Matching**: Configurable email patterns for different banks
+- **REST API**: Query transactions, emails, and manage schedules via HTTP endpoints
+- **Email Query API**: Search and filter stored emails with pagination
+- **Duplicate Prevention**: Emails are deduplicated by Gmail message ID
+- **OAuth Token Management**: Automatic refresh token handling for Gmail API
 
 ## Architecture
 
@@ -78,11 +78,11 @@ mywallet/
 - Gmail account with API access
 - OpenAI API key
 
-## 🚀 Quick Start
+## Quick Start
 
-**📖 For detailed setup instructions, see [HOW_TO_RUN.md](./HOW_TO_RUN.md)**
+** For detailed setup instructions, see [HOW_TO_RUN.md](./HOW_TO_RUN.md)**
 
-**🔔 For Gmail Real-time Sync setup, see [GMAIL_SYNC_IMPLEMENTATION.md](./GMAIL_SYNC_IMPLEMENTATION.md)**
+** For Gmail Real-time Sync setup, see [GMAIL_SYNC_IMPLEMENTATION.md](./GMAIL_SYNC_IMPLEMENTATION.md)**
 
 ### Quick Summary:
 
@@ -312,7 +312,7 @@ GET /api/emails/search?q=credito&limit=20
 GET /api/emails/stats
 ```
 
-### Gmail Sync (Real-time) ✨ NEW
+### Gmail Sync (Real-time)
 
 **Link Gmail Account**
 ```
@@ -560,20 +560,20 @@ npm run lint
 ## Documentation
 
 - **[HOW_TO_RUN.md](./HOW_TO_RUN.md)** - Complete setup and running instructions
-- **[GMAIL_SYNC_IMPLEMENTATION.md](./GMAIL_SYNC_IMPLEMENTATION.md)** ✨ NEW - Real-time Gmail sync feature guide
+- **[GMAIL_SYNC_IMPLEMENTATION.md](./GMAIL_SYNC_IMPLEMENTATION.md)** - Real-time Gmail sync feature guide
 - **[IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)** - Current implementation status
 - **[OAUTH_FIX.md](./OAUTH_FIX.md)** - OAuth troubleshooting guide
 - **[CREDENTIALS_GUIDE.md](./CREDENTIALS_GUIDE.md)** - Credentials setup guide
 
 ## Roadmap
 
-### ✅ Phase 1: Core Features (COMPLETED)
+### Phase 1: Core Features (COMPLETED)
 - Gmail integration with OAuth
 - Email processing workflows
 - AI-powered transaction extraction
 - Scheduled processing
 - REST API
-- Real-time Gmail sync with webhooks ✨ NEW
+- Real-time Gmail sync with webhooks
 
 ### Phase 2: Pattern Learning
 - Auto-detect new bank email formats
