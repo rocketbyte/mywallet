@@ -207,7 +207,8 @@ export async function gmailSubscriptionWorkflow(
         forceRefresh
       });
       currentAccessToken = result.accessToken;
-      tokenExpiresAt = result.expiresAt;
+      // Activity results are JSON-deserialized — Date becomes a string in transit.
+      tokenExpiresAt = new Date(result.expiresAt);
 
       log.info('Access token is fresh', {
         expiresAt: result.expiresAt,
