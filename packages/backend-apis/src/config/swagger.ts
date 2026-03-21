@@ -1,3 +1,4 @@
+import path from 'path';
 import swaggerJsdoc from 'swagger-jsdoc';
 import { config } from './environment';
 
@@ -178,11 +179,13 @@ This API provides powerful tools to interact with your financial data, automate 
       },
     },
   },
-  // Path to the API docs
+  // Absolute paths — resolved from this file's location so they work
+  // regardless of the process CWD (local dev, Docker, CI, etc.)
   apis: [
-    './src/routes/*.ts',
-    './src/controllers/*.ts',
-    './src/models/*.ts',
+    path.join(__dirname, '../routes/*.ts'),
+    path.join(__dirname, '../routes/*.js'),
+    path.join(__dirname, '../controllers/*.ts'),
+    path.join(__dirname, '../controllers/*.js'),
   ],
 };
 
