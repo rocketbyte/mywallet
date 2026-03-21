@@ -12,41 +12,53 @@ const controller = new EmailController(mongoose.connection);
  * @openapi
  * /emails:
  *   get:
- *     summary: Get all emails
- *     description: Returns a paginated list of emails with optional filtering.
+ *     summary: List emails
+ *     description: Returns a paginated list of stored emails with optional filters.
  *     tags: [Emails]
  *     parameters:
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 50
- *       - in: query
- *         name: offset
- *         schema:
- *           type: integer
- *           default: 0
+ *       - $ref: '#/components/parameters/UserId'
+ *       - $ref: '#/components/parameters/LimitQuery'
+ *       - $ref: '#/components/parameters/OffsetQuery'
  *       - in: query
  *         name: isProcessed
  *         schema:
  *           type: boolean
+ *         description: Filter by processing status.
  *       - in: query
  *         name: fromAddress
  *         schema:
  *           type: string
+ *         description: Filter by sender email address.
+ *         example: 'alertas@chase.com'
  *       - in: query
  *         name: startDate
  *         schema:
  *           type: string
  *           format: date-time
+ *         description: Return emails received on or after this date.
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date-time
+ *         description: Return emails received on or before this date.
  *     responses:
  *       200:
- *         description: A list of emails.
+ *         description: Paginated list of emails.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userId: { type: string, example: 'user_123' }
+ *                 emails:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Email'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/', controller.getAllEmails.bind(controller));
 
@@ -55,11 +67,28 @@ router.get('/', controller.getAllEmails.bind(controller));
  * /emails/stats:
  *   get:
  *     summary: Get email statistics
- *     description: Returns overall statistics for emails in the system.
+ *     description: Returns processing statistics for all emails belonging to the user.
  *     tags: [Emails]
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
  *     responses:
  *       200:
  *         description: Email statistics.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userId: { type: string, example: 'user_123' }
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer, example: 320 }
+ *                     processed: { type: integer, example: 310 }
+ *                     unprocessed: { type: integer, example: 10 }
+ *                     processingRate: { type: string, example: '96.88%' }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/stats', controller.getEmailStats.bind(controller));
 
@@ -68,27 +97,43 @@ router.get('/stats', controller.getEmailStats.bind(controller));
  * /emails/search:
  *   get:
  *     summary: Search emails
- *     description: Full-text search across all emails.
+ *     description: Full-text search across subject, body, snippet, and sender fields.
  *     tags: [Emails]
  *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
  *       - in: query
  *         name: q
  *         required: true
  *         schema:
  *           type: string
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 50
- *       - in: query
- *         name: offset
- *         schema:
- *           type: integer
- *           default: 0
+ *         description: Search term.
+ *         example: 'Chase'
+ *       - $ref: '#/components/parameters/LimitQuery'
+ *       - $ref: '#/components/parameters/OffsetQuery'
  *     responses:
  *       200:
- *         description: Search results.
+ *         description: Matching emails.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userId: { type: string, example: 'user_123' }
+ *                 searchTerm: { type: string, example: 'Chase' }
+ *                 emails:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Email'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *       400:
+ *         description: Search term is required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/search', controller.searchEmails.bind(controller));
 
@@ -97,19 +142,32 @@ router.get('/search', controller.searchEmails.bind(controller));
  * /emails/{id}:
  *   get:
  *     summary: Get email by ID
- *     description: Returns a single email by its Gmail ID.
+ *     description: Returns a single email record by its Gmail message ID.
  *     tags: [Emails]
  *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: string
+ *         description: Gmail message ID.
+ *         example: '18f3c2a1b9e4d7f0'
  *     responses:
  *       200:
  *         description: The email record.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userId: { type: string, example: 'user_123' }
+ *                 email:
+ *                   $ref: '#/components/schemas/Email'
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/:id', controller.getEmailById.bind(controller));
 
