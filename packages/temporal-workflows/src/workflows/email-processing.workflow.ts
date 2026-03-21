@@ -91,26 +91,37 @@ export async function emailProcessingWorkflow(
     }
 
     // Step 2: Process each email
+    const isSyncPath = !!(input.emailIds && input.emailIds.length > 0);
+
     for (const email of emails) {
+      // In the sync path, emails come from getEmailsByIds which returns:
+      //   id = MongoDB _id, emailId = Gmail message ID
+      // In the search path, emails come from fetchEmails which returns:
+      //   id = Gmail message ID (no emailId field)
+      const gmailMessageId: string = (email as any).emailId ?? email.id;
+
       try {
-        log.info(`Processing email: ${email.id}`, {
+        log.info(`Processing email: ${gmailMessageId}`, {
           subject: email.subject,
           from: email.from
         });
 
-        // Save raw email to database first (with userId)
-        await emailActivities.saveEmail({
-          userId: input.userId,
-          emailId: email.id,
-          threadId: email.threadId,
-          from: email.from,
-          to: 'me',
-          subject: email.subject,
-          date: email.date,
-          body: email.body,
-          snippet: email.snippet,
-          fetchedBy: input.workflowId
-        });
+        // Save raw email only in the search path — in the sync path the email
+        // was already persisted by fetchGmailChanges with all required fields.
+        if (!isSyncPath) {
+          await emailActivities.saveEmail({
+            userId: input.userId,
+            emailId: gmailMessageId,
+            threadId: email.threadId,
+            from: email.from,
+            to: 'me',
+            subject: email.subject,
+            date: email.date,
+            body: email.body,
+            snippet: email.snippet,
+            fetchedBy: input.workflowId
+          });
+        }
 
         // Match email against patterns
         const pattern = await mongoActivities.matchEmailPattern({
@@ -121,18 +132,18 @@ export async function emailProcessingWorkflow(
 
         if (!pattern) {
           log.warn('No matching pattern found for email', {
-            emailId: email.id,
+            emailId: gmailMessageId,
             subject: email.subject
           });
           result.errors.push({
-            emailId: email.id,
+            emailId: gmailMessageId,
             error: 'No matching pattern found'
           });
           result.failedCount++;
           continue;
         }
 
-        log.info(`Matched pattern: ${pattern.name}`, { emailId: email.id });
+        log.info(`Matched pattern: ${pattern.name}`, { emailId: gmailMessageId });
 
         // Extract transaction data using OpenAI
         const extractedData = await openaiActivities.extractTransactionFromEmail({
@@ -145,7 +156,7 @@ export async function emailProcessingWorkflow(
         });
 
         log.info('Extraction complete', {
-          emailId: email.id,
+          emailId: gmailMessageId,
           merchant: extractedData.merchant,
           amount: extractedData.amount,
           confidence: extractedData.confidence
@@ -154,12 +165,12 @@ export async function emailProcessingWorkflow(
         // Validate extraction confidence
         if (extractedData.confidence < CONFIDENCE_THRESHOLD) {
           log.warn('Low confidence extraction', {
-            emailId: email.id,
+            emailId: gmailMessageId,
             confidence: extractedData.confidence,
             threshold: CONFIDENCE_THRESHOLD
           });
           result.errors.push({
-            emailId: email.id,
+            emailId: gmailMessageId,
             error: 'Low confidence extraction',
             confidence: extractedData.confidence
           });
@@ -177,7 +188,7 @@ export async function emailProcessingWorkflow(
         // Save transaction to MongoDB (with userId)
         const transaction = await mongoActivities.saveTransaction({
           userId: input.userId,
-          emailId: email.id,
+          emailId: gmailMessageId,
           emailSubject: email.subject,
           emailDate: email.date,
           emailFrom: email.from,
@@ -194,12 +205,12 @@ export async function emailProcessingWorkflow(
         });
 
         // Mark email as processed
-        await gmailActivities.markEmailAsProcessed(email.id);
+        await gmailActivities.markEmailAsProcessed(gmailMessageId);
 
         // Update email processing status in database (with userId)
         await emailActivities.updateEmailProcessing({
           userId: input.userId,
-          emailId: email.id,
+          emailId: gmailMessageId,
           isProcessed: true,
           processedAt: new Date(),
           processingWorkflowId: input.workflowId,
@@ -213,7 +224,7 @@ export async function emailProcessingWorkflow(
         result.processedCount++;
 
         log.info('Successfully processed email', {
-          emailId: email.id,
+          emailId: gmailMessageId,
           transactionId: transaction.id,
           merchant: transaction.merchant,
           amount: transaction.amount
@@ -225,7 +236,7 @@ export async function emailProcessingWorkflow(
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         log.error('Failed to process email', {
-          emailId: email.id,
+          emailId: gmailMessageId,
           error: errorMessage
         });
 
@@ -233,7 +244,7 @@ export async function emailProcessingWorkflow(
         try {
           await emailActivities.updateEmailProcessing({
             userId: input.userId,
-            emailId: email.id,
+            emailId: gmailMessageId,
             isProcessed: false,
             processedAt: new Date(),
             processingWorkflowId: input.workflowId,
@@ -244,7 +255,7 @@ export async function emailProcessingWorkflow(
         }
 
         result.errors.push({
-          emailId: email.id,
+          emailId: gmailMessageId,
           error: errorMessage
         });
         result.failedCount++;
