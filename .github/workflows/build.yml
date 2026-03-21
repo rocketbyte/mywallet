@@ -183,9 +183,11 @@ jobs:
             --set secrets.gmail.clientId="$GMAIL_CLIENT_ID" \
             --set secrets.gmail.clientSecret="$GMAIL_CLIENT_SECRET" \
             --set secrets.gmail.refreshToken="$GMAIL_REFRESH_TOKEN" \
-            --set secrets.openai.apiKey="$OPENAI_API_KEY" \
-            --wait \
-            --timeout 5m
+            --set secrets.openai.apiKey="$OPENAI_API_KEY"
+
+          echo "⏳ Waiting for rollout..."
+          kubectl rollout status deployment/mywallet-backend-api -n wallet --timeout=10m
+          kubectl rollout status deployment/mywallet-temporal-worker -n wallet --timeout=10m
 
       - name: Verify deployment
         run: |
