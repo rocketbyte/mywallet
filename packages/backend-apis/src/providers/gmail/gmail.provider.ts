@@ -46,7 +46,8 @@ export class GmailProvider implements IEmailProvider {
       access_type: 'offline',
       scope: [
         'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/gmail.modify'
+        'https://www.googleapis.com/auth/gmail.modify',
+        'https://www.googleapis.com/auth/userinfo.email'  // needed to fetch email address after token exchange
       ],
       prompt: 'consent',
       ...(state && { state })
@@ -67,13 +68,12 @@ export class GmailProvider implements IEmailProvider {
       );
     }
 
-    let email = '';
     const oauth2 = google.oauth2({ version: 'v2', auth: this.oauth2Client });
-    try {
-      const userInfo = await oauth2.userinfo.get();
-      email = userInfo.data.email ?? '';
-    } catch (err) {
-      logger.warn('GmailProvider: could not fetch user email after code exchange', { err });
+    const userInfo = await oauth2.userinfo.get();
+    const email = userInfo.data.email;
+
+    if (!email) {
+      throw new Error('Could not retrieve email address from Google — ensure the userinfo.email scope is granted.');
     }
 
     return { email, refreshToken: tokens.refresh_token };
