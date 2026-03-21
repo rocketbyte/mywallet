@@ -31,6 +31,10 @@ This API provides powerful tools to interact with your financial data, automate 
     ],
     servers: [
       {
+        url: 'https://wallet.rotbyte.com/api',
+        description: 'Production server',
+      },
+      {
         url: `http://localhost:${config.port}/api`,
         description: 'Local development server',
       },
