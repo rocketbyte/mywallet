@@ -113,6 +113,57 @@ export class GmailSyncGateway implements IMailSyncGateway {
     };
   }
 
+  /**
+   * Recursively extracts readable text from a Gmail message payload.
+   * Priority: text/plain > text/html (stripped). Recurses into multipart parts
+   * so nested structures like multipart/mixed > multipart/alternative > text/html work.
+   */
+  private extractBody(payload: import('googleapis').gmail_v1.Schema$MessagePart | undefined): string {
+    if (!payload) return '';
+
+    // Leaf node — check for data directly on this part
+    if (!payload.parts || payload.parts.length === 0) {
+      if (!payload.body?.data) return '';
+      const raw = Buffer.from(payload.body.data, 'base64url').toString('utf-8');
+      return payload.mimeType === 'text/html' ? this.stripHtml(raw) : raw;
+    }
+
+    // Prefer text/plain at this level
+    const plainPart = payload.parts.find(p => p.mimeType === 'text/plain');
+    if (plainPart?.body?.data) {
+      return Buffer.from(plainPart.body.data, 'base64url').toString('utf-8');
+    }
+
+    // Fall back to text/html at this level
+    const htmlPart = payload.parts.find(p => p.mimeType === 'text/html');
+    if (htmlPart?.body?.data) {
+      return this.stripHtml(Buffer.from(htmlPart.body.data, 'base64url').toString('utf-8'));
+    }
+
+    // Recurse into multipart/* children (e.g. multipart/alternative inside multipart/mixed)
+    for (const part of payload.parts) {
+      const result = this.extractBody(part);
+      if (result) return result;
+    }
+
+    return '';
+  }
+
+  private stripHtml(html: string): string {
+    return html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   private async fetchMessage(
     accessToken: string,
     messageId: string
@@ -133,17 +184,7 @@ export class GmailSyncGateway implements IMailSyncGateway {
     const getHeader = (name: string) =>
       headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
 
-    let body = '';
-    if (message.payload?.parts) {
-      const textPart = message.payload.parts.find(
-        part => part.mimeType === 'text/plain'
-      );
-      if (textPart?.body?.data) {
-        body = Buffer.from(textPart.body.data, 'base64').toString('utf-8');
-      }
-    } else if (message.payload?.body?.data) {
-      body = Buffer.from(message.payload.body.data, 'base64').toString('utf-8');
-    }
+    const body = this.extractBody(message.payload);
 
     return {
       id: message.id!,
