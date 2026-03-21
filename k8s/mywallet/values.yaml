@@ -37,8 +37,19 @@ backend:
     targetPort: 3000
 
   ingress:
-    # Ingress is managed externally via k3s/ingresses/rotbyte-ingress.yaml
-    enabled: false
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    hosts:
+      - host: wallet.rotbyte.com
+        paths:
+          - path: /api
+            pathType: Prefix
+          - path: /docs
+            pathType: Prefix
+    tls: []
 
   resources:
     requests:
