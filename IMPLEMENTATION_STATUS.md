@@ -1,24 +1,95 @@
 # MyWallet Implementation Status
 
-**Last Updated**: December 10, 2024
-**Phase**: Phase 1 - Infrastructure and Core Implementation
-**Status**: 90% Complete (Blocked by disk space)
+**Last Updated**: March 21, 2025
+**Phase**: Phase 2 - Production Deployment & Provider Abstraction
+**Status**: Production — deployed at https://wallet.rotbyte.com
 
 ---
 
 ## 🎯 Project Overview
 
-Building an expense tracking system using:
-- **Temporal.io** for durable workflow orchestration
-- **Gmail API** to fetch bank transaction emails
-- **OpenAI** for AI-powered transaction extraction
-- **MongoDB** for data storage
-- **Express** for REST API
-- **Docker Compose** for containerization
+An expense tracking system that automatically extracts bank transactions from Gmail emails.
+
+**Stack:**
+- **Temporal.io** — durable workflow orchestration (self-hosted on Raspberry Pi k3s cluster)
+- **Gmail API** — OAuth2 + Pub/Sub push notifications for real-time email sync
+- **OpenAI / Ollama** — AI-powered transaction extraction from email bodies
+- **MongoDB** — multi-tenant data storage
+- **Express** — REST API with OpenAPI/Swagger docs
+- **Kubernetes (k3s)** — deployed on Raspberry Pi cluster via Helm
+
+**Production URLs:**
+| Service | URL |
+|---------|-----|
+| API | https://wallet.rotbyte.com/api |
+| API Docs (ReDoc) | https://wallet.rotbyte.com/docs/reference |
+| API Docs (Scalar) | https://wallet.rotbyte.com/docs/playground |
+| OpenAPI JSON | https://wallet.rotbyte.com/docs/openapi.json |
+| Temporal UI | https://temporal.rotbyte.com |
+
+**Infrastructure:**
+- Kubernetes namespace: `wallet` on k3s cluster
+- Docker images: `ghcr.io/rocketbyte/mywallet-backend-api:dev` and `mywallet-temporal-worker:dev`
+- Helm chart: `k8s/mywallet/`
+- CI/CD: GitHub Actions → build multi-arch Docker images → `helm upgrade` → `kubectl rollout status`
 
 ---
 
 ## ✅ Completed Work
+
+### Phase 2 Additions (March 2025)
+
+#### 11. Provider Abstraction Layer (100%)
+- ✅ `IEmailProvider` interface (`packages/backend-apis/src/providers/types.ts`)
+- ✅ `GmailProvider` implementing `IEmailProvider` (`packages/backend-apis/src/providers/gmail/gmail.provider.ts`)
+- ✅ Provider registry (`packages/backend-apis/src/providers/index.ts`)
+- ✅ `AuthController` refactored to be provider-agnostic (accepts `IEmailProvider`)
+- ✅ `GmailWebhookController` delegates `linkAccount`, `unlinkAccount`, `getAccountStatus` to provider
+- ✅ Auto-link OAuth flow: `GET /api/auth/gmail?userId=<id>` embeds userId in OAuth `state`; callback auto-links on return
+- ✅ Adding Outlook/Yahoo requires only: implement `IEmailProvider` + register in `providers/index.ts`
+
+**Architecture:**
+```
+GET /api/auth/gmail?userId=user_123
+  → GmailProvider.getAuthUrl('user_123')          # embeds userId in OAuth state (base64 JSON)
+  → Google OAuth consent screen
+  → GET /api/auth/gmail/callback?code=X&state=<base64>
+  → AuthController decodes userId from state
+  → GmailProvider.exchangeCode(code)              # gets email + refreshToken
+  → GmailProvider.linkAccount({userId, email, refreshToken})  # starts Temporal workflow
+  → 200 HTML: "Account linked, workflow running"
+```
+
+**Files Created/Updated:**
+- `packages/backend-apis/src/providers/gmail/gmail.provider.ts` ✅ NEW
+- `packages/backend-apis/src/providers/index.ts` ✅ NEW
+- `packages/backend-apis/src/controllers/auth.controller.ts` ✅ REFACTORED
+- `packages/backend-apis/src/controllers/gmail-webhook.controller.ts` ✅ REFACTORED
+- `packages/backend-apis/src/routes/auth.routes.ts` ✅ UPDATED
+- `packages/backend-apis/src/routes/gmail-webhook.routes.ts` ✅ UPDATED
+
+#### 12. Production Infrastructure (100%)
+- ✅ Kubernetes (k3s) Helm chart deployment
+- ✅ NGINX Ingress for `wallet.rotbyte.com` (Cloudflare Full SSL, no TLS block needed)
+- ✅ Temporal UI exposed at `temporal.rotbyte.com`
+- ✅ Docker multi-arch images (linux/amd64 + linux/arm64)
+- ✅ GitHub Actions CI/CD: build → push → `helm upgrade` → `kubectl rollout status`
+- ✅ `HELM_VALUES_SECRETS` GitHub secret for production secrets
+- ✅ Image tags: `dev` branch → `:dev` tag, main → `:latest`
+
+#### 13. OpenAPI / Swagger Docs (100%)
+- ✅ All endpoints documented with full request/response schemas
+- ✅ Reusable `$ref` components (Email, Schedule, WorkflowStatus, ErrorResponse, etc.)
+- ✅ Production server URL in Swagger spec
+- ✅ `__dirname`-based `apis` paths (fixes Docker CWD mismatch)
+- ✅ ReDoc and Scalar UI both available
+
+#### 14. Gmail OAuth + Pub/Sub (100%)
+- ✅ Redirect URI updated to `https://wallet.rotbyte.com/api/auth/gmail/callback`
+- ✅ Registered in Google Cloud Console
+- ✅ Auto-link on OAuth callback (no manual curl needed)
+
+---
 
 ### 1. Project Structure (100%)
 - ✅ Monorepo setup with npm workspaces
@@ -157,38 +228,6 @@ Building an expense tracking system using:
 
 **Files Created**:
 - `README.md` (completely rewritten)
-
----
-
-## 🚧 Current Blocker
-
-### ⚠️ DISK SPACE ISSUE
-
-**Problem**: Out of disk space prevents:
-- ❌ `npm install` (fails with ENOSPC error)
-- ❌ Docker image pulls (I/O errors)
-- ❌ Running the application
-
-**Solution Required**:
-```bash
-# Check disk usage
-df -h
-
-# Clean Docker (will free several GB)
-docker system prune -a
-docker volume prune
-
-# Clean npm cache
-npm cache clean --force
-
-# macOS specific
-# - Empty Trash
-# - Remove old downloads
-# - Delete unused applications
-# - Clear browser caches
-```
-
-**Recommended**: Free at least 10GB before continuing.
 
 ---
 
