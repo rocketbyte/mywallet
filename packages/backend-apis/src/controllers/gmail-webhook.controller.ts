@@ -35,9 +35,18 @@ export class GmailWebhookController {
       let notification: DecodedGmailNotification;
       try {
         notification = JSON.parse(decodedData);
-      } catch (error) {
-        logger.error('Error parsing Gmail webhook payload', { error });
-        res.status(500).json({ error: 'webhook_processing_failed', message: (error as Error).message });
+      } catch {
+        // Non-JSON payload (e.g. manual test messages published to the topic).
+        // Acknowledge with 200 so Pub/Sub stops retrying — nothing to process.
+        logger.warn('Ignoring non-JSON Pub/Sub message', { data: decodedData });
+        res.status(200).json({ status: 'ignored', reason: 'invalid_payload' });
+        return;
+      }
+
+      if (!notification.emailAddress || !notification.historyId) {
+        // Valid JSON but not a Gmail notification — acknowledge and ignore.
+        logger.warn('Ignoring Pub/Sub message missing emailAddress/historyId', { notification });
+        res.status(200).json({ status: 'ignored', reason: 'not_gmail_notification' });
         return;
       }
 
