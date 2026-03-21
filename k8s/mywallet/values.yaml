@@ -28,7 +28,7 @@ backend:
 
   image:
     repository: ghcr.io/rocketbyte/mywallet-backend-api
-    tag: "latest"
+    tag: "dev"
     pullPolicy: Always
 
   service:
@@ -100,7 +100,7 @@ worker:
 
   image:
     repository: ghcr.io/rocketbyte/mywallet-temporal-worker
-    tag: "latest"
+    tag: "dev"
     pullPolicy: Always
 
   resources:

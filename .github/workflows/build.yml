@@ -149,10 +149,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
+      - name: Install kubectl and helm
+        run: |
+          curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl && mv kubectl /usr/local/bin/
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
       - name: Configure kubectl
         env:
@@ -167,14 +168,24 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-      - name: Restart deployments to pull new images
+      - name: Deploy via Helm
+        env:
+          MONGODB_ROOT_PASSWORD: ${{ secrets.MONGODB_ROOT_PASSWORD }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          kubectl rollout restart deployment/mywallet-backend-api -n wallet
-          kubectl rollout restart deployment/mywallet-temporal-worker -n wallet
-
-          echo "⏳ Waiting for deployments to complete..."
-          kubectl rollout status deployment/mywallet-backend-api -n wallet --timeout=5m
-          kubectl rollout status deployment/mywallet-temporal-worker -n wallet --timeout=5m
+          helm upgrade mywallet k8s/mywallet/ \
+            --namespace wallet \
+            --values k8s/mywallet/values.yaml \
+            --set secrets.mongodb.rootPassword="$MONGODB_ROOT_PASSWORD" \
+            --set secrets.gmail.clientId="$GMAIL_CLIENT_ID" \
+            --set secrets.gmail.clientSecret="$GMAIL_CLIENT_SECRET" \
+            --set secrets.gmail.refreshToken="$GMAIL_REFRESH_TOKEN" \
+            --set secrets.openai.apiKey="$OPENAI_API_KEY" \
+            --wait \
+            --timeout 5m
 
       - name: Verify deployment
         run: |
