@@ -85,7 +85,11 @@ export class GmailProvider implements IEmailProvider {
    */
   async linkAccount(input: LinkAccountInput): Promise<LinkAccountResult> {
     const { userId, email, refreshToken } = input;
-    const pubSubTopicName = input.pubSubTopicName ?? process.env.PUBSUB_TOPIC_NAME ?? '';
+    const pubSubTopicName = input.pubSubTopicName ?? process.env.GMAIL_PUBSUB_TOPIC ?? '';
+
+    if (!pubSubTopicName) {
+      throw new Error('Pub/Sub topic name is required. Set GMAIL_PUBSUB_TOPIC env var or pass pubSubTopicName explicitly.');
+    }
 
     const workflowId = `${GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX}${userId}`;
     const client = await getTemporalClient();
