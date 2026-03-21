@@ -174,14 +174,20 @@ jobs:
         run: |
           echo "$HELM_VALUES_SECRETS" > /tmp/values-secrets.yaml
 
+          # Use a branch+SHA tag so every push produces a unique image tag.
+          # Kubernetes detects the change and restarts pods automatically.
+          IMAGE_TAG="${{ github.ref_name }}-$(echo ${{ github.sha }} | cut -c1-7)"
+
           helm upgrade mywallet k8s/mywallet/ \
             --namespace wallet \
             --values k8s/mywallet/values.yaml \
-            --values /tmp/values-secrets.yaml
+            --values /tmp/values-secrets.yaml \
+            --set backend.image.tag="${IMAGE_TAG}" \
+            --set worker.image.tag="${IMAGE_TAG}"
 
           rm /tmp/values-secrets.yaml
 
-          echo "⏳ Waiting for rollout..."
+          echo "⏳ Waiting for rollout (image: ${IMAGE_TAG})..."
           kubectl rollout status deployment/mywallet-backend-api -n wallet --timeout=10m
           kubectl rollout status deployment/mywallet-temporal-worker -n wallet --timeout=10m
 
