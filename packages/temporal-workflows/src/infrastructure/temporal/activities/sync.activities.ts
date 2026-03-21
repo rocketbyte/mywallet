@@ -252,6 +252,13 @@ export function createSyncActivities(container: DependencyContainer) {
     async saveGmailAccount(input: SaveGmailAccountInput): Promise<void> {
       Context.current().heartbeat({ userId: input.userId });
 
+      // Deactivate any other accounts sharing the same email so the webhook
+      // lookup always resolves to the most recently linked account.
+      await GmailAccount.updateMany(
+        { email: input.email, userId: { $ne: input.userId } },
+        { isActive: false }
+      );
+
       await GmailAccount.findOneAndUpdate(
         { userId: input.userId },
         {
