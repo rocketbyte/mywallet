@@ -149,10 +149,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
+      - name: Install kubectl and helm
+        run: |
+          curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl && mv kubectl /usr/local/bin/
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
       - name: Configure kubectl
         env:
@@ -167,14 +168,28 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-      - name: Restart deployments to pull new images
+      - name: Deploy via Helm
+        env:
+          HELM_VALUES_SECRETS: ${{ secrets.HELM_VALUES_SECRETS }}
         run: |
-          kubectl rollout restart deployment/mywallet-backend-api -n wallet
-          kubectl rollout restart deployment/mywallet-temporal-worker -n wallet
+          echo "$HELM_VALUES_SECRETS" > /tmp/values-secrets.yaml
 
-          echo "⏳ Waiting for deployments to complete..."
-          kubectl rollout status deployment/mywallet-backend-api -n wallet --timeout=5m
-          kubectl rollout status deployment/mywallet-temporal-worker -n wallet --timeout=5m
+          # Use a branch+SHA tag so every push produces a unique image tag.
+          # Kubernetes detects the change and restarts pods automatically.
+          IMAGE_TAG="${{ github.ref_name }}-$(echo ${{ github.sha }} | cut -c1-7)"
+
+          helm upgrade mywallet k8s/mywallet/ \
+            --namespace wallet \
+            --values k8s/mywallet/values.yaml \
+            --values /tmp/values-secrets.yaml \
+            --set backend.image.tag="${IMAGE_TAG}" \
+            --set worker.image.tag="${IMAGE_TAG}"
+
+          rm /tmp/values-secrets.yaml
+
+          echo "⏳ Waiting for rollout (image: ${IMAGE_TAG})..."
+          kubectl rollout status deployment/mywallet-backend-api -n wallet --timeout=10m
+          kubectl rollout status deployment/mywallet-temporal-worker -n wallet --timeout=10m
 
       - name: Verify deployment
         run: |

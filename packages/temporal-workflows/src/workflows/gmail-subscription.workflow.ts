@@ -182,10 +182,19 @@ export async function gmailSubscriptionWorkflow(
    * by Google and no amount of retrying will recover it.
    */
   function isRevocationError(error: unknown): boolean {
-    const msg = (error as Error)?.message ?? String(error);
-    return TOKEN_REFRESH_CONFIG.REVOCATION_ERROR_TYPES.some(pattern =>
-      msg.toLowerCase().includes(pattern.toLowerCase())
-    );
+    // Temporal wraps activity errors — the real message may be in the cause chain.
+    // Walk the entire chain so invalid_grant is caught regardless of wrapping depth.
+    let current: unknown = error;
+    while (current) {
+      const msg = (current as Error)?.message ?? String(current);
+      if (TOKEN_REFRESH_CONFIG.REVOCATION_ERROR_TYPES.some(p =>
+        msg.toLowerCase().includes(p.toLowerCase())
+      )) {
+        return true;
+      }
+      current = (current as any)?.cause;
+    }
+    return false;
   }
 
   // -------------------------------------------------------------------------
@@ -207,7 +216,8 @@ export async function gmailSubscriptionWorkflow(
         forceRefresh
       });
       currentAccessToken = result.accessToken;
-      tokenExpiresAt = result.expiresAt;
+      // Activity results are JSON-deserialized — Date becomes a string in transit.
+      tokenExpiresAt = new Date(result.expiresAt);
 
       log.info('Access token is fresh', {
         expiresAt: result.expiresAt,

@@ -1,18 +1,18 @@
 import { Router } from 'express';
 import { GmailWebhookController } from '../controllers/gmail-webhook.controller';
-import mongoose from 'mongoose';
+import { gmailProvider } from '../providers';
 
 const router = Router();
-
-// Initialize controller with MongoDB connection
-const controller = new GmailWebhookController(mongoose.connection);
+const controller = new GmailWebhookController(gmailProvider);
 
 /**
  * @openapi
  * /gmail/webhook:
  *   post:
  *     summary: Receive Gmail Pub/Sub notification
- *     description: Endpoint called by Google Pub/Sub when a new change occurs in a watched Gmail account.
+ *     description: |
+ *       Called by Google Pub/Sub when a new change occurs in a watched Gmail account.
+ *       Signals (or starts) the Temporal `gmailSubscriptionWorkflow` for the matching user.
  *     tags: [Gmail]
  *     requestBody:
  *       required: true
@@ -27,7 +27,7 @@ const controller = new GmailWebhookController(mongoose.connection);
  *                 properties:
  *                   data:
  *                     type: string
- *                     description: Base64 encoded JSON notification.
+ *                     description: Base64-encoded JSON notification `{ emailAddress, historyId }`.
  *                   messageId:
  *                     type: string
  *                   publishTime:
@@ -47,6 +47,8 @@ const controller = new GmailWebhookController(mongoose.connection);
  *                   enum: [processed, ignored]
  *                 workflowId:
  *                   type: string
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post('/webhook', (req, res) => controller.handleWebhook(req, res));
 
@@ -55,7 +57,9 @@ router.post('/webhook', (req, res) => controller.handleWebhook(req, res));
  * /gmail/link:
  *   post:
  *     summary: Link a Gmail account
- *     description: Starts the Temporal synchronization workflow for a new Gmail account.
+ *     description: |
+ *       Starts the Temporal `gmailSubscriptionWorkflow` for the given user.
+ *       Use this for manual linking when `userId` was not passed to `GET /auth/gmail`.
  *     tags: [Gmail]
  *     requestBody:
  *       required: true
@@ -63,21 +67,35 @@ router.post('/webhook', (req, res) => controller.handleWebhook(req, res));
  *         application/json:
  *           schema:
  *             type: object
- *             required: [userId, email, refreshToken, pubSubTopicName]
+ *             required: [userId, email, refreshToken]
  *             properties:
  *               userId:
  *                 type: string
+ *                 example: user_123
  *               email:
  *                 type: string
  *                 format: email
+ *                 example: user@gmail.com
  *               refreshToken:
  *                 type: string
  *               pubSubTopicName:
  *                 type: string
+ *                 description: Overrides the default PubSub topic from env.
  *     responses:
  *       201:
  *         description: Account linked and workflow started.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: linked }
+ *                 userId: { type: string }
+ *                 workflowId: { type: string }
+ *                 message: { type: string }
  *       400:
+ *         $ref: '#/components/responses/ServerError'
+ *       500:
  *         $ref: '#/components/responses/ServerError'
  */
 router.post('/link', (req, res) => controller.linkAccount(req, res));
@@ -87,7 +105,7 @@ router.post('/link', (req, res) => controller.linkAccount(req, res));
  * /gmail/unlink/{userId}:
  *   delete:
  *     summary: Unlink a Gmail account
- *     description: Stops the Temporal synchronization and removes the account.
+ *     description: Sends a `stopSync` signal to the Temporal workflow and marks the account inactive.
  *     tags: [Gmail]
  *     parameters:
  *       - in: path
@@ -95,11 +113,22 @@ router.post('/link', (req, res) => controller.linkAccount(req, res));
  *         required: true
  *         schema:
  *           type: string
+ *         example: user_123
  *     responses:
  *       200:
  *         description: Account unlinked successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: unlinked }
+ *                 userId: { type: string }
+ *                 message: { type: string }
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res));
 
@@ -108,7 +137,7 @@ router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res
  * /gmail/status/{userId}:
  *   get:
  *     summary: Get Gmail sync status
- *     description: Returns the current status of the Temporal sync workflow and account metadata.
+ *     description: Returns the MongoDB account record merged with the live Temporal workflow status.
  *     tags: [Gmail]
  *     parameters:
  *       - in: path
@@ -116,11 +145,29 @@ router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res
  *         required: true
  *         schema:
  *           type: string
+ *         example: user_123
  *     responses:
  *       200:
- *         description: Success.
+ *         description: Account status.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userId: { type: string }
+ *                 email: { type: string }
+ *                 isActive: { type: boolean }
+ *                 workflowId: { type: string }
+ *                 workflowStatus: { type: string }
+ *                 watchExpiration: { type: string, format: date-time, nullable: true }
+ *                 lastSyncAt: { type: string, format: date-time, nullable: true }
+ *                 totalEmailsSynced: { type: integer }
+ *                 lastError: { type: string, nullable: true }
+ *                 errorCount: { type: integer }
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get('/status/:userId', (req, res) => controller.getStatus(req, res));
 

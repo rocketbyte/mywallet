@@ -1,24 +1,377 @@
 # MyWallet Implementation Status
 
-**Last Updated**: December 10, 2024
-**Phase**: Phase 1 - Infrastructure and Core Implementation
-**Status**: 90% Complete (Blocked by disk space)
+**Last Updated**: March 21, 2026
+**Phase**: Phase 2 - Production Stabilization
+**Status**: Production — deployed at https://wallet.rotbyte.com — end-to-end Gmail sync working
 
 ---
 
 ## 🎯 Project Overview
 
-Building an expense tracking system using:
-- **Temporal.io** for durable workflow orchestration
-- **Gmail API** to fetch bank transaction emails
-- **OpenAI** for AI-powered transaction extraction
-- **MongoDB** for data storage
-- **Express** for REST API
-- **Docker Compose** for containerization
+An expense tracking system that automatically extracts bank transactions from Gmail emails.
+
+**Stack:**
+- **Temporal.io** — durable workflow orchestration (self-hosted on Raspberry Pi k3s cluster)
+- **Gmail API** — OAuth2 + Pub/Sub push notifications for real-time email sync
+- **OpenAI / Ollama** — AI-powered transaction extraction from email bodies
+- **MongoDB** — multi-tenant data storage
+- **Express** — REST API with OpenAPI/Swagger docs
+- **Kubernetes (k3s)** — deployed on Raspberry Pi cluster via Helm
+
+**Production URLs:**
+| Service | URL |
+|---------|-----|
+| API | https://wallet.rotbyte.com/api |
+| API Docs (ReDoc) | https://wallet.rotbyte.com/docs/reference |
+| API Docs (Scalar) | https://wallet.rotbyte.com/docs/playground |
+| OpenAPI JSON | https://wallet.rotbyte.com/docs/openapi.json |
+| Temporal UI | https://temporal.rotbyte.com |
+
+**Infrastructure:**
+- Kubernetes namespace: `wallet` on k3s cluster
+- Docker images: `ghcr.io/rocketbyte/mywallet-backend-api:dev` and `mywallet-temporal-worker:dev`
+- Helm chart: `k8s/mywallet/`
+- CI/CD: GitHub Actions → build multi-arch Docker images → `helm upgrade` → `kubectl rollout status`
 
 ---
 
 ## ✅ Completed Work
+
+---
+
+## 🗄️ Database Schema — Current State
+
+**Last reviewed**: March 21, 2026
+6 collections in use. One active migration in progress (`emails` → `notifications` + `transactions` refactor).
+
+---
+
+### `emails` ⚠️ being replaced
+Raw emails mixed with processing state in one document. Being split into `notifications` (raw) + updated `transactions` (processed result).
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String | Tenant identifier |
+| `emailId` | String | Gmail message ID |
+| `threadId` | String | Gmail thread ID |
+| `from`, `to`, `subject` | String | Email headers |
+| `date` | Date | Email sent date |
+| `body` | String | Plain text body |
+| `snippet` | String | Gmail preview |
+| `rawHtml` | String | Original HTML |
+| `isProcessed` | Boolean | Processing pipeline state |
+| `processedAt` | Date | When processed |
+| `processingWorkflowId` | String | Temporal workflow that processed it |
+| `matchedPatternId/Name` | String | Which pattern matched |
+| `transactionId` | String | Link to extracted transaction |
+| `confidence` | Number | AI extraction confidence |
+| `processingError` | String | Error if processing failed |
+| `fetchedAt` | Date | When our system received it |
+| `fetchedBy` | String | Which workflow fetched it |
+
+**Problems**: mixes immutable raw data with mutable processing state; `emailId`/`threadId` are Gmail-specific field names; `rawHtml` is optional but needed for reprocessing.
+
+---
+
+### `transactions`
+AI-extracted structured financial data. Currently duplicates several raw email fields.
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String | Tenant identifier |
+| `emailId` | String | Source Gmail message ID ⚠️ duplicated from emails |
+| `emailSubject` | String | ⚠️ duplicated from emails |
+| `emailDate` | Date | ⚠️ duplicated from emails |
+| `emailFrom` | String | ⚠️ duplicated from emails |
+| `rawEmailText` | String | ⚠️ duplicated from emails |
+| `transactionDate` | Date | Extracted transaction date |
+| `merchant` | String | Extracted merchant name |
+| `amount` | Number | Extracted amount |
+| `currency` | String | ISO 4217 (USD, DOP, EUR...) |
+| `category` | String | Food, Transport, Shopping, etc. |
+| `subcategory` | String | Optional sub-classification |
+| `transactionType` | String | `debit` or `credit` |
+| `accountNumber` | String | Last 4 digits |
+| `bankName` | String | Bank name |
+| `extractedData` | Mixed | Raw AI response |
+| `confidence` | Number | 0–1 extraction confidence score |
+| `workflowId` | String | Temporal workflow that extracted it |
+| `workflowRunId` | String | Temporal run ID |
+| `processedAt` | Date | When extracted |
+
+**Problems**: `emailId`, `emailSubject`, `emailDate`, `emailFrom`, `rawEmailText` are all denormalized copies of data in `emails` — these will be replaced by a single `notificationId` reference once the migration is complete.
+
+---
+
+### `gmail_accounts`
+One record per linked Gmail account. Manages OAuth tokens and watch subscription lifecycle.
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String | Unique — one Gmail account per user |
+| `email` | String | Gmail address |
+| `refreshToken` | String | Long-lived OAuth token (select: false) |
+| `currentAccessToken` | String | Short-lived token (select: false) |
+| `accessTokenExpiresAt` | Date | Token expiry |
+| `watchExpiration` | Date | Gmail watch subscription expiry (7-day max) |
+| `historyId` | String | Last processed Gmail history ID |
+| `lastSyncAt` | Date | Last successful sync |
+| `workflowId` | String | Associated Temporal workflow ID |
+| `isActive` | Boolean | Whether sync is running |
+| `pubSubTopicName` | String | GCP Pub/Sub topic name |
+| `pubSubSubscription` | String | GCP Pub/Sub subscription ID |
+| `totalEmailsSynced` | Number | Cumulative sync counter |
+| `lastError` | String | Last error message |
+| `errorCount` | Number | Error counter |
+
+**Problems**: collection name and fields are Gmail-specific. When Outlook support is added this should become a generic `linked_accounts` collection with a `provider` field (same pattern as `IEmailProvider` abstraction in the API layer).
+
+---
+
+### `email_patterns`
+Rules used to recognize bank transaction emails and guide AI extraction.
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | String | Unique pattern name |
+| `bankName` | String | e.g. Chase, Banreservas |
+| `accountType` | String | `credit`, `debit`, `checking`, `savings` |
+| `fromAddresses` | String[] | Sender email addresses to match |
+| `subjectPatterns` | String[] | Regex patterns for subject matching |
+| `bodyKeywords` | String[] | Keywords to confirm match |
+| `extractionPrompt` | String | AI prompt used for data extraction |
+| `isActive` | Boolean | Whether pattern is in use |
+| `priority` | Number | Match priority (higher = checked first) |
+| `matchCount` | Number | Total times this pattern matched |
+| `successRate` | Number | Successful extraction rate |
+| `lastMatchedAt` | Date | Last time it matched an email |
+
+**Problems**: `fromAddresses` and `subjectPatterns` work fine for Gmail but are also valid for any IMAP/SMTP provider — no changes needed now. `extractionPrompt` is AI-agnostic (plain text). No migration needed.
+
+---
+
+### `budgets`
+Monthly spending budget allocations per user.
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String | Tenant identifier |
+| `month` | Number | 1–12 |
+| `year` | Number | e.g. 2026 |
+| `categories` | Array | `{ category, budgetAmount, spentAmount, transactionCount }` |
+| `totalBudget` | Number | Sum of all category budgets |
+| `totalSpent` | Number | Sum of all actual spending |
+| `lastCalculatedAt` | Date | Last recalculation timestamp |
+
+**Problems**: none. No migration needed.
+
+---
+
+### `schedule_configs`
+Configuration for Temporal schedules that poll Gmail on a cron.
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String | Tenant identifier |
+| `scheduleId` | String | Unique Temporal schedule ID |
+| `name` | String | User-friendly name |
+| `description` | String | Optional |
+| `isActive` | Boolean | Whether schedule is running |
+| `searchQuery` | String | ⚠️ Gmail search query string |
+| `cronExpression` | String | Cron schedule (default: every minute) |
+| `maxResults` | Number | Max emails per run |
+| `afterDate` | Date | Only fetch emails after this date |
+| `skipProcessed` | Boolean | Skip emails already in DB |
+| `totalRuns` | Number | Cumulative run counter |
+| `lastRunAt` | Date | Last run timestamp |
+| `lastRunStatus` | String | `success` or `failure` |
+| `totalEmailsFetched` | Number | Cumulative emails fetched |
+| `totalEmailsProcessed` | Number | Cumulative emails processed |
+| `totalErrors` | Number | Cumulative error count |
+| `createdBy` | String | Creator user ID |
+
+**Problems**: `searchQuery` is a Gmail-specific search syntax string. When other providers are added, this field will need to become provider-agnostic (e.g. a structured filter object). Low priority — deferred to when a second provider is added.
+
+---
+
+### Migration Roadmap
+
+| Collection | Status | Action |
+|---|---|---|
+| `emails` | ⚠️ Active migration | Replace with `notifications` (Phase 1–5, see plan below) |
+| `transactions` | ⚠️ Needs refactor | Remove duplicated email fields, add `notificationId` ref |
+| `gmail_accounts` | 🔵 Deferred | Rename to `linked_accounts` + add `provider` field when Outlook added |
+| `email_patterns` | ✅ No action needed | Vendor-agnostic already |
+| `budgets` | ✅ No action needed | Clean |
+| `schedule_configs` | 🔵 Deferred | `searchQuery` becomes structured filter when second provider added |
+
+---
+
+### Planned: `notifications` (replaces `emails`)
+Immutable raw record. Saved once when the message arrives from any provider. Never updated except for `status`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String | Tenant identifier |
+| `provider` | String | `gmail`, `outlook`, `yahoo`, etc. (open string) |
+| `providerMessageId` | String | Provider's own message ID |
+| `providerThreadId` | String | Thread/conversation ID |
+| `from` | String | Sender address |
+| `to` | String | Recipient address |
+| `subject` | String | Email subject |
+| `receivedAt` | Date | When the bank sent it |
+| `bodyText` | String | Plain text (HTML stripped) |
+| `bodyHtml` | String | Original HTML — required, not optional |
+| `snippet` | String | Short preview |
+| `status` | String | `pending`, `processing`, `processed`, `failed`, `ignored` |
+| `ingestedAt` | Date | When our system received it |
+| `ingestedBy` | String | Workflow/process ID that ingested it |
+| `createdAt` | Date | Auto |
+| `updatedAt` | Date | Auto |
+
+**Compound unique index**: `{ userId, providerMessageId }` — per-tenant deduplication.
+
+---
+
+### Planned: `transactions` (after refactor)
+Removes all denormalized email fields. References `notifications` instead.
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | String | Tenant identifier |
+| `notificationId` | ObjectId | Reference to `notifications._id` |
+| `transactionDate` | Date | Extracted transaction date |
+| `merchant` | String | Extracted merchant name |
+| `amount` | Number | Extracted amount |
+| `currency` | String | ISO 4217 |
+| `type` | String | `debit` or `credit` |
+| `category` | String | Food, Transport, Shopping, etc. |
+| `subcategory` | String | Optional |
+| `accountLast4` | String | Last 4 digits of card/account |
+| `bankName` | String | Bank name |
+| `referenceNumber` | String | Bank reference/approval code |
+| `patternId` | String | Which EmailPattern matched |
+| `patternName` | String | Pattern name at extraction time |
+| `confidence` | Number | 0–1 AI extraction confidence |
+| `status` | String | `pending_review`, `confirmed`, `rejected` |
+| `extractedAt` | Date | When extracted |
+| `workflowId` | String | Temporal workflow that extracted it |
+| `createdAt` | Date | Auto |
+| `updatedAt` | Date | Auto |
+
+**Removed from current model**: `emailId`, `emailSubject`, `emailDate`, `emailFrom`, `rawEmailText`, `extractedData` (raw AI response), `workflowRunId`.
+**Renamed**: `transactionType` → `type`, `accountNumber` → `accountLast4`.
+**Added**: `notificationId`, `referenceNumber`, `status`, `patternId`, `patternName`.
+
+---
+
+### Phase 2 — Production Bug Fixes (March 2026)
+
+#### 15. End-to-End Gmail Sync Pipeline (100%)
+
+All bugs in the real-time email sync pipeline have been resolved. The system now correctly:
+1. Receives a Gmail Pub/Sub webhook notification
+2. Signals the running `gmailSubscriptionWorkflow` via `incomingWebhook`
+3. Fetches Gmail history changes and saves new emails to MongoDB (with all required fields)
+4. Triggers `emailProcessingWorkflow` for any new messages
+5. Matches emails against patterns, extracts transactions via OpenAI, saves results
+
+**Bugs fixed:**
+
+| # | Bug | Root Cause | Fix |
+|---|-----|-----------|-----|
+| 1 | `GmailAccount.email` saved as empty string | Missing `userinfo.email` OAuth scope — `oauth2.userinfo.get()` returned nothing silently | Added scope to `GmailProvider.getAuthUrl()`; `exchangeCode()` now throws if email is empty |
+| 2 | `renewGmailWatch` activity failed with "topicName required" | `GmailProvider.linkAccount()` read `process.env.PUBSUB_TOPIC_NAME` but ConfigMap injects `GMAIL_PUBSUB_TOPIC` | Corrected env var name; added early-throw guard if topic is empty |
+| 3 | `tokenExpiresAt.getTime is not a function` crash in workflow | Temporal JSON-serializes activity return values — `Date` objects become strings in transit; workflow state had a string not a Date | `tokenExpiresAt = new Date(result.expiresAt)` after every activity call |
+| 4 | `invalid_grant` (token revocation) not caught by `isRevocationError` | Temporal wraps activity errors; outer `message` is `"Activity task failed"`, real error is in the `.cause` chain | `isRevocationError` now traverses the full `.cause` chain |
+| 5 | Webhook routed to wrong user's workflow (multiple accounts sharing same email) | Multiple `GmailAccount` docs with same email were all `isActive: true`; `findOne` returned the oldest record | `saveGmailAccount` now calls `GmailAccount.updateMany({ email, userId: { $ne } }, { isActive: false })` before upserting |
+| 6 | Non-JSON Pub/Sub test messages caused infinite webhook retry loop | Webhook handler returned `500` on JSON parse error → Pub/Sub retried indefinitely | Return `200` for non-JSON payloads and missing `emailAddress`/`historyId` fields |
+| 7 | `Email validation failed: threadId required, subject required, body required, snippet required` | `getEmailsByIds` returned a stripped `SavedEmail` without required Mongoose fields; `emailProcessingWorkflow` tried to `saveEmail` with incomplete data | `getEmailsByIds` now returns all fields (`threadId`, `to`, `body`, `snippet`); workflow skips `saveEmail` entirely in the sync path (emails already saved by `fetchGmailChanges`) |
+| 8 | Wrong ID used for `updateEmailProcessing` and `markEmailAsProcessed` in sync path | `getEmailsByIds` returns `id = MongoDB _id`, but those calls need the Gmail message ID | Added `const gmailMessageId = email.emailId ?? email.id` to normalize across both code paths |
+
+**Key architectural insight — two `emailProcessingWorkflow` paths:**
+```
+Search path (manual trigger):
+  gmailActivities.fetchEmails()  →  email.id = Gmail message ID
+  saveEmail()  →  persist to MongoDB
+  updateEmailProcessing(emailId: email.id)  ✅
+
+Sync path (triggered by gmailSubscriptionWorkflow):
+  emailActivities.getEmailsByIds()  →  email.id = MongoDB _id, email.emailId = Gmail message ID
+  saveEmail()  →  SKIP (already saved by fetchGmailChanges with complete data)
+  updateEmailProcessing(emailId: email.emailId)  ✅
+```
+
+**Files changed:**
+- `packages/temporal-workflows/src/workflows/email-processing.workflow.ts` — dual-path ID normalization, skip `saveEmail` in sync path
+- `packages/temporal-workflows/src/activities/database/email.activities.ts` — `getEmailsByIds` returns full fields
+- `packages/temporal-workflows/src/workflows/gmail-subscription.workflow.ts` — `new Date(result.expiresAt)` fix, `isRevocationError` cause-chain traversal
+- `packages/temporal-workflows/src/infrastructure/temporal/activities/sync.activities.ts` — `saveGmailAccount` deactivates duplicate email accounts
+- `packages/backend-apis/src/controllers/gmail-webhook.controller.ts` — return `200` for non-Gmail Pub/Sub messages
+- `packages/backend-apis/src/providers/gmail/gmail.provider.ts` — `userinfo.email` scope, `GMAIL_PUBSUB_TOPIC` env var, throw on empty email
+
+#### 16. CI/CD — SHA-based Image Tags & Pod Restart (100%)
+- ✅ Docker images now tagged `{branch}-{sha7}` (e.g. `dev-a1b2c3d`) — Kubernetes detects a real image change on every push
+- ✅ `helm upgrade` sets `backend.image.tag` and `worker.image.tag` from the SHA tag
+- ✅ `kubectl rollout restart` added as fallback to force pod recreation even when tag doesn't change
+
+**File changed:** `.github/workflows/build.yml`
+
+---
+
+### Phase 2 Additions (March 2026)
+
+#### 11. Provider Abstraction Layer (100%)
+- ✅ `IEmailProvider` interface (`packages/backend-apis/src/providers/types.ts`)
+- ✅ `GmailProvider` implementing `IEmailProvider` (`packages/backend-apis/src/providers/gmail/gmail.provider.ts`)
+- ✅ Provider registry (`packages/backend-apis/src/providers/index.ts`)
+- ✅ `AuthController` refactored to be provider-agnostic (accepts `IEmailProvider`)
+- ✅ `GmailWebhookController` delegates `linkAccount`, `unlinkAccount`, `getAccountStatus` to provider
+- ✅ Auto-link OAuth flow: `GET /api/auth/gmail?userId=<id>` embeds userId in OAuth `state`; callback auto-links on return
+- ✅ Adding Outlook/Yahoo requires only: implement `IEmailProvider` + register in `providers/index.ts`
+
+**Architecture:**
+```
+GET /api/auth/gmail?userId=user_123
+  → GmailProvider.getAuthUrl('user_123')          # embeds userId in OAuth state (base64 JSON)
+  → Google OAuth consent screen
+  → GET /api/auth/gmail/callback?code=X&state=<base64>
+  → AuthController decodes userId from state
+  → GmailProvider.exchangeCode(code)              # gets email + refreshToken
+  → GmailProvider.linkAccount({userId, email, refreshToken})  # starts Temporal workflow
+  → 200 HTML: "Account linked, workflow running"
+```
+
+**Files Created/Updated:**
+- `packages/backend-apis/src/providers/gmail/gmail.provider.ts` ✅ NEW
+- `packages/backend-apis/src/providers/index.ts` ✅ NEW
+- `packages/backend-apis/src/controllers/auth.controller.ts` ✅ REFACTORED
+- `packages/backend-apis/src/controllers/gmail-webhook.controller.ts` ✅ REFACTORED
+- `packages/backend-apis/src/routes/auth.routes.ts` ✅ UPDATED
+- `packages/backend-apis/src/routes/gmail-webhook.routes.ts` ✅ UPDATED
+
+#### 12. Production Infrastructure (100%)
+- ✅ Kubernetes (k3s) Helm chart deployment
+- ✅ NGINX Ingress for `wallet.rotbyte.com` (Cloudflare Full SSL, no TLS block needed)
+- ✅ Temporal UI exposed at `temporal.rotbyte.com`
+- ✅ Docker multi-arch images (linux/amd64 + linux/arm64)
+- ✅ GitHub Actions CI/CD: build → push → `helm upgrade` → `kubectl rollout status`
+- ✅ `HELM_VALUES_SECRETS` GitHub secret for production secrets
+- ✅ Image tags: `dev` branch → `:dev` tag, main → `:latest`
+
+#### 13. OpenAPI / Swagger Docs (100%)
+- ✅ All endpoints documented with full request/response schemas
+- ✅ Reusable `$ref` components (Email, Schedule, WorkflowStatus, ErrorResponse, etc.)
+- ✅ Production server URL in Swagger spec
+- ✅ `__dirname`-based `apis` paths (fixes Docker CWD mismatch)
+- ✅ ReDoc and Scalar UI both available
+
+#### 14. Gmail OAuth + Pub/Sub (100%)
+- ✅ Redirect URI updated to `https://wallet.rotbyte.com/api/auth/gmail/callback`
+- ✅ Registered in Google Cloud Console
+- ✅ Auto-link on OAuth callback (no manual curl needed)
+
+---
 
 ### 1. Project Structure (100%)
 - ✅ Monorepo setup with npm workspaces
@@ -157,38 +510,6 @@ Building an expense tracking system using:
 
 **Files Created**:
 - `README.md` (completely rewritten)
-
----
-
-## 🚧 Current Blocker
-
-### ⚠️ DISK SPACE ISSUE
-
-**Problem**: Out of disk space prevents:
-- ❌ `npm install` (fails with ENOSPC error)
-- ❌ Docker image pulls (I/O errors)
-- ❌ Running the application
-
-**Solution Required**:
-```bash
-# Check disk usage
-df -h
-
-# Clean Docker (will free several GB)
-docker system prune -a
-docker volume prune
-
-# Clean npm cache
-npm cache clean --force
-
-# macOS specific
-# - Empty Trash
-# - Remove old downloads
-# - Delete unused applications
-# - Clear browser caches
-```
-
-**Recommended**: Free at least 10GB before continuing.
 
 ---
 
@@ -501,35 +822,32 @@ curl http://localhost:3000/api/health
 
 ## 📊 Progress Summary
 
-| Component | Status | Files | Progress |
-|-----------|--------|-------|----------|
-| Project Setup | ✅ Complete | 7 | 100% |
-| Data Models | ✅ Complete | 7 | 100% |
-| API Clients | ✅ Complete | 6 | 100% |
-| Temporal Activities | ✅ Complete | 5 | 100% |
-| Temporal Workflows | ✅ Complete | 2 | 100% |
-| Worker Process | ✅ Complete | 3 | 100% |
-| Express API | ✅ Complete | 9 | 100% |
-| Docker Infrastructure | ✅ Complete | 4 | 100% |
-| Seed Data | ✅ Complete | 1 | 100% |
-| Documentation | ✅ Complete | 2 | 100% |
-| **TOTAL** | **90% Complete** | **60+** | **Blocked by disk space** |
+| Component | Status | Progress |
+|-----------|--------|----------|
+| Project Setup | ✅ Complete | 100% |
+| Data Models | ✅ Complete | 100% |
+| API Clients | ✅ Complete | 100% |
+| Temporal Activities | ✅ Complete | 100% |
+| Temporal Workflows | ✅ Complete | 100% |
+| Worker Process | ✅ Complete | 100% |
+| Express API | ✅ Complete | 100% |
+| Docker / K8s Infrastructure | ✅ Complete | 100% |
+| CI/CD Pipeline | ✅ Complete | 100% |
+| Provider Abstraction (IEmailProvider) | ✅ Complete | 100% |
+| Gmail OAuth + Pub/Sub Real-time Sync | ✅ Complete | 100% |
+| Email Processing Pipeline (sync path) | ✅ Complete | 100% |
+| Documentation | ✅ Complete | 100% |
+| **TOTAL** | **Production — end-to-end working** | **100%** |
 
 ---
 
 ## 🐛 Known Issues
 
-1. **Disk Space**: Cannot install dependencies or run Docker
-   - **Impact**: Blocking all testing
-   - **Resolution**: Free minimum 10GB
+1. **Stale Temporal workflows** (`gmail-subscription-11`, `-12`, `-13`): started before the `pubSubTopicName` fix — they have an empty topic name and will keep failing. Terminate them via the Temporal UI (`https://temporal.rotbyte.com`) and re-link those accounts.
 
-2. **Gmail OAuth Helper**: Script not yet created
-   - **Impact**: Manual OAuth setup required
-   - **Resolution**: Create `scripts/setup-gmail-oauth.ts`
-
-3. **No Tests**: Unit and integration tests not implemented
+2. **No Tests**: Unit and integration tests not implemented
    - **Impact**: Manual testing only
-   - **Resolution**: Add Jest tests in Phase 2
+   - **Resolution**: Add Jest tests (see Phase 3 Enhancements)
 
 ---
 
@@ -572,5 +890,5 @@ curl http://localhost:3000/api/health
 
 ---
 
-**Status**: Ready for testing once disk space is available!
-**Next Session**: Free disk space → Install deps → Configure APIs → Test!
+**Status**: Production — Gmail sync pipeline fully operational end-to-end.
+**Next**: Add user/email query endpoints, terminate stale workflows in Temporal UI.

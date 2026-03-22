@@ -237,9 +237,13 @@ export const createEmailActivities = (mongoConnection: Connection) => {
       return emails.map(email => ({
         id: email._id.toString(),
         emailId: email.emailId,
+        threadId: email.threadId,
         subject: email.subject,
         from: email.from,
+        to: email.to,
         date: email.date,
+        body: email.body,
+        snippet: email.snippet,
         isProcessed: email.isProcessed
       }));
     }

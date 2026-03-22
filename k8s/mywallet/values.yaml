@@ -3,7 +3,7 @@
 # Global configuration
 global:
   namespace: wallet
-  domain: rocketbyte.duckdns.org
+  domain: wallet.rotbyte.com
   storageClass: local-path
 
   # Node selector for Raspberry Pi cluster
@@ -28,7 +28,7 @@ backend:
 
   image:
     repository: ghcr.io/rocketbyte/mywallet-backend-api
-    tag: "latest"
+    tag: "dev"
     pullPolicy: Always
 
   service:
@@ -40,18 +40,16 @@ backend:
     enabled: true
     className: nginx
     annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
       nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     hosts:
-      - host: rocketbyte.duckdns.org
+      - host: wallet.rotbyte.com
         paths:
           - path: /api
             pathType: Prefix
-    tls:
-      - hosts:
-          - rocketbyte.duckdns.org
-        secretName: ssl-cert-prod
+          - path: /docs
+            pathType: Prefix
+    tls: []
 
   resources:
     requests:
@@ -102,7 +100,7 @@ worker:
 
   image:
     repository: ghcr.io/rocketbyte/mywallet-temporal-worker
-    tag: "latest"
+    tag: "dev"
     pullPolicy: Always
 
   resources:
@@ -175,7 +173,7 @@ app:
   # Gmail configuration
   gmail:
     pubSubTopic: "projects/mywallet-481322/topics/gmail-notifications"
-    redirectUri: "https://rocketbyte.duckdns.org/api/auth/gmail/callback"
+    redirectUri: "https://wallet.rotbyte.com/api/auth/gmail/callback"
     # OAuth credentials are set in values-secrets.yaml
 
   # AI configuration
