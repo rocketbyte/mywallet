@@ -30,13 +30,6 @@ data:
   GMAIL_PUBSUB_TOPIC: {{ .Values.app.gmail.pubSubTopic | quote }}
   GMAIL_REDIRECT_URI: {{ .Values.app.gmail.redirectUri | quote }}
 
-  # AI configuration
-  AI_PROVIDER: {{ .Values.app.ai.provider | quote }}
+  # AI configuration — all calls routed through LiteLLM gateway (llm namespace)
+  LITELLM_BASE_URL: {{ .Values.app.ai.litellmBaseUrl | quote }}
   OPENAI_MODEL: {{ .Values.app.ai.model | quote }}
-  OLLAMA_MODEL: {{ .Values.app.ai.model | quote }}
-  {{- if and .Values.app.ai.endpoint (eq .Values.app.ai.provider "ollama") }}
-  OLLAMA_ENDPOINT: {{ .Values.app.ai.endpoint | quote }}
-  {{- end }}
-  {{- if and .Values.app.ai.endpoint (eq .Values.app.ai.provider "openai") }}
-  OPENAI_ENDPOINT: {{ .Values.app.ai.endpoint | quote }}
-  {{- end }}

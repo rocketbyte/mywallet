@@ -1,28 +1,17 @@
-import { proxyActivities, sleep, log } from '@temporalio/workflow';
+import { proxyActivities, executeChild, sleep, log } from '@temporalio/workflow';
 import type { GmailActivities } from '../activities/gmail/gmail.activities';
-import type { OpenAIActivities } from '../activities/openai/openai.activities';
-import type { MongoDBActivities } from '../activities/database/mongodb.activities';
 import type { EmailActivities } from '../activities/database/email.activities';
 import {
   EmailProcessingInput,
   EmailProcessingResult
 } from '../shared/types';
-import { ACTIVITY_TIMEOUTS, RETRY_POLICIES, CONFIDENCE_THRESHOLD } from '../shared/constants';
+import { ACTIVITY_TIMEOUTS, RETRY_POLICIES } from '../shared/constants';
+import { transactionPipelineWorkflow } from './transaction-pipeline.workflow';
 
 // Proxy activities with their respective configurations
 const gmailActivities = proxyActivities<GmailActivities>({
   startToCloseTimeout: ACTIVITY_TIMEOUTS.GMAIL_FETCH,
   retry: RETRY_POLICIES.GMAIL
-});
-
-const openaiActivities = proxyActivities<OpenAIActivities>({
-  startToCloseTimeout: ACTIVITY_TIMEOUTS.OPENAI_EXTRACT,
-  retry: RETRY_POLICIES.OPENAI
-});
-
-const mongoActivities = proxyActivities<MongoDBActivities>({
-  startToCloseTimeout: ACTIVITY_TIMEOUTS.DB_OPERATION,
-  retry: RETRY_POLICIES.MONGODB
 });
 
 const emailActivities = proxyActivities<EmailActivities>({
@@ -123,111 +112,61 @@ export async function emailProcessingWorkflow(
           });
         }
 
-        // Match email against patterns
-        const pattern = await mongoActivities.matchEmailPattern({
-          from: email.from,
-          subject: email.subject,
-          body: email.body || ''
-        });
-
-        if (!pattern) {
-          log.warn('No matching pattern found for email', {
+        // Run the 3-step AI pipeline as a child workflow.
+        // Each step (classify → extract → store) is independently durable.
+        const pipelineResult = await executeChild(
+          transactionPipelineWorkflow,
+          { args: [{
+            userId: input.userId,
             emailId: gmailMessageId,
-            subject: email.subject
-          });
+            subject: email.subject,
+            from: email.from,
+            body: email.body || '',
+            date: email.date,
+            workflowId: input.workflowId
+          }],
+            workflowId: `pipeline-${gmailMessageId}-${input.workflowId}`
+          }
+        );
+
+        log.info('Pipeline result', { emailId: gmailMessageId, status: pipelineResult.status });
+
+        if (pipelineResult.status === 'ignored') {
           result.errors.push({
             emailId: gmailMessageId,
-            error: 'No matching pattern found'
+            error: pipelineResult.reason ?? 'Not a transaction'
           });
           result.failedCount++;
           continue;
         }
 
-        log.info(`Matched pattern: ${pattern.name}`, { emailId: gmailMessageId });
-
-        // Extract transaction data using OpenAI
-        const extractedData = await openaiActivities.extractTransactionFromEmail({
-          emailContent: email.body || '',
-          emailSubject: email.subject,
-          emailFrom: email.from,
-          emailDate: email.date,
-          extractionPrompt: pattern.extractionPrompt,
-          bankName: pattern.bankName
-        });
-
-        log.info('Extraction complete', {
-          emailId: gmailMessageId,
-          merchant: extractedData.merchant,
-          amount: extractedData.amount,
-          confidence: extractedData.confidence
-        });
-
-        // Validate extraction confidence
-        if (extractedData.confidence < CONFIDENCE_THRESHOLD) {
-          log.warn('Low confidence extraction', {
-            emailId: gmailMessageId,
-            confidence: extractedData.confidence,
-            threshold: CONFIDENCE_THRESHOLD
-          });
+        if (pipelineResult.status === 'failed') {
           result.errors.push({
             emailId: gmailMessageId,
-            error: 'Low confidence extraction',
-            confidence: extractedData.confidence
+            error: pipelineResult.reason ?? 'Pipeline failed'
           });
-
-          // Update pattern stats as failed
-          await mongoActivities.updateEmailPatternStats({
-            patternId: pattern.id,
-            success: false
-          });
-
           result.failedCount++;
           continue;
         }
 
-        // Save transaction to MongoDB (with userId)
-        const transaction = await mongoActivities.saveTransaction({
-          userId: input.userId,
-          emailId: gmailMessageId,
-          emailSubject: email.subject,
-          emailDate: email.date,
-          emailFrom: email.from,
-          rawEmailText: email.body || '',
-          extractedData,
-          workflowId: input.workflowId,
-          workflowRunId: input.workflowRunId
-        });
-
-        // Update pattern statistics
-        await mongoActivities.updateEmailPatternStats({
-          patternId: pattern.id,
-          success: true
-        });
-
-        // Mark email as processed
+        // status === 'stored' — mark email as processed in Gmail
         await gmailActivities.markEmailAsProcessed(gmailMessageId);
 
-        // Update email processing status in database (with userId)
-        await emailActivities.updateEmailProcessing({
-          userId: input.userId,
+        result.transactions.push({
+          id: pipelineResult.transactionId ?? '',
           emailId: gmailMessageId,
-          isProcessed: true,
-          processedAt: new Date(),
-          processingWorkflowId: input.workflowId,
-          matchedPatternId: pattern.id,
-          matchedPatternName: pattern.name,
-          transactionId: transaction.id,
-          confidence: extractedData.confidence
+          transactionDate: new Date(),
+          merchant: pipelineResult.merchant ?? '',
+          amount: pipelineResult.amount ?? 0,
+          category: 'Other'
         });
-
-        result.transactions.push(transaction);
         result.processedCount++;
 
         log.info('Successfully processed email', {
           emailId: gmailMessageId,
-          transactionId: transaction.id,
-          merchant: transaction.merchant,
-          amount: transaction.amount
+          transactionId: pipelineResult.transactionId,
+          merchant: pipelineResult.merchant,
+          amount: pipelineResult.amount
         });
 
         // Rate limiting: small delay between processing emails

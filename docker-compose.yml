@@ -16,7 +16,7 @@ services:
     networks:
       - mywallet-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      test: [ "CMD-SHELL", "pg_isready -U temporal" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,7 +39,7 @@ services:
     networks:
       - mywallet-network
     healthcheck:
-      test: ["CMD", "tctl", "--address", "temporal:7233", "workflow", "list"]
+      test: [ "CMD", "tctl", "--address", "temporal:7233", "workflow", "list" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -74,10 +74,37 @@ services:
     networks:
       - mywallet-network
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # LiteLLM AI Gateway Proxy
+  # All AI calls from the worker are routed through this service.
+  # The worker points LITELLM_BASE_URL=http://litellm:4000/v1
+  # and LiteLLM routes to the configured provider (OpenAI, Ollama, Anthropic, etc.)
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: mywallet-litellm
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-mywallet-local}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama.llm.svc.cluster.local:11434}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # - GROQ_API_KEY=${GROQ_API_KEY}
+    command: [ "--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1" ]
+    networks:
+      - mywallet-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4000/health/liveliness" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 networks:
   mywallet-network:

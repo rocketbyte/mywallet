@@ -1,8 +1,8 @@
 # MyWallet Implementation Status
 
-**Last Updated**: March 21, 2026
-**Phase**: Phase 2 - Production Stabilization
-**Status**: Production — deployed at https://wallet.rotbyte.com — end-to-end Gmail sync working
+**Last Updated**: March 25, 2026
+**Phase**: Phase 3 - AI Pipeline
+**Status**: Production base stable. Phase 3 AI pipeline implemented — deploy LiteLLM, seed pipeline steps, and redeploy worker to activate.
 
 ---
 
@@ -13,7 +13,8 @@ An expense tracking system that automatically extracts bank transactions from Gm
 **Stack:**
 - **Temporal.io** — durable workflow orchestration (self-hosted on Raspberry Pi k3s cluster)
 - **Gmail API** — OAuth2 + Pub/Sub push notifications for real-time email sync
-- **OpenAI / Ollama** — AI-powered transaction extraction from email bodies
+- **LiteLLM** — AI gateway proxy (OpenAI-compatible, routes to any provider: OpenAI, Ollama, Anthropic, Groq, etc.)
+- **OpenAI / Ollama** — AI providers accessed via LiteLLM gateway
 - **MongoDB** — multi-tenant data storage
 - **Express** — REST API with OpenAPI/Swagger docs
 - **Kubernetes (k3s)** — deployed on Raspberry Pi cluster via Helm
@@ -510,6 +511,179 @@ GET /api/auth/gmail?userId=user_123
 
 **Files Created**:
 - `README.md` (completely rewritten)
+
+---
+
+---
+
+## 🤖 Phase 3 — AI Extraction Pipeline (Planned)
+
+**Goal:** Replace the current single-step AI extraction with a durable, configurable 3-step pipeline orchestrated by Temporal, routed through LiteLLM, with prompts stored in MongoDB and manageable via API/UI.
+
+---
+
+### AI Gateway Decision: LiteLLM ✅
+
+**Chosen:** LiteLLM (self-hosted proxy, Docker container in k8s)
+
+**Why LiteLLM over Bifrost:**
+- Most mature and battle-tested AI proxy (production-proven at scale)
+- Exposes an OpenAI-compatible REST API — the existing `OpenAIGateway` only needs its `baseURL` pointed to LiteLLM; zero code changes to the gateway implementation
+- Supports every provider needed: OpenAI, Anthropic, Ollama (already in use), Groq, Gemini, and 100+ more — model switching is a config change, not a code change
+- Central observability: cost tracking, token usage, logging, and fallback routing out of the box
+- Bifrost is less mature and the TypeScript ecosystem around it is thinner; for a production system on k3s, LiteLLM's operational track record is more reliable
+
+**Why not a code-level-only abstraction:**
+- The project already has `IAIGateway` interface for type safety, which is kept
+- But a proxy service adds: centralized routing, live model swapping without redeployment, spend caps, retry/fallback across providers, and usage dashboards — none of which are possible with a code-level interface alone
+
+**Deployment:** LiteLLM added as a new Kubernetes `Deployment` + `Service` in the `wallet` namespace. The `OpenAIGateway`'s `baseURL` environment variable (`LITELLM_BASE_URL`) points to it. Providers and model aliases are configured in a `litellm-config.yaml` ConfigMap.
+
+```
+App → OpenAIGateway (baseURL=http://litellm-svc:4000/v1) → LiteLLM proxy → OpenAI / Ollama / Anthropic / ...
+```
+
+---
+
+### Pipeline Architecture
+
+Each incoming email (triggered by webhook or scheduled poll) goes through a 3-step Temporal workflow. Every step is a separate Temporal **activity**, uses its own **prompt stored in MongoDB**, and calls the AI via **LiteLLM**.
+
+```
+Webhook / Schedule
+        │
+        ▼
+┌────────────────────────────────────────────────────────┐
+│         transactionPipelineWorkflow (Temporal)         │
+│                                                        │
+│  Step 1: classifyEmail                                 │
+│    → load prompt from DB (pipeline_steps collection)   │
+│    → call LiteLLM: "Is this a bank transaction?"       │
+│    → result: { isTransaction, confidence, type }       │
+│    → if NOT transaction → mark ignored, stop           │
+│                                                        │
+│  Step 2: extractTransaction                            │
+│    → load prompt from DB                               │
+│    → call LiteLLM: "Extract structured transaction"    │
+│    → result: { merchant, amount, currency, date,       │
+│               bank, type, accountLast4, reference }    │
+│                                                        │
+│  Step 3: storeTransaction                              │
+│    → persist to transactions collection                │
+│    → link to source notification                       │
+│    → update notification status → processed           │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+### New MongoDB Collection: `pipeline_steps`
+
+Stores the configuration for each step in the pipeline. Prompts are user-editable at runtime.
+
+| Field | Type | Notes |
+|---|---|---|
+| `stepKey` | String | Unique key: `classify_email`, `extract_transaction`, `store_transaction` |
+| `name` | String | Human-readable name |
+| `description` | String | What this step does |
+| `order` | Number | Execution order (1, 2, 3) |
+| `systemPrompt` | String | The system/instruction prompt sent to the AI |
+| `userPromptTemplate` | String | Template for the user message; `{{email_body}}`, `{{email_subject}}` etc. are replaced at runtime |
+| `model` | String | LiteLLM model alias (e.g. `gpt-4o-mini`, `ollama/phi3`, `claude-3-haiku`) |
+| `temperature` | Number | 0–1 |
+| `maxTokens` | Number | Token cap |
+| `isActive` | Boolean | Whether this step is enabled |
+| `version` | Number | Incremented on each prompt update (for audit trail) |
+| `updatedBy` | String | Who last updated the prompt |
+| `createdAt` | Date | Auto |
+| `updatedAt` | Date | Auto |
+
+---
+
+### New API Endpoints (Pipeline Management)
+
+**Pipeline Steps (Prompt Management UI)**
+```
+GET    /api/pipeline/steps              — list all steps with current prompts
+GET    /api/pipeline/steps/:stepKey     — get single step config
+PUT    /api/pipeline/steps/:stepKey     — update prompt / model / settings
+POST   /api/pipeline/steps/:stepKey/test — test a prompt against a sample email
+```
+
+**Pipeline Execution**
+```
+POST   /api/pipeline/run/:notificationId — manually trigger pipeline for a single notification
+GET    /api/pipeline/runs               — list recent pipeline runs with status per step
+```
+
+---
+
+### New Temporal Workflow & Activities
+
+**Workflow:** `transactionPipelineWorkflow`
+- Replaces the monolithic `emailProcessingWorkflow` extraction step
+- Each step is a separate durable activity with independent retry policy
+- `stepKey` is passed to each activity; activity loads prompt from DB at runtime (not hardcoded)
+
+**Activities:**
+- `classifyEmailActivity(notificationId, stepConfig)` → `ClassificationResult`
+- `extractTransactionActivity(notificationId, classificationResult, stepConfig)` → `RawTransactionData`
+- `storeTransactionActivity(notificationId, rawTransactionData, stepConfig)` → `Transaction`
+
+---
+
+### Prompt Management UI
+
+The REST API above provides all the CRUD operations needed. The existing ReDoc/Scalar playground at `/docs/playground` is sufficient as an admin UI to read and update prompts.
+
+For a dedicated lightweight management page, a single-file HTML form served under `/admin/pipeline` can be added to the Express API — outside the scope of the REST API proper but within the same deployment.
+
+---
+
+### Implemented (Phase 3 — March 25, 2026)
+
+**Model:**
+- ✅ `packages/temporal-workflows/src/models/pipeline-step.model.ts` — `pipeline_steps` collection
+
+**Types & Constants:**
+- ✅ `shared/types.ts` — `PipelineStepConfig`, `ClassifyEmailInput`, `ClassificationResult`, `ExtractTransactionDataInput`, `RawTransactionData`, `StoreTransactionInput`, `StoredTransactionResult`, `TransactionPipelineInput/Result`
+- ✅ `shared/constants.ts` — `PIPELINE_STEP_KEYS`, `PIPELINE_ACTIVITY_TIMEOUTS`, `PIPELINE_RETRY_POLICY`, `CLASSIFICATION_CONFIDENCE_THRESHOLD`
+
+**Repository:**
+- ✅ `application/interfaces/repositories/ipipeline-step-repository.ts` — interface + error classes
+- ✅ `infrastructure/persistence/mongodb/repositories/pipeline-step.repository.ts` — MongoDB impl
+
+**Activities:**
+- ✅ `infrastructure/temporal/activities/pipeline.activities.ts` — `classifyEmail`, `extractTransactionData`, `storeTransaction`
+
+**Workflow:**
+- ✅ `workflows/transaction-pipeline.workflow.ts` — 3-step durable pipeline workflow
+- ✅ `workflows/email-processing.workflow.ts` — updated to call pipeline as child workflow
+
+**DI / Worker:**
+- ✅ `infrastructure/config/di-container.ts` — `IPipelineStepRepository` registered
+- ✅ `infrastructure/temporal/activities.index.ts` — pipeline activities included
+- ✅ `temporal-worker/src/config/environment.ts` — `LITELLM_BASE_URL` env var support
+
+**API:**
+- ✅ `packages/backend-apis/src/controllers/pipeline.controller.ts`
+- ✅ `packages/backend-apis/src/routes/pipeline.routes.ts`
+- ✅ `packages/backend-apis/src/routes/index.ts` — pipeline routes registered at `/api/pipeline`
+
+**Infrastructure:**
+- ✅ `docker-compose.yml` — LiteLLM service added (port 4000)
+- ✅ `litellm-config.yaml` — LiteLLM provider configuration
+- ✅ `.env.example` — `LITELLM_BASE_URL`, `LITELLM_MASTER_KEY` added
+
+**Seed:**
+- ✅ `scripts/seed-pipeline-steps.ts` — seeds default prompts for all 3 steps
+- ✅ `package.json` — `npm run seed:pipeline` script
+
+### Remaining Infrastructure (Phase 3)
+
+- 🔲 `k8s/mywallet/templates/litellm/` — Kubernetes manifests for LiteLLM deployment in production
+- 🔲 `k8s/mywallet/values.yaml` — add LiteLLM image/resource config
+- 🔲 GitHub Actions — add `LITELLM_MASTER_KEY` to `HELM_VALUES_SECRETS`
 
 ---
 

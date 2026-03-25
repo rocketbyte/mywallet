@@ -41,10 +41,12 @@ export const config = {
   },
 
   // OpenAI configuration (supports custom endpoints)
+  // When LITELLM_BASE_URL is set the OpenAIGateway will route all calls through
+  // the LiteLLM proxy instead of directly to OpenAI.
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    endpoint: process.env.OPENAI_ENDPOINT  // Optional custom endpoint
+    endpoint: process.env.LITELLM_BASE_URL || process.env.OPENAI_ENDPOINT
   },
 
   // Ollama configuration (supports remote servers)

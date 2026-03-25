@@ -176,12 +176,10 @@ app:
     redirectUri: "https://wallet.rotbyte.com/api/auth/gmail/callback"
     # OAuth credentials are set in values-secrets.yaml
 
-  # AI configuration
+  # AI configuration — routed through LiteLLM gateway in the llm namespace
   ai:
-    provider: openai  # Options: openai, ollama
-    model: gpt-4
-    endpoint: ""  # For Ollama: http://ollama.ai.svc.cluster.local:11434
-    # API key (OpenAI) is set in values-secrets.yaml
+    litellmBaseUrl: "http://litellm.llm.svc.cluster.local:4000/v1"
+    model: "qwen3:4b"  # Must match a model_name in llm-platform/apps/litellm/manifests/configmap.yaml
 
 # Labels to apply to all resources
 labels:

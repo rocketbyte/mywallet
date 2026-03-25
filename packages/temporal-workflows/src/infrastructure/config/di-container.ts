@@ -17,6 +17,7 @@ import { IMailSyncGateway } from '../../application/interfaces/gateways/imail-sy
 import { ITransactionRepository } from '../../application/interfaces/repositories/itransaction-repository';
 import { IEmailRepository } from '../../application/interfaces/repositories/iemail-repository';
 import { IPatternRepository } from '../../application/interfaces/repositories/ipattern-repository';
+import { IPipelineStepRepository } from '../../application/interfaces/repositories/ipipeline-step-repository';
 
 // Layer 3 & 4 - Gmail Implementations
 import { GmailGateway } from '../external/email/gmail/gmail.gateway';
@@ -35,6 +36,7 @@ import { OllamaTransactionExtractorGateway } from '../external/ai/ollama/ollama-
 import { MongoDBTransactionRepository } from '../persistence/mongodb/repositories/transaction.repository';
 import { MongoDBEmailRepository } from '../persistence/mongodb/repositories/email.repository';
 import { MongoDBPatternRepository } from '../persistence/mongodb/repositories/pattern.repository';
+import { MongoDBPipelineStepRepository } from '../persistence/mongodb/repositories/pipeline-step.repository';
 
 // Layer 2 - Use Cases
 import { ProcessEmailUseCase } from '../../application/use-cases/process-email/process-email.use-case';
@@ -154,6 +156,10 @@ export class DIContainer {
 
     container.register<IPatternRepository>('IPatternRepository', {
       useClass: MongoDBPatternRepository
+    });
+
+    container.register<IPipelineStepRepository>('IPipelineStepRepository', {
+      useClass: MongoDBPipelineStepRepository
     });
 
     // ==================== USE CASE REGISTRATION ====================

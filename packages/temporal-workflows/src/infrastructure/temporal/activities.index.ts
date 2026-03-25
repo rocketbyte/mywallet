@@ -9,6 +9,7 @@ import { DependencyContainer } from 'tsyringe';
 import { createEmailActivities } from './activities/email.activities';
 import { createTransactionActivities } from './activities/transaction.activities';
 import { createSyncActivities } from './activities/sync.activities';
+import { createPipelineActivities } from './activities/pipeline.activities';
 
 /**
  * Create all activities using DI Container
@@ -26,7 +27,10 @@ export function createActivities(container: DependencyContainer) {
     ...createTransactionActivities(container),
 
     // Sync activities (Gmail sync - placeholder for now)
-    ...createSyncActivities(container)
+    ...createSyncActivities(container),
+
+    // Pipeline activities (3-step AI extraction pipeline)
+    ...createPipelineActivities(container)
   };
 }
 

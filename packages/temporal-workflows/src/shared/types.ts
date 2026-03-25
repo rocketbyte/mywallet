@@ -415,3 +415,98 @@ export interface StartEmailProcessingWorkflowOutput {
   runId: string;
   emailCount: number;
 }
+
+// ==================== AI Pipeline Types ====================
+
+export interface PipelineStepConfig {
+  stepKey: string;
+  name: string;
+  order: number;
+  systemPrompt: string;
+  userPromptTemplate: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  isActive: boolean;
+  version: number;
+}
+
+export interface ClassifyEmailInput {
+  userId: string;
+  emailId: string;
+  subject: string;
+  from: string;
+  body: string;
+  date: Date;
+}
+
+export interface ClassificationResult {
+  isTransaction: boolean;
+  confidence: number;
+  transactionType?: 'credit' | 'debit' | 'transfer' | 'payment' | 'refund' | 'other';
+  reasoning?: string;
+}
+
+export interface ExtractTransactionDataInput {
+  userId: string;
+  emailId: string;
+  subject: string;
+  from: string;
+  body: string;
+  date: Date;
+  classificationResult: ClassificationResult;
+}
+
+export interface RawTransactionData {
+  merchant: string;
+  amount: number;
+  currency: string;
+  transactionDate: Date;
+  transactionType: 'debit' | 'credit';
+  bankName: string;
+  accountLast4?: string;
+  referenceNumber?: string;
+  category?: string;
+  description?: string;
+  confidence: number;
+}
+
+export interface StoreTransactionInput {
+  userId: string;
+  emailId: string;
+  rawData: RawTransactionData;
+  workflowId: string;
+  patternId?: string;
+  patternName?: string;
+}
+
+export interface StoredTransactionResult {
+  transactionId: string;
+  merchant: string;
+  amount: number;
+  currency: string;
+}
+
+export interface TransactionPipelineInput {
+  userId: string;
+  emailId: string;
+  subject: string;
+  from: string;
+  body: string;
+  date: Date;
+  workflowId: string;
+  patternId?: string;
+  patternName?: string;
+}
+
+export interface TransactionPipelineResult {
+  emailId: string;
+  status: 'stored' | 'ignored' | 'failed';
+  reason?: string;
+  transactionId?: string;
+  merchant?: string;
+  amount?: number;
+  currency?: string;
+  classificationConfidence?: number;
+  extractionConfidence?: number;
+}

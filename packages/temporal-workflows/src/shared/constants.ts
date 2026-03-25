@@ -143,6 +143,33 @@ export const GMAIL_WATCH_CONFIG = {
   CONTINUE_AS_NEW_DAYS: 30      // Reset workflow history every 30 days
 } as const;
 
+// ==================== AI Pipeline Constants ====================
+
+export const PIPELINE_STEP_KEYS = {
+  CLASSIFY_EMAIL: 'classify_email',
+  EXTRACT_TRANSACTION: 'extract_transaction',
+  STORE_TRANSACTION: 'store_transaction'
+} as const;
+
+export const PIPELINE_ACTIVITY_TIMEOUTS = {
+  CLASSIFY: '2 minutes',
+  EXTRACT: '3 minutes',
+  STORE: '30 seconds'
+} as const;
+
+export const PIPELINE_RETRY_POLICY = {
+  initialInterval: '1s' as any,
+  backoffCoefficient: 2,
+  maximumInterval: '30s' as any,
+  maximumAttempts: 3,
+  nonRetryableErrorTypes: ['PipelineStepNotFoundError', 'PipelineStepInactiveError']
+};
+
+// Minimum confidence for the classify step to proceed to extraction
+export const CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.7;
+
+// ==================== Signal Names ====================
+
 // Signal Names
 export const GMAIL_SIGNALS = {
   INCOMING_WEBHOOK: 'incomingWebhook',
