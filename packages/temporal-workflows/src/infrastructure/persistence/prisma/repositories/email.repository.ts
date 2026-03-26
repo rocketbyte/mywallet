@@ -72,7 +72,7 @@ export class PrismaEmailRepository implements IEmailRepository {
       orderBy: { date: 'desc' },
       ...(limit ? { take: limit } : {}),
     });
-    return records.map(r => this.toSavedEmail(r));
+    return records.map((r: any) => this.toSavedEmail(r));
   }
 
   async markDuplicate(emailId: string): Promise<void> {

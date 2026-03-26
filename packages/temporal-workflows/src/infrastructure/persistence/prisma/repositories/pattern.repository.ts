@@ -42,14 +42,14 @@ export class PrismaPatternRepository implements IPatternRepository {
       where: { isActive: true },
       orderBy: { priority: 'desc' },
     });
-    return records.map(r => this.toDomain(r));
+    return records.map((r: any) => this.toDomain(r));
   }
 
   async findAll(): Promise<EmailPattern[]> {
     const records = await this.prisma.emailPattern.findMany({
       orderBy: { priority: 'desc' },
     });
-    return records.map(r => this.toDomain(r));
+    return records.map((r: any) => this.toDomain(r));
   }
 
   async updatePatternStats(patternId: string, success: boolean): Promise<void> {

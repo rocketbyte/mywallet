@@ -30,7 +30,7 @@ export class PrismaPipelineStepRepository implements IPipelineStepRepository {
     const records = await this.prisma.pipelineStep.findMany({
       orderBy: { order: 'asc' },
     });
-    return records.map(r => this.toConfig(r));
+    return records.map((r: any) => this.toConfig(r));
   }
 
   async upsert(
@@ -43,7 +43,7 @@ export class PrismaPipelineStepRepository implements IPipelineStepRepository {
       create: {
         stepKey,
         name: fields.name || stepKey,
-        description: fields.description || '',
+        description: (fields as any).description || '',
         order: fields.order || 0,
         systemPrompt: fields.systemPrompt || '',
         userPromptTemplate: fields.userPromptTemplate || '',

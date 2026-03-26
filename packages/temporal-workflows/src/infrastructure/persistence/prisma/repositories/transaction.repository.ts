@@ -72,7 +72,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       where,
       orderBy: { transactionDate: 'desc' },
     });
-    return records.map(r => this.toDomain(r));
+    return records.map((r: any) => this.toDomain(r));
   }
 
   async getStats(params: StatsParams): Promise<TransactionStats> {
@@ -105,7 +105,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
         orderBy: { _sum: { amount: 'desc' } },
       });
 
-      stats.categories = groups.map(g => ({
+      stats.categories = groups.map((g: any) => ({
         category: g.category,
         count: g._count.id,
         totalAmount: g._sum.amount ?? 0,
