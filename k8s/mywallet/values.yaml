@@ -195,7 +195,7 @@ app:
   # DB provider — 'mongodb' | 'prisma' (Supabase)
   # DATABASE_URL and DIRECT_URL are managed via kubectl in the secret (never committed)
   db:
-    provider: "prisma"
+    provider: "mongodb"
 
 # Labels to apply to all resources
 labels:
