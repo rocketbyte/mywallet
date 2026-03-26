@@ -125,6 +125,17 @@ worker:
     NODE_ENV: production
     LOG_LEVEL: info
 
+# Pipeline Worker — separate pod for AI extraction (serial, 1 task at a time)
+pipelineWorker:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 # MongoDB configuration
 mongodb:
   enabled: true
