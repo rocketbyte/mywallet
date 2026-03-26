@@ -176,7 +176,7 @@ async function run() {
       workflowsPath: require.resolve('../../temporal-workflows/src/workflows'),
       activities,
       maxConcurrentActivityTaskExecutions: 1,
-      maxConcurrentWorkflowTaskExecutions: 1
+      maxConcurrentWorkflowTaskExecutions: 2
     });
 
     logger.info('✅ Pipeline worker created successfully', {
