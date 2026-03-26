@@ -118,7 +118,7 @@ export async function emailProcessingWorkflow(
           transactionPipelineWorkflow,
           {
             taskQueue: TASK_QUEUES.PIPELINE,
-            workflowId: `pipeline-${gmailMessageId}-${input.workflowId}`,
+            workflowId: `txn-extract/${gmailMessageId}`,
             args: [{
               userId: input.userId,
               emailId: gmailMessageId,

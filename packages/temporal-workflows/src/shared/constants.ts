@@ -9,8 +9,8 @@ export const TASK_QUEUES = {
 
 // Workflow ID Prefixes
 export const WORKFLOW_IDS = {
-  EMAIL_PROCESSING_PREFIX: 'email-processing-',
-  TRANSACTION_ANALYSIS_PREFIX: 'transaction-analysis-'
+  EMAIL_PROCESSING_PREFIX: 'email-batch/',
+  TRANSACTION_ANALYSIS_PREFIX: 'txn-extract/'
 } as const;
 
 // Activity Timeouts
@@ -71,7 +71,7 @@ export const RATE_LIMITS = {
 
 // Schedule IDs
 export const SCHEDULE_IDS = {
-  EMAIL_PROCESSING_PREFIX: 'email-processing-schedule-'
+  EMAIL_PROCESSING_PREFIX: 'email-schedule/'
 } as const;
 
 // Default Schedule Configuration
@@ -88,7 +88,7 @@ export const DEFAULT_SCHEDULE_CONFIG = {
 export const GMAIL_SYNC_TASK_QUEUE = 'gmail-sync-queue';
 
 // Workflow ID Prefix
-export const GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX = 'gmail-subscription-';
+export const GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX = 'gmail-sync/';
 
 // Activity Timeouts for Gmail Sync
 export const GMAIL_SYNC_TIMEOUTS = {

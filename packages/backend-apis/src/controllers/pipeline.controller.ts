@@ -123,7 +123,7 @@ export async function runPipelineForEmail(req: Request, res: Response): Promise<
     }
 
     const client = await getTemporalClient();
-    const workflowId = `pipeline-manual-${emailId}-${Date.now()}`;
+    const workflowId = `txn-extract/${emailId}/manual`;
 
     const handle = await client.workflow.start(transactionPipelineWorkflow, {
       taskQueue: TASK_QUEUES.PIPELINE,
