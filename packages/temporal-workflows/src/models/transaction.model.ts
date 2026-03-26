@@ -56,7 +56,7 @@ const TransactionSchema = new Schema<ITransaction>({
   subcategory: { type: String },
   transactionType: { type: String, enum: ['debit', 'credit'], required: true },
 
-  accountNumber: { type: String, required: true },
+  accountNumber: { type: String },
   bankName: { type: String, required: true },
 
   rawEmailText: { type: String, required: true },
