@@ -27,7 +27,7 @@ import {
 } from '../../temporal-workflows/src/activities';
 
 // Import constants
-import { GMAIL_SYNC_TASK_QUEUE } from '../../temporal-workflows/src/shared/constants';
+import { GMAIL_SYNC_TASK_QUEUE, TASK_QUEUES } from '../../temporal-workflows/src/shared/constants';
 
 async function run() {
   logger.info('🚀 Starting Temporal Worker...');
@@ -167,12 +167,31 @@ async function run() {
       maxConcurrentWorkflows: 20
     });
 
+    // Pipeline worker — concurrency 1 to avoid overloading LiteLLM/Ollama.
+    // All transactionPipelineWorkflow runs are queued and executed one at a time.
+    const pipelineWorker = await Worker.create({
+      connection,
+      namespace: config.temporal.namespace,
+      taskQueue: TASK_QUEUES.PIPELINE,
+      workflowsPath: require.resolve('../../temporal-workflows/src/workflows'),
+      activities,
+      maxConcurrentActivityTaskExecutions: 1,
+      maxConcurrentWorkflowTaskExecutions: 1
+    });
+
+    logger.info('✅ Pipeline worker created successfully', {
+      taskQueue: TASK_QUEUES.PIPELINE,
+      maxConcurrentActivities: 1,
+      maxConcurrentWorkflows: 1
+    });
+
     // Handle graceful shutdown
     const shutdown = async () => {
       logger.info('🛑 Shutting down workers...');
       await Promise.all([
         worker.shutdown(),
-        gmailSyncWorker.shutdown()
+        gmailSyncWorker.shutdown(),
+        pipelineWorker.shutdown()
       ]);
       await mongoose.disconnect();
       DIContainer.reset();  // Clean up DI Container
@@ -187,7 +206,8 @@ async function run() {
     logger.info('👂 Workers polling for tasks...');
     await Promise.all([
       worker.run(),
-      gmailSyncWorker.run()
+      gmailSyncWorker.run(),
+      pipelineWorker.run()
     ]);
 
   } catch (err: any) {

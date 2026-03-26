@@ -1,7 +1,10 @@
 // Task Queue Names
 export const TASK_QUEUES = {
   EMAIL_PROCESSING: 'email-processing-queue',
-  TRANSACTION_ANALYSIS: 'transaction-analysis-queue'
+  TRANSACTION_ANALYSIS: 'transaction-analysis-queue',
+  // Dedicated pipeline queue — worker runs with concurrency=1 to avoid
+  // hammering the Ollama/LiteLLM instance with parallel AI calls.
+  PIPELINE: 'pipeline-queue'
 } as const;
 
 // Workflow ID Prefixes
@@ -152,15 +155,20 @@ export const PIPELINE_STEP_KEYS = {
 } as const;
 
 export const PIPELINE_ACTIVITY_TIMEOUTS = {
-  CLASSIFY: '2 minutes',
-  EXTRACT: '3 minutes',
+  // Generous ceiling for slow local LLM inference (Ollama on a Pi can take minutes).
+  // Liveness is enforced by heartbeatTimeout — the activity heartbeats every 20s
+  // during the AI call so Temporal retries quickly if the worker crashes.
+  AI_CALL: '1 hour',
   STORE: '30 seconds'
 } as const;
 
+// If the worker dies mid-activity Temporal will reschedule after this window.
+export const PIPELINE_HEARTBEAT_TIMEOUT = '2 minutes';
+
 export const PIPELINE_RETRY_POLICY = {
-  initialInterval: '1s' as any,
+  initialInterval: '5s' as any,
   backoffCoefficient: 2,
-  maximumInterval: '30s' as any,
+  maximumInterval: '60s' as any,
   maximumAttempts: 3,
   nonRetryableErrorTypes: ['PipelineStepNotFoundError', 'PipelineStepInactiveError']
 };

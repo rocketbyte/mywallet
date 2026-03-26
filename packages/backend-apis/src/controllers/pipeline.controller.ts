@@ -126,7 +126,7 @@ export async function runPipelineForEmail(req: Request, res: Response): Promise<
     const workflowId = `pipeline-manual-${emailId}-${Date.now()}`;
 
     const handle = await client.workflow.start(transactionPipelineWorkflow, {
-      taskQueue: TASK_QUEUES.EMAIL_PROCESSING,
+      taskQueue: TASK_QUEUES.PIPELINE,
       workflowId,
       args: [{
         userId,

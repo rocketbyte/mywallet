@@ -22,18 +22,22 @@ import {
 } from '../shared/types';
 import {
   PIPELINE_ACTIVITY_TIMEOUTS,
+  PIPELINE_HEARTBEAT_TIMEOUT,
   PIPELINE_RETRY_POLICY,
   CLASSIFICATION_CONFIDENCE_THRESHOLD
 } from '../shared/constants';
 
-// Each activity gets its own proxy with the appropriate timeout.
+// AI activities: generous startToClose + heartbeatTimeout so Temporal detects
+// a crashed worker quickly and reschedules without waiting the full 15 minutes.
 const { classifyEmail } = proxyActivities<PipelineActivities>({
-  startToCloseTimeout: PIPELINE_ACTIVITY_TIMEOUTS.CLASSIFY,
+  startToCloseTimeout: PIPELINE_ACTIVITY_TIMEOUTS.AI_CALL,
+  heartbeatTimeout: PIPELINE_HEARTBEAT_TIMEOUT,
   retry: PIPELINE_RETRY_POLICY
 });
 
 const { extractTransactionData } = proxyActivities<PipelineActivities>({
-  startToCloseTimeout: PIPELINE_ACTIVITY_TIMEOUTS.EXTRACT,
+  startToCloseTimeout: PIPELINE_ACTIVITY_TIMEOUTS.AI_CALL,
+  heartbeatTimeout: PIPELINE_HEARTBEAT_TIMEOUT,
   retry: PIPELINE_RETRY_POLICY
 });
 

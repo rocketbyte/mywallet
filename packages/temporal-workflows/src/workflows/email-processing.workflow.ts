@@ -5,7 +5,7 @@ import {
   EmailProcessingInput,
   EmailProcessingResult
 } from '../shared/types';
-import { ACTIVITY_TIMEOUTS, RETRY_POLICIES } from '../shared/constants';
+import { ACTIVITY_TIMEOUTS, RETRY_POLICIES, TASK_QUEUES } from '../shared/constants';
 import { transactionPipelineWorkflow } from './transaction-pipeline.workflow';
 
 // Proxy activities with their respective configurations
@@ -116,16 +116,18 @@ export async function emailProcessingWorkflow(
         // Each step (classify → extract → store) is independently durable.
         const pipelineResult = await executeChild(
           transactionPipelineWorkflow,
-          { args: [{
-            userId: input.userId,
-            emailId: gmailMessageId,
-            subject: email.subject,
-            from: email.from,
-            body: email.body || '',
-            date: email.date,
-            workflowId: input.workflowId
-          }],
-            workflowId: `pipeline-${gmailMessageId}-${input.workflowId}`
+          {
+            taskQueue: TASK_QUEUES.PIPELINE,
+            workflowId: `pipeline-${gmailMessageId}-${input.workflowId}`,
+            args: [{
+              userId: input.userId,
+              emailId: gmailMessageId,
+              subject: email.subject,
+              from: email.from,
+              body: email.body || '',
+              date: email.date,
+              workflowId: input.workflowId
+            }]
           }
         );
 

@@ -47,7 +47,7 @@ export function createPipelineActivities(container: DependencyContainer) {
      * Returns a classification result with confidence score.
      */
     async classifyEmail(input: ClassifyEmailInput): Promise<ClassificationResult> {
-      Context.current().heartbeat();
+      Context.current().heartbeat('started');
 
       const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.CLASSIFY_EMAIL);
 
@@ -58,13 +58,24 @@ export function createPipelineActivities(container: DependencyContainer) {
         email_date: new Date(input.date).toISOString()
       });
 
-      const result = await aiGateway.extractStructuredData({
-        systemPrompt: step.systemPrompt,
-        userPrompt: userMessage,
-        temperature: step.temperature,
-        maxTokens: step.maxTokens,
-        responseFormat: 'json'
-      });
+      // Heartbeat every 20s during the AI call so Temporal detects a crashed
+      // worker within heartbeatTimeout (2 min) rather than startToCloseTimeout.
+      const heartbeat = setInterval(() => {
+        try { Context.current().heartbeat('ai-call-in-progress'); } catch {}
+      }, 20_000);
+
+      let result;
+      try {
+        result = await aiGateway.extractStructuredData({
+          systemPrompt: step.systemPrompt,
+          userPrompt: userMessage,
+          temperature: step.temperature,
+          maxTokens: step.maxTokens,
+          responseFormat: 'json'
+        });
+      } finally {
+        clearInterval(heartbeat);
+      }
 
       const data = result.data as Partial<ClassificationResult>;
 
@@ -83,7 +94,7 @@ export function createPipelineActivities(container: DependencyContainer) {
      * and return them as structured JSON.
      */
     async extractTransactionData(input: ExtractTransactionDataInput): Promise<RawTransactionData> {
-      Context.current().heartbeat();
+      Context.current().heartbeat('started');
 
       const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.EXTRACT_TRANSACTION);
 
@@ -95,13 +106,22 @@ export function createPipelineActivities(container: DependencyContainer) {
         transaction_type: input.classificationResult.transactionType ?? ''
       });
 
-      const result = await aiGateway.extractStructuredData({
-        systemPrompt: step.systemPrompt,
-        userPrompt: userMessage,
-        temperature: step.temperature,
-        maxTokens: step.maxTokens,
-        responseFormat: 'json'
-      });
+      const heartbeat = setInterval(() => {
+        try { Context.current().heartbeat('ai-call-in-progress'); } catch {}
+      }, 20_000);
+
+      let result;
+      try {
+        result = await aiGateway.extractStructuredData({
+          systemPrompt: step.systemPrompt,
+          userPrompt: userMessage,
+          temperature: step.temperature,
+          maxTokens: step.maxTokens,
+          responseFormat: 'json'
+        });
+      } finally {
+        clearInterval(heartbeat);
+      }
 
       const data = result.data as Partial<RawTransactionData>;
 
