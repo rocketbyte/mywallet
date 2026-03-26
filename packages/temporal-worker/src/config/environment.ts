@@ -31,7 +31,8 @@ export const config = {
   // Provider selection - enables runtime switching between providers
   providers: {
     email: process.env.EMAIL_PROVIDER || 'gmail',      // 'gmail' | 'outlook'
-    ai: process.env.AI_PROVIDER || 'openai'             // 'openai' | 'ollama'
+    ai: process.env.AI_PROVIDER || 'openai',            // 'openai' | 'ollama'
+    db: process.env.DB_PROVIDER || 'mongodb'            // 'mongodb' | 'prisma'
   },
 
   gmail: {

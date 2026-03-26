@@ -3,6 +3,7 @@ import 'reflect-metadata';
 
 import { Worker, NativeConnection } from '@temporalio/worker';
 import mongoose from 'mongoose';
+import { PrismaClient } from '@prisma/client';
 import { config, validateConfig } from './config/environment';
 import { logger } from './utils/logger';
 import { OAuth2Client } from 'google-auth-library';
@@ -28,9 +29,19 @@ async function run() {
   }
 
   try {
-    logger.info('📦 Connecting to MongoDB...', { uri: config.mongodb.uri.replace(/:[^:@]+@/, ':***@') });
-    await mongoose.connect(config.mongodb.uri);
-    logger.info('✅ MongoDB connected');
+    const dbProvider = config.providers.db as 'mongodb' | 'prisma';
+    let prismaClient: PrismaClient | undefined;
+
+    if (dbProvider === 'prisma') {
+      logger.info('🐘 Connecting to Supabase via Prisma...');
+      prismaClient = new PrismaClient();
+      await prismaClient.$connect();
+      logger.info('✅ Prisma (Supabase) connected');
+    } else {
+      logger.info('📦 Connecting to MongoDB...', { uri: config.mongodb.uri.replace(/:[^:@]+@/, ':***@') });
+      await mongoose.connect(config.mongodb.uri);
+      logger.info('✅ MongoDB connected');
+    }
 
     const oauth2Client = new OAuth2Client(
       config.gmail.clientId,
@@ -40,7 +51,9 @@ async function run() {
     DIContainer.setup({
       emailProvider: config.providers.email as 'gmail',
       aiProvider: config.providers.ai as 'openai' | 'ollama',
-      mongoConnection: mongoose.connection,
+      dbProvider,
+      mongoConnection: dbProvider === 'mongodb' ? mongoose.connection : undefined,
+      prismaClient,
       gmailOAuth2Client: oauth2Client,
       openaiApiKey: config.openai.apiKey,
       openaiModel: config.openai.model,
@@ -53,13 +66,17 @@ async function run() {
     logger.info('✅ DI Container initialized');
 
     const cleanActivities = createCleanActivities(container);
-    const mongodbActivities = createMongoDBActivities(mongoose.connection);
-    const emailActivities = createEmailActivities(mongoose.connection);
+
+    const legacyMongoActivities = dbProvider === 'mongodb'
+      ? {
+          ...createMongoDBActivities(mongoose.connection),
+          ...createEmailActivities(mongoose.connection),
+        }
+      : {};
 
     const activities = {
       ...cleanActivities,
-      ...mongodbActivities,
-      ...emailActivities
+      ...legacyMongoActivities,
     };
 
     logger.info('✅ Pipeline activities ready');
@@ -93,7 +110,11 @@ async function run() {
     const shutdown = async () => {
       logger.info('🛑 Shutting down pipeline worker...');
       await pipelineWorker.shutdown();
-      await mongoose.disconnect();
+      if (dbProvider === 'prisma' && prismaClient) {
+        await prismaClient.$disconnect();
+      } else {
+        await mongoose.disconnect();
+      }
       DIContainer.reset();
       logger.info('👋 Pipeline worker shut down gracefully');
       process.exit(0);

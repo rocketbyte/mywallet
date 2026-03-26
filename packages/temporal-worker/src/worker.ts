@@ -5,6 +5,7 @@ import { Worker, NativeConnection } from '@temporalio/worker';
 import { Client } from '@temporalio/client';
 import { OAuth2Client } from 'google-auth-library';
 import mongoose from 'mongoose';
+import { PrismaClient } from '@prisma/client';
 import { config, validateConfig } from './config/environment';
 import { logger } from './utils/logger';
 
@@ -39,10 +40,20 @@ async function run() {
   }
 
   try {
-    // Connect to MongoDB
-    logger.info('📦 Connecting to MongoDB...', { uri: config.mongodb.uri.replace(/:[^:@]+@/, ':***@') });
-    await mongoose.connect(config.mongodb.uri);
-    logger.info('✅ MongoDB connected');
+    // Connect to database (MongoDB or Prisma/Supabase)
+    const dbProvider = config.providers.db as 'mongodb' | 'prisma';
+    let prismaClient: PrismaClient | undefined;
+
+    if (dbProvider === 'prisma') {
+      logger.info('🐘 Connecting to Supabase via Prisma...');
+      prismaClient = new PrismaClient();
+      await prismaClient.$connect();
+      logger.info('✅ Prisma (Supabase) connected');
+    } else {
+      logger.info('📦 Connecting to MongoDB...', { uri: config.mongodb.uri.replace(/:[^:@]+@/, ':***@') });
+      await mongoose.connect(config.mongodb.uri);
+      logger.info('✅ MongoDB connected');
+    }
 
     // Initialize Gmail OAuth2 Client
     logger.info('📧 Initializing Gmail client...');
@@ -64,7 +75,9 @@ async function run() {
     DIContainer.setup({
       emailProvider: config.providers.email as 'gmail',
       aiProvider: config.providers.ai as 'openai' | 'ollama',
-      mongoConnection: mongoose.connection,
+      dbProvider,
+      mongoConnection: dbProvider === 'mongodb' ? mongoose.connection : undefined,
+      prismaClient,
 
       // Gmail configuration
       gmailOAuth2Client: oauth2Client,
@@ -107,28 +120,29 @@ async function run() {
     logger.info('✅ Temporal client created');
 
     // ==================== LEGACY ACTIVITIES (Temporary) ====================
-    // Keep old activities for gradual migration
     const gmailClient = new GmailClient(oauth2Client);
     const openaiClient = new OpenAIClient(config.openai.apiKey);
 
     const gmailActivities = createGmailActivities(gmailClient);
     const openaiActivities = createOpenAIActivities(openaiClient);
-    const mongodbActivities = createMongoDBActivities(mongoose.connection);
-    const emailActivities = createEmailActivities(mongoose.connection);
-    const scheduleActivities = createScheduleActivities(mongoose.connection);
-
-    // Create workflow starter activities (allows workflows to start other workflows)
     const workflowStarterActivities = createWorkflowStarterActivities(temporalClient);
 
-    // Merge new and legacy activities
+    // Legacy MongoDB activities only registered when using MongoDB provider
+    const legacyMongoActivities = dbProvider === 'mongodb'
+      ? {
+          ...createMongoDBActivities(mongoose.connection),
+          ...createEmailActivities(mongoose.connection),
+          ...createScheduleActivities(mongoose.connection),
+        }
+      : {};
+
+    // Merge new and legacy activities (clean activities take precedence)
     const activities = {
-      ...cleanActivities,        // New Clean Architecture activities (will override legacy)
-      ...gmailActivities,         // Legacy Gmail activities
-      ...openaiActivities,        // Legacy OpenAI activities
-      ...mongodbActivities,       // Legacy MongoDB activities
-      ...emailActivities,         // Legacy Email activities
-      ...scheduleActivities,      // Legacy Schedule activities
-      ...workflowStarterActivities // Workflow starter activities
+      ...cleanActivities,
+      ...gmailActivities,
+      ...openaiActivities,
+      ...legacyMongoActivities,
+      ...workflowStarterActivities,
     };
 
     logger.info('✅ All activities registered (Clean + Legacy + Workflow Starter)');
@@ -170,12 +184,13 @@ async function run() {
     // Handle graceful shutdown
     const shutdown = async () => {
       logger.info('🛑 Shutting down workers...');
-      await Promise.all([
-        worker.shutdown(),
-        gmailSyncWorker.shutdown()
-      ]);
-      await mongoose.disconnect();
-      DIContainer.reset();  // Clean up DI Container
+      await Promise.all([worker.shutdown(), gmailSyncWorker.shutdown()]);
+      if (dbProvider === 'prisma' && prismaClient) {
+        await prismaClient.$disconnect();
+      } else {
+        await mongoose.disconnect();
+      }
+      DIContainer.reset();
       logger.info('👋 Workers shut down gracefully');
       process.exit(0);
     };

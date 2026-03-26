@@ -54,4 +54,6 @@ router_settings:
 
 # General settings
 general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY  # Optional: set to secure the proxy
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # PostgreSQL (Supabase) — enables spend tracking, request logs, and /ui dashboard
+  database_url: os.environ/LITELLM_DATABASE_URL

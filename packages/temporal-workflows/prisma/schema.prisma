@@ -1,0 +1,198 @@
+// Prisma Schema — MyWallet (Supabase / PostgreSQL)
+// Provider: prisma (supabase) | activated by DB_PROVIDER=prisma
+// Local:    DB_PROVIDER=mongodb  (default, uses mongoose)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Emails ──────────────────────────────────────────────────────────────────
+
+model Email {
+  id                   String    @id @default(cuid())
+  userId               String?
+  emailId              String    @unique
+  threadId             String
+  from                 String
+  to                   String    @default("")
+  subject              String
+  date                 DateTime
+  body                 String
+  snippet              String    @default("")
+  rawHtml              String?
+  isProcessed          Boolean   @default(false)
+  processedAt          DateTime?
+  processingWorkflowId String?
+  matchedPatternId     String?
+  matchedPatternName   String?
+  transactionId        String?
+  processingError      String?
+  confidence           Float?
+  fetchedAt            DateTime  @default(now())
+  fetchedBy            String    @default("unknown")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([isProcessed, date(sort: Desc)])
+  @@index([userId, isProcessed])
+  @@map("emails")
+}
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id              String   @id @default(cuid())
+  userId          String?
+  emailId         String   @unique
+  emailSubject    String   @default("")
+  emailDate       DateTime @default(now())
+  emailFrom       String   @default("")
+  transactionDate DateTime
+  merchant        String
+  amount          Float
+  currency        String
+  category        String
+  subcategory     String?
+  transactionType String   // 'debit' | 'credit'
+  accountNumber   String
+  bankName        String   @default("")
+  rawEmailText    String   @default("")
+  extractedData   Json     @default("{}")
+  confidence      Float
+  workflowId      String   @default("")
+  workflowRunId   String   @default("")
+  processedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([transactionDate(sort: Desc), category])
+  @@index([userId, transactionDate(sort: Desc)])
+  @@index([workflowId])
+  @@index([bankName, accountNumber])
+  @@map("transactions")
+}
+
+// ─── Email Patterns ───────────────────────────────────────────────────────────
+
+model EmailPattern {
+  id               String    @id @default(cuid())
+  name             String    @unique
+  bankName         String
+  accountType      String    @default("checking") // 'credit' | 'debit' | 'checking' | 'savings'
+  fromAddresses    String[]
+  subjectPatterns  String[]
+  bodyKeywords     String[]
+  extractionPrompt String
+  isActive         Boolean   @default(true)
+  priority         Int       @default(0)
+  matchCount       Int       @default(0)
+  successRate      Float     @default(0)
+  lastMatchedAt    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([isActive, priority(sort: Desc)])
+  @@index([bankName])
+  @@map("email_patterns")
+}
+
+// ─── Gmail Accounts ───────────────────────────────────────────────────────────
+
+model GmailAccount {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  email                String
+  refreshToken         String
+  currentAccessToken   String?
+  accessTokenExpiresAt DateTime?
+  watchExpiration      DateTime?
+  historyId            String?
+  lastSyncAt           DateTime?
+  workflowId           String    @unique
+  isActive             Boolean   @default(true)
+  pubSubTopicName      String
+  pubSubSubscription   String?
+  totalEmailsSynced    Int       @default(0)
+  lastError            String?
+  errorCount           Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([isActive, watchExpiration])
+  @@map("gmail_accounts")
+}
+
+// ─── Budgets ──────────────────────────────────────────────────────────────────
+
+model Budget {
+  id               String   @id @default(cuid())
+  userId           String
+  month            Int
+  year             Int
+  categories       Json     @default("[]") // [{category, budgetAmount, spentAmount, transactionCount}]
+  totalBudget      Float    @default(0)
+  totalSpent       Float    @default(0)
+  lastCalculatedAt DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, year, month])
+  @@map("budgets")
+}
+
+// ─── Pipeline Steps ───────────────────────────────────────────────────────────
+
+model PipelineStep {
+  id                 String   @id @default(cuid())
+  stepKey            String   @unique
+  name               String
+  description        String   @default("")
+  order              Int      @default(0)
+  systemPrompt       String
+  userPromptTemplate String
+  model              String   @default("gpt-4o-mini")
+  temperature        Float    @default(0.1)
+  maxTokens          Int      @default(500)
+  isActive           Boolean  @default(true)
+  version            Int      @default(1)
+  updatedBy          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([order, isActive])
+  @@map("pipeline_steps")
+}
+
+// ─── Schedule Configs ─────────────────────────────────────────────────────────
+
+model ScheduleConfig {
+  id                   String    @id @default(cuid())
+  userId               String
+  scheduleId           String    @unique
+  name                 String
+  description          String?
+  isActive             Boolean   @default(true)
+  searchQuery          String
+  cronExpression       String    @default("* * * * *")
+  maxResults           Int       @default(50)
+  afterDate            DateTime?
+  skipProcessed        Boolean   @default(true)
+  totalRuns            Int       @default(0)
+  lastRunAt            DateTime?
+  lastRunStatus        String?   // 'success' | 'failure'
+  totalEmailsFetched   Int       @default(0)
+  totalEmailsProcessed Int       @default(0)
+  totalErrors          Int       @default(0)
+  createdBy            String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId, isActive])
+  @@map("schedule_configs")
+}
