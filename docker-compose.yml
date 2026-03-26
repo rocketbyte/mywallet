@@ -93,6 +93,8 @@ services:
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-mywallet-local}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama.llm.svc.cluster.local:11434}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - CLOUDFLARE_API_BASE=${CLOUDFLARE_API_BASE}
       # - OPENAI_API_KEY=${OPENAI_API_KEY}
       # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       # - GROQ_API_KEY=${GROQ_API_KEY}
