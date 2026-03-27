@@ -111,10 +111,10 @@ export function createTransactionActivities(container: DependencyContainer) {
      * Find transaction by email ID
      * Delegates to repository
      */
-    async findTransactionByEmailId(emailId: string): Promise<SavedTransaction | null> {
+    async findTransactionByEmailId(userId: string, emailId: string): Promise<SavedTransaction | null> {
       Context.current().heartbeat();
 
-      const transaction = await transactionRepository.findByEmailId(emailId);
+      const transaction = await transactionRepository.findByEmailId(userId, emailId);
 
       if (!transaction) {
         return null;
@@ -135,10 +135,10 @@ export function createTransactionActivities(container: DependencyContainer) {
      * Check if transaction exists for email
      * Delegates to repository
      */
-    async transactionExistsForEmail(emailId: string): Promise<boolean> {
+    async transactionExistsForEmail(userId: string, emailId: string): Promise<boolean> {
       Context.current().heartbeat();
 
-      const transaction = await transactionRepository.findByEmailId(emailId);
+      const transaction = await transactionRepository.findByEmailId(userId, emailId);
       return transaction !== null;
     }
   };

@@ -59,7 +59,7 @@ export class ProcessEmailUseCase {
         });
 
         // Check if transaction already exists for this email
-        const existingTransaction = await this.transactionRepo.findByEmailId(email.id);
+        const existingTransaction = await this.transactionRepo.findByEmailId(input.userId || '', email.id);
         if (existingTransaction) {
           results.skippedCount++;
           continue; // Skip duplicates
@@ -146,6 +146,7 @@ export class ProcessEmailUseCase {
  * Input for ProcessEmailUseCase
  */
 export interface ProcessEmailInput {
+  userId?: string;
   searchQuery: string;
   maxResults?: number;
   afterDate?: Date;
