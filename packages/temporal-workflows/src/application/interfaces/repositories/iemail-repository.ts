@@ -12,9 +12,9 @@ export interface IEmailRepository {
   save(email: Email, metadata?: EmailMetadata): Promise<SavedEmail>;
 
   /**
-   * Find email by its ID
+   * Find email by its ID scoped to a tenant
    */
-  findById(emailId: string): Promise<SavedEmail | null>;
+  findById(userId: string, emailId: string): Promise<SavedEmail | null>;
 
   /**
    * Update processing status of an email
@@ -58,6 +58,7 @@ export interface SavedEmail {
   subject: string;
   from: string;
   date: Date;
+  body?: string;
   isProcessed: boolean;
   processedAt?: Date;
   processingWorkflowId?: string;
@@ -73,4 +74,6 @@ export interface ProcessingStatus {
   transactionId?: string;
   confidence?: number;
   error?: string;
+  matchedPatternId?: string;
+  matchedPatternName?: string;
 }

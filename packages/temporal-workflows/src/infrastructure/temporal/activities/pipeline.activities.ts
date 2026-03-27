@@ -14,6 +14,8 @@ import { DependencyContainer } from 'tsyringe';
 
 import { IAIGateway } from '../../../application/interfaces/gateways/iai-gateway';
 import { IPipelineStepRepository } from '../../../application/interfaces/repositories/ipipeline-step-repository';
+import { ITransactionRepository } from '../../../application/interfaces/repositories/itransaction-repository';
+import { IEmailRepository } from '../../../application/interfaces/repositories/iemail-repository';
 import {
   ClassifyEmailInput,
   ClassificationResult,
@@ -23,8 +25,6 @@ import {
   StoredTransactionResult
 } from '../../../shared/types';
 import { PIPELINE_STEP_KEYS } from '../../../shared/constants';
-import { Transaction } from '../../../models/transaction.model';
-import { Email } from '../../../models/email.model';
 
 // ---------------------------------------------------------------------------
 // Template interpolation helper
@@ -37,6 +37,8 @@ function renderTemplate(template: string, vars: Record<string, string>): string 
 export function createPipelineActivities(container: DependencyContainer) {
   const aiGateway = container.resolve<IAIGateway>('IAIGateway');
   const pipelineStepRepo = container.resolve<IPipelineStepRepository>('IPipelineStepRepository');
+  const transactionRepo = container.resolve<ITransactionRepository>('ITransactionRepository');
+  const emailRepo = container.resolve<IEmailRepository>('IEmailRepository');
 
   return {
     /**
@@ -143,42 +145,35 @@ export function createPipelineActivities(container: DependencyContainer) {
     /**
      * Step 3: Store Transaction
      *
-     * Persists the extracted transaction data to MongoDB.
+     * Persists the extracted transaction data via the injected repositories.
      * Marks the source email as processed.
      * Idempotent — if the transaction already exists for the email it is skipped.
      */
     async storeTransaction(input: StoreTransactionInput): Promise<StoredTransactionResult> {
       Context.current().heartbeat();
 
-      // Check for existing transaction to ensure idempotency
-      const existing = await Transaction.findOne({
-        userId: input.userId,
-        emailId: input.emailId
-      }).lean();
-
+      // Idempotency check — scoped to tenant
+      const existing = await transactionRepo.findByEmailId(input.userId, input.emailId);
       if (existing) {
         return {
-          transactionId: existing._id.toString(),
+          transactionId: existing.id,
           merchant: existing.merchant,
           amount: existing.amount,
           currency: existing.currency
         };
       }
 
-      // Fetch the source email to backfill required fields on the Transaction
-      const sourceEmail = await Email.findOne({
-        userId: input.userId,
-        emailId: input.emailId
-      }).lean();
+      // Fetch source email to denormalize fields onto the transaction record
+      const sourceEmail = await emailRepo.findById(input.userId, input.emailId);
 
-      const transaction = await Transaction.create({
-        userId: input.userId,
+      const transaction = await transactionRepo.save({
+        id: '',
         emailId: input.emailId,
+        userId: input.userId,
         emailSubject: sourceEmail?.subject ?? '',
         emailDate: sourceEmail?.date ?? new Date(),
         emailFrom: sourceEmail?.from ?? '',
         rawEmailText: sourceEmail?.body ?? '',
-
         transactionDate: input.rawData.transactionDate,
         merchant: input.rawData.merchant,
         amount: input.rawData.amount,
@@ -188,31 +183,23 @@ export function createPipelineActivities(container: DependencyContainer) {
         accountNumber: input.rawData.accountLast4 ?? '',
         category: input.rawData.category ?? 'Other',
         confidence: input.rawData.confidence,
-
-        extractedData: input.rawData,
         workflowId: input.workflowId,
-        workflowRunId: input.workflowId,
-        processedAt: new Date()
+        workflowRunId: input.workflowRunId,
+        rawData: input.rawData
+      } as any);
+
+      await emailRepo.updateProcessingStatus(input.emailId, {
+        isProcessed: true,
+        processedAt: new Date(),
+        workflowId: input.workflowId,
+        transactionId: transaction.id,
+        confidence: input.rawData.confidence,
+        matchedPatternId: input.patternId,
+        matchedPatternName: input.patternName
       });
 
-      // Mark the email as processed and link to the transaction
-      await Email.updateOne(
-        { userId: input.userId, emailId: input.emailId },
-        {
-          $set: {
-            isProcessed: true,
-            processedAt: new Date(),
-            processingWorkflowId: input.workflowId,
-            matchedPatternId: input.patternId,
-            matchedPatternName: input.patternName,
-            transactionId: transaction._id.toString(),
-            confidence: input.rawData.confidence
-          }
-        }
-      );
-
       return {
-        transactionId: transaction._id.toString(),
+        transactionId: transaction.id,
         merchant: transaction.merchant,
         amount: transaction.amount,
         currency: transaction.currency

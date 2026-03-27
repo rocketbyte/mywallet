@@ -14,7 +14,7 @@ import { PrismaClient } from '@prisma/client';
 
 // Layer 2 - Application Interfaces (Gateways)
 import { IEmailGateway } from '../../application/interfaces/gateways/iemail-gateway';
-import { IAIGateway, ITransactionExtractorGateway } from '../../application/interfaces/gateways/iai-gateway';
+import { IAIGateway } from '../../application/interfaces/gateways/iai-gateway';
 import { IMailSyncGateway } from '../../application/interfaces/gateways/imail-sync-gateway';
 
 // Layer 2 - Application Interfaces (Repositories)
@@ -28,10 +28,9 @@ import { GmailGateway } from '../external/email/gmail/gmail.gateway';
 import { GmailMapper } from '../external/email/gmail/gmail.mapper';
 import { GmailSyncGateway } from '../external/email/gmail/gmail-sync.gateway';
 
-// Layer 3 & 4 - LiteLLM / OpenAI-compatible Implementations
+// Layer 3 & 4 - LiteLLM / OpenAI-compatible Implementation
 // All AI calls are routed through the LiteLLM proxy — never directly to a model.
 import { OpenAIGateway } from '../external/ai/openai/openai.gateway';
-import { OpenAITransactionExtractorGateway } from '../external/ai/openai/openai-transaction-extractor.gateway';
 
 // Layer 3 - MongoDB Repository Implementations
 import { MongoDBTransactionRepository } from '../persistence/mongodb/repositories/transaction.repository';
@@ -96,9 +95,6 @@ export class DIContainer {
       },
     });
     container.register<IAIGateway>('IAIGateway', { useClass: OpenAIGateway });
-    container.register<ITransactionExtractorGateway>('ITransactionExtractorGateway', {
-      useClass: OpenAITransactionExtractorGateway,
-    });
 
     // ==================== REPOSITORIES ====================
     if (config.dbProvider === 'prisma') {

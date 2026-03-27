@@ -44,8 +44,8 @@ export class PrismaTransactionRepository implements ITransactionRepository {
     return record ? this.toDomain(record) : null;
   }
 
-  async findByEmailId(emailId: string): Promise<Transaction | null> {
-    const record = await this.prisma.transaction.findUnique({ where: { emailId } });
+  async findByEmailId(userId: string, emailId: string): Promise<Transaction | null> {
+    const record = await this.prisma.transaction.findFirst({ where: { userId, emailId } });
     return record ? this.toDomain(record) : null;
   }
 

@@ -40,8 +40,8 @@ export class PrismaEmailRepository implements IEmailRepository {
     return this.toSavedEmail(record);
   }
 
-  async findById(emailId: string): Promise<SavedEmail | null> {
-    const record = await this.prisma.email.findUnique({ where: { emailId } });
+  async findById(userId: string, emailId: string): Promise<SavedEmail | null> {
+    const record = await this.prisma.email.findFirst({ where: { userId, emailId } });
     return record ? this.toSavedEmail(record) : null;
   }
 
@@ -55,6 +55,8 @@ export class PrismaEmailRepository implements IEmailRepository {
         transactionId: status.transactionId,
         confidence: status.confidence,
         processingError: status.error,
+        matchedPatternId: status.matchedPatternId,
+        matchedPatternName: status.matchedPatternName,
       },
     });
   }
@@ -94,6 +96,7 @@ export class PrismaEmailRepository implements IEmailRepository {
       subject: record.subject,
       from: record.from,
       date: record.date,
+      body: record.body ?? undefined,
       isProcessed: record.isProcessed,
       processedAt: record.processedAt ?? undefined,
       processingWorkflowId: record.processingWorkflowId ?? undefined,

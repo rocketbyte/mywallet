@@ -476,6 +476,7 @@ export interface StoreTransactionInput {
   emailId: string;
   rawData: RawTransactionData;
   workflowId: string;
+  workflowRunId: string;
   patternId?: string;
   patternName?: string;
 }

@@ -17,9 +17,9 @@ export interface ITransactionRepository {
   findById(id: string): Promise<Transaction | null>;
 
   /**
-   * Find transaction by email ID (to prevent duplicates)
+   * Find transaction by email ID scoped to a tenant (used for idempotency)
    */
-  findByEmailId(emailId: string): Promise<Transaction | null>;
+  findByEmailId(userId: string, emailId: string): Promise<Transaction | null>;
 
   /**
    * Find all transactions matching filters

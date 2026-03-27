@@ -13,7 +13,7 @@
  * The workflow is triggered as a child workflow from emailProcessingWorkflow
  * and can also be triggered directly via the pipeline API.
  */
-import { proxyActivities, log } from '@temporalio/workflow';
+import { proxyActivities, log, workflowInfo } from '@temporalio/workflow';
 
 import type { PipelineActivities } from '../infrastructure/temporal/activities/pipeline.activities';
 import {
@@ -113,6 +113,7 @@ export async function transactionPipelineWorkflow(
     emailId: input.emailId,
     rawData,
     workflowId: input.workflowId,
+    workflowRunId: workflowInfo().runId,
     patternId: input.patternId,
     patternName: input.patternName
   });
