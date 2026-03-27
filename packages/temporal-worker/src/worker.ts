@@ -69,27 +69,17 @@ async function run() {
     // ==================== CLEAN ARCHITECTURE SETUP ====================
     logger.info('🔧 Setting up Clean Architecture DI Container...');
     logger.info(`📧 Email Provider: ${config.providers.email}`);
-    logger.info(`🤖 AI Provider: ${config.providers.ai}`);
+    logger.info(`🤖 AI Gateway: LiteLLM (${config.litellm.endpoint})`);
 
-    // Setup DI Container with provider configuration
     DIContainer.setup({
       emailProvider: config.providers.email as 'gmail',
-      aiProvider: config.providers.ai as 'openai' | 'ollama',
       dbProvider,
       mongoConnection: dbProvider === 'mongodb' ? mongoose.connection : undefined,
       prismaClient,
-
-      // Gmail configuration
       gmailOAuth2Client: oauth2Client,
-
-      // OpenAI configuration
-      openaiApiKey: config.openai.apiKey,
-      openaiModel: config.openai.model,
-      openaiEndpoint: config.openai.endpoint,
-
-      // Ollama configuration
-      ollamaEndpoint: config.ollama.endpoint,
-      ollamaModel: config.ollama.model
+      litellmApiKey: config.litellm.apiKey,
+      litellmModel: config.litellm.model,
+      litellmEndpoint: config.litellm.endpoint
     });
 
     const container = DIContainer.getContainer();
@@ -121,7 +111,7 @@ async function run() {
 
     // ==================== LEGACY ACTIVITIES (Temporary) ====================
     const gmailClient = new GmailClient(oauth2Client);
-    const openaiClient = new OpenAIClient(config.openai.apiKey);
+    const openaiClient = new OpenAIClient(config.litellm.apiKey);
 
     const gmailActivities = createGmailActivities(gmailClient);
     const openaiActivities = createOpenAIActivities(openaiClient);

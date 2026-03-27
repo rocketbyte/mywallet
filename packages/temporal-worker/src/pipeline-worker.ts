@@ -50,16 +50,13 @@ async function run() {
 
     DIContainer.setup({
       emailProvider: config.providers.email as 'gmail',
-      aiProvider: config.providers.ai as 'openai' | 'ollama',
       dbProvider,
       mongoConnection: dbProvider === 'mongodb' ? mongoose.connection : undefined,
       prismaClient,
       gmailOAuth2Client: oauth2Client,
-      openaiApiKey: config.openai.apiKey,
-      openaiModel: config.openai.model,
-      openaiEndpoint: config.openai.endpoint,
-      ollamaEndpoint: config.ollama.endpoint,
-      ollamaModel: config.ollama.model
+      litellmApiKey: config.litellm.apiKey,
+      litellmModel: config.litellm.model,
+      litellmEndpoint: config.litellm.endpoint
     });
 
     const container = DIContainer.getContainer();

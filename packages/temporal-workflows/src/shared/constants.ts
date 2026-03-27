@@ -34,7 +34,7 @@ export const RETRY_POLICIES = {
     backoffCoefficient: 2,
     maximumInterval: '30s' as any,
     maximumAttempts: 3,
-    nonRetryableErrorTypes: ['InvalidRequestError']
+    nonRetryableErrorTypes: ['InvalidRequestError', 'AuthenticationError']
   },
   MONGODB: {
     initialInterval: '500ms' as any,
@@ -170,7 +170,7 @@ export const PIPELINE_RETRY_POLICY = {
   backoffCoefficient: 2,
   maximumInterval: '60s' as any,
   maximumAttempts: 3,
-  nonRetryableErrorTypes: ['PipelineStepNotFoundError', 'PipelineStepInactiveError']
+  nonRetryableErrorTypes: ['PipelineStepNotFoundError', 'PipelineStepInactiveError', 'AuthenticationError']
 };
 
 // Minimum confidence for the classify step to proceed to extraction

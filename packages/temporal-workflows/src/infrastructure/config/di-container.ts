@@ -28,13 +28,10 @@ import { GmailGateway } from '../external/email/gmail/gmail.gateway';
 import { GmailMapper } from '../external/email/gmail/gmail.mapper';
 import { GmailSyncGateway } from '../external/email/gmail/gmail-sync.gateway';
 
-// Layer 3 & 4 - OpenAI Implementations
+// Layer 3 & 4 - LiteLLM / OpenAI-compatible Implementations
+// All AI calls are routed through the LiteLLM proxy — never directly to a model.
 import { OpenAIGateway } from '../external/ai/openai/openai.gateway';
 import { OpenAITransactionExtractorGateway } from '../external/ai/openai/openai-transaction-extractor.gateway';
-
-// Layer 3 & 4 - Ollama Implementations
-import { OllamaGateway } from '../external/ai/ollama/ollama.gateway';
-import { OllamaTransactionExtractorGateway } from '../external/ai/ollama/ollama-transaction-extractor.gateway';
 
 // Layer 3 - MongoDB Repository Implementations
 import { MongoDBTransactionRepository } from '../persistence/mongodb/repositories/transaction.repository';
@@ -53,7 +50,6 @@ import { ProcessEmailUseCase } from '../../application/use-cases/process-email/p
 
 export interface DIContainerConfig {
   emailProvider: 'gmail';        // 'outlook' can be added later
-  aiProvider: 'openai' | 'ollama';
   dbProvider: 'mongodb' | 'prisma';
 
   // MongoDB (required when dbProvider === 'mongodb')
@@ -65,14 +61,12 @@ export interface DIContainerConfig {
   // Gmail config
   gmailOAuth2Client?: OAuth2Client;
 
-  // OpenAI config
-  openaiApiKey?: string;
-  openaiModel?: string;
-  openaiEndpoint?: string;
-
-  // Ollama config
-  ollamaEndpoint?: string;
-  ollamaModel?: string;
+  // LiteLLM / OpenAI-compatible gateway config.
+  // All AI calls go through the LiteLLM proxy (litellmEndpoint).
+  // litellmApiKey must match LITELLM_MASTER_KEY in the llm-platform secret.
+  litellmApiKey?: string;
+  litellmModel?: string;
+  litellmEndpoint?: string;
 }
 
 export class DIContainer {
@@ -91,31 +85,20 @@ export class DIContainer {
       container.register<IMailSyncGateway>('IMailSyncGateway', { useClass: GmailSyncGateway });
     }
 
-    // ==================== AI GATEWAY ====================
-    if (config.aiProvider === 'openai') {
-      container.register('OpenAIConfig', {
-        useValue: {
-          apiKey: config.openaiApiKey!,
-          model: config.openaiModel || 'gpt-4o-mini',
-          endpoint: config.openaiEndpoint,
-        },
-      });
-      container.register<IAIGateway>('IAIGateway', { useClass: OpenAIGateway });
-      container.register<ITransactionExtractorGateway>('ITransactionExtractorGateway', {
-        useClass: OpenAITransactionExtractorGateway,
-      });
-    } else if (config.aiProvider === 'ollama') {
-      container.register('OllamaConfig', {
-        useValue: {
-          endpoint: config.ollamaEndpoint!,
-          model: config.ollamaModel || 'phi3:mini',
-        },
-      });
-      container.register<IAIGateway>('IAIGateway', { useClass: OllamaGateway });
-      container.register<ITransactionExtractorGateway>('ITransactionExtractorGateway', {
-        useClass: OllamaTransactionExtractorGateway,
-      });
-    }
+    // ==================== AI GATEWAY (LiteLLM proxy) ====================
+    // OpenAIGateway is the OpenAI-compatible client pointed at the LiteLLM proxy.
+    // Model routing (Cloudflare, Ollama, etc.) is configured in LiteLLM — not here.
+    container.register('OpenAIConfig', {
+      useValue: {
+        apiKey: config.litellmApiKey!,
+        model: config.litellmModel || 'cf/llama-3.1-8b-instruct',
+        endpoint: config.litellmEndpoint,
+      },
+    });
+    container.register<IAIGateway>('IAIGateway', { useClass: OpenAIGateway });
+    container.register<ITransactionExtractorGateway>('ITransactionExtractorGateway', {
+      useClass: OpenAITransactionExtractorGateway,
+    });
 
     // ==================== REPOSITORIES ====================
     if (config.dbProvider === 'prisma') {
