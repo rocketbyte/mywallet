@@ -41,30 +41,30 @@ export interface ITransaction extends Document {
 }
 
 const TransactionSchema = new Schema<ITransaction>({
-  userId: { type: String, required: true, index: true },
-  emailId: { type: String, required: true, index: true },  // Removed unique: true
-  emailSubject: { type: String, required: true },
-  emailDate: { type: Date, required: true },
-  emailFrom: { type: String, required: true },
+  userId: { type: String, index: true },
+  emailId: { type: String, index: true },
+  emailSubject: { type: String },
+  emailDate: { type: Date },
+  emailFrom: { type: String },
 
-  transactionDate: { type: Date, required: true, index: true },
-  merchant: { type: String, required: true },
-  amount: { type: Number, required: true },
-  currency: { type: String, required: true, default: 'USD' },
+  transactionDate: { type: Date, index: true },
+  merchant: { type: String },
+  amount: { type: Number },
+  currency: { type: String, default: 'USD' },
 
-  category: { type: String, required: true, index: true },
+  category: { type: String, index: true },
   subcategory: { type: String },
-  transactionType: { type: String, enum: ['debit', 'credit'], required: true },
+  transactionType: { type: String, enum: ['debit', 'credit'] },
 
   accountNumber: { type: String },
-  bankName: { type: String, required: true },
+  bankName: { type: String },
 
-  rawEmailText: { type: String, required: true },
+  rawEmailText: { type: String },
   extractedData: { type: Schema.Types.Mixed },
   confidence: { type: Number, min: 0, max: 1 },
 
-  workflowId: { type: String, required: true },
-  workflowRunId: { type: String, required: true },
+  workflowId: { type: String },
+  workflowRunId: { type: String },
 
   processedAt: { type: Date, default: Date.now }
 }, {
