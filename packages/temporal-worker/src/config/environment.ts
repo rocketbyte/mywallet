@@ -3,17 +3,12 @@ import * as path from 'path';
 
 // Load environment variables from project root
 const envPath = path.resolve(process.cwd(), '../../.env');
-console.log('Loading .env from:', envPath);
 const result = dotenv.config({ path: envPath });
 
 if (result.error) {
-  console.warn('Warning: Could not load .env file:', result.error.message);
-  console.log('Trying alternative path...');
   // Try alternative path if first attempt fails
   dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 }
-
-console.log('Environment loaded. GMAIL_REFRESH_TOKEN:', process.env.GMAIL_REFRESH_TOKEN ? 'SET' : 'NOT SET');
 
 export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -25,13 +20,13 @@ export const config = {
   },
 
   mongodb: {
-    uri: process.env.MONGODB_URI || 'mongodb://admin:admin123@localhost:27017/mywallet?authSource=admin'
+    uri: process.env.MONGODB_URI || ''
   },
 
-  // Provider selection - enables runtime switching between providers
+  // Provider selection
   providers: {
-    email: process.env.EMAIL_PROVIDER || 'gmail',      // 'gmail' | 'outlook'
-    ai: process.env.AI_PROVIDER || 'openai'             // 'openai' | 'ollama'
+    email: process.env.EMAIL_PROVIDER || 'gmail',  // 'gmail' | 'outlook'
+    db: process.env.DB_PROVIDER || 'mongodb'        // 'mongodb' | 'prisma'
   },
 
   gmail: {
@@ -40,17 +35,14 @@ export const config = {
     refreshToken: process.env.GMAIL_REFRESH_TOKEN || ''
   },
 
-  // OpenAI configuration (supports custom endpoints)
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    endpoint: process.env.OPENAI_ENDPOINT  // Optional custom endpoint
-  },
-
-  // Ollama configuration (supports remote servers)
-  ollama: {
-    endpoint: process.env.OLLAMA_ENDPOINT || 'http://localhost:11434',
-    model: process.env.OLLAMA_MODEL || 'phi3:mini'
+  // LiteLLM proxy configuration.
+  // All AI calls are routed through LiteLLM — never directly to a model.
+  // LITELLM_API_KEY must match LITELLM_MASTER_KEY in the llm-platform secret.
+  // OPENAI_MODEL must match a model_name in the LiteLLM configmap.
+  litellm: {
+    apiKey: process.env.LITELLM_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'cf/llama-3.1-8b-instruct',
+    endpoint: process.env.LITELLM_BASE_URL || ''
   },
 
   logging: {
@@ -58,11 +50,10 @@ export const config = {
   }
 };
 
-// Validate required environment variables based on selected providers
+// Validate required environment variables
 export function validateConfig() {
   const required: Array<{ key: string; value: string }> = [];
 
-  // Validate email provider configuration
   if (config.providers.email === 'gmail') {
     required.push(
       { key: 'GMAIL_CLIENT_ID', value: config.gmail.clientId },
@@ -70,18 +61,11 @@ export function validateConfig() {
       { key: 'GMAIL_REFRESH_TOKEN', value: config.gmail.refreshToken }
     );
   }
-  // Future: Add Outlook validation here
 
-  // Validate AI provider configuration
-  if (config.providers.ai === 'openai') {
-    required.push(
-      { key: 'OPENAI_API_KEY', value: config.openai.apiKey }
-    );
-  } else if (config.providers.ai === 'ollama') {
-    required.push(
-      { key: 'OLLAMA_ENDPOINT', value: config.ollama.endpoint }
-    );
-  }
+  required.push(
+    { key: 'LITELLM_API_KEY', value: config.litellm.apiKey },
+    { key: 'LITELLM_BASE_URL', value: config.litellm.endpoint }
+  );
 
   const missing = required.filter(r => !r.value);
 

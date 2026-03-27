@@ -19,11 +19,14 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
    * Save transaction to MongoDB
    */
   async save(transaction: Transaction): Promise<Transaction> {
+    const ext = transaction as any;
     const doc = await TransactionModel.create({
+      userId: ext.userId,
       emailId: transaction.emailId,
-      emailSubject: '', // Will be populated from email
-      emailDate: new Date(),
-      emailFrom: '',
+      emailSubject: ext.emailSubject ?? '',
+      emailDate: ext.emailDate ?? new Date(),
+      emailFrom: ext.emailFrom ?? '',
+      rawEmailText: ext.rawEmailText ?? '',
       transactionDate: transaction.transactionDate,
       merchant: transaction.merchant,
       amount: transaction.amount,
@@ -33,11 +36,10 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
       transactionType: transaction.transactionType,
       accountNumber: transaction.accountNumber,
       bankName: transaction.bankName || '',
-      rawEmailText: '', // Will be populated from email
       extractedData: transaction.rawData || {},
       confidence: transaction.confidence,
-      workflowId: '', // Will be set by caller
-      workflowRunId: '',
+      workflowId: ext.workflowId ?? '',
+      workflowRunId: ext.workflowRunId ?? '',
       processedAt: new Date()
     });
 
@@ -53,10 +55,10 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
   }
 
   /**
-   * Find transaction by email ID
+   * Find transaction by email ID scoped to a tenant
    */
-  async findByEmailId(emailId: string): Promise<Transaction | null> {
-    const doc = await TransactionModel.findOne({ emailId });
+  async findByEmailId(userId: string, emailId: string): Promise<Transaction | null> {
+    const doc = await TransactionModel.findOne({ userId, emailId });
     return doc ? this.toDomain(doc) : null;
   }
 

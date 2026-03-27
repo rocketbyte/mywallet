@@ -34,7 +34,8 @@ export const createWorkflowStarterActivities = (temporalClient: Client) => {
         };
       }
 
-      const workflowId = `${input.workflowIdPrefix}${Date.now()}`;
+      const ts = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+      const workflowId = `${input.workflowIdPrefix}-${ts}`;
 
       console.log(`[Activity] Starting email processing workflow for ${input.emailIds.length} emails`, {
         userId: input.userId,

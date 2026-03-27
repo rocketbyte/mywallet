@@ -34,9 +34,9 @@ export class OpenAIGateway implements IAIGateway {
         { role: 'system', content: request.systemPrompt },
         { role: 'user', content: request.userPrompt }
       ],
-      response_format: request.responseFormat === 'json'
-        ? { type: 'json_object' }
-        : { type: 'text' },
+      ...(request.responseFormat === 'json' && !this.modelName.startsWith('cf/')
+        ? { response_format: { type: 'json_object' as const } }
+        : {}),
       temperature: request.temperature ?? 0.1,
       max_tokens: request.maxTokens ?? 500
     });

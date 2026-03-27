@@ -28,7 +28,8 @@ export class WorkflowController {
 
       const client = await getTemporalClient();
 
-      const workflowId = `${WORKFLOW_IDS.EMAIL_PROCESSING_PREFIX}${userId}-${Date.now()}`;
+      const ts = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+      const workflowId = `${WORKFLOW_IDS.EMAIL_PROCESSING_PREFIX}${userId}-${ts}`;
 
       const handle = await client.workflow.start(emailProcessingWorkflow, {
         taskQueue: TASK_QUEUES.EMAIL_PROCESSING,

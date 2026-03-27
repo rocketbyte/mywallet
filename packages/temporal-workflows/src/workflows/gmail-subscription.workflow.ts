@@ -353,7 +353,7 @@ export async function gmailSubscriptionWorkflow(
             await workflowStarterActivities.startEmailProcessingWorkflow({
               userId: input.userId,
               emailIds: changes.messages.map(m => m.id),
-              workflowIdPrefix: `email-processing-from-sync-${input.userId}-`
+              workflowIdPrefix: `email-batch-${input.userId}`
             });
           }
 

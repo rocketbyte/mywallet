@@ -1,13 +1,16 @@
 // Task Queue Names
 export const TASK_QUEUES = {
   EMAIL_PROCESSING: 'email-processing-queue',
-  TRANSACTION_ANALYSIS: 'transaction-analysis-queue'
+  TRANSACTION_ANALYSIS: 'transaction-analysis-queue',
+  // Dedicated pipeline queue — worker runs with concurrency=1 to avoid
+  // hammering the Ollama/LiteLLM instance with parallel AI calls.
+  PIPELINE: 'pipeline-queue'
 } as const;
 
 // Workflow ID Prefixes
 export const WORKFLOW_IDS = {
-  EMAIL_PROCESSING_PREFIX: 'email-processing-',
-  TRANSACTION_ANALYSIS_PREFIX: 'transaction-analysis-'
+  EMAIL_PROCESSING_PREFIX: 'email-batch-',
+  PIPELINE_PREFIX: 'pipeline-email-'
 } as const;
 
 // Activity Timeouts
@@ -31,7 +34,7 @@ export const RETRY_POLICIES = {
     backoffCoefficient: 2,
     maximumInterval: '30s' as any,
     maximumAttempts: 3,
-    nonRetryableErrorTypes: ['InvalidRequestError']
+    nonRetryableErrorTypes: ['InvalidRequestError', 'AuthenticationError']
   },
   MONGODB: {
     initialInterval: '500ms' as any,
@@ -68,7 +71,7 @@ export const RATE_LIMITS = {
 
 // Schedule IDs
 export const SCHEDULE_IDS = {
-  EMAIL_PROCESSING_PREFIX: 'email-processing-schedule-'
+  EMAIL_PROCESSING_PREFIX: 'email-schedule/'
 } as const;
 
 // Default Schedule Configuration
@@ -85,7 +88,7 @@ export const DEFAULT_SCHEDULE_CONFIG = {
 export const GMAIL_SYNC_TASK_QUEUE = 'gmail-sync-queue';
 
 // Workflow ID Prefix
-export const GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX = 'gmail-subscription-';
+export const GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX = 'gmail-watch-';
 
 // Activity Timeouts for Gmail Sync
 export const GMAIL_SYNC_TIMEOUTS = {
@@ -142,6 +145,38 @@ export const GMAIL_WATCH_CONFIG = {
   RENEWAL_CHECK_INTERVAL: '1 day',
   CONTINUE_AS_NEW_DAYS: 30      // Reset workflow history every 30 days
 } as const;
+
+// ==================== AI Pipeline Constants ====================
+
+export const PIPELINE_STEP_KEYS = {
+  CLASSIFY_EMAIL: 'classify_email',
+  EXTRACT_TRANSACTION: 'extract_transaction',
+  STORE_TRANSACTION: 'store_transaction'
+} as const;
+
+export const PIPELINE_ACTIVITY_TIMEOUTS = {
+  // Generous ceiling for slow local LLM inference (Ollama on a Pi can take minutes).
+  // Liveness is enforced by heartbeatTimeout — the activity heartbeats every 20s
+  // during the AI call so Temporal retries quickly if the worker crashes.
+  AI_CALL: '1 hour',
+  STORE: '30 seconds'
+} as const;
+
+// If the worker dies mid-activity Temporal will reschedule after this window.
+export const PIPELINE_HEARTBEAT_TIMEOUT = '2 minutes';
+
+export const PIPELINE_RETRY_POLICY = {
+  initialInterval: '5s' as any,
+  backoffCoefficient: 2,
+  maximumInterval: '60s' as any,
+  maximumAttempts: 3,
+  nonRetryableErrorTypes: ['PipelineStepNotFoundError', 'PipelineStepInactiveError', 'AuthenticationError']
+};
+
+// Minimum confidence for the classify step to proceed to extraction
+export const CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.7;
+
+// ==================== Signal Names ====================
 
 // Signal Names
 export const GMAIL_SIGNALS = {

@@ -5,6 +5,7 @@ import emailRoutes from './email.routes';
 import scheduleRoutes from './schedule.routes';
 import gmailWebhookRoutes from './gmail-webhook.routes';
 import authRoutes from './auth.routes';
+import pipelineRoutes from './pipeline.routes';
 
 const router = Router();
 
@@ -14,5 +15,6 @@ router.use('/emails', emailRoutes);
 router.use('/schedules', scheduleRoutes);
 router.use('/gmail', gmailWebhookRoutes);
 router.use('/auth', authRoutes);
+router.use('/pipeline', pipelineRoutes);
 
 export default router;

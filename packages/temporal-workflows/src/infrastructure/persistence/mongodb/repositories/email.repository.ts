@@ -40,10 +40,10 @@ export class MongoDBEmailRepository implements IEmailRepository {
   }
 
   /**
-   * Find email by ID
+   * Find email by ID scoped to a tenant
    */
-  async findById(emailId: string): Promise<SavedEmail | null> {
-    const doc = await EmailModel.findOne({ emailId });
+  async findById(userId: string, emailId: string): Promise<SavedEmail | null> {
+    const doc = await EmailModel.findOne({ userId, emailId });
     return doc ? this.toSavedEmail(doc) : null;
   }
 
@@ -60,7 +60,9 @@ export class MongoDBEmailRepository implements IEmailRepository {
           processingWorkflowId: status.workflowId,
           transactionId: status.transactionId,
           confidence: status.confidence,
-          processingError: status.error
+          processingError: status.error,
+          matchedPatternId: status.matchedPatternId,
+          matchedPatternName: status.matchedPatternName
         }
       }
     );
@@ -128,6 +130,7 @@ export class MongoDBEmailRepository implements IEmailRepository {
       subject: doc.subject,
       from: doc.from,
       date: doc.date,
+      body: doc.body,
       isProcessed: doc.isProcessed,
       processedAt: doc.processedAt,
       processingWorkflowId: doc.processingWorkflowId,
