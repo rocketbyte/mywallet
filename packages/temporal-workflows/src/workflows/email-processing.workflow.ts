@@ -5,7 +5,7 @@ import {
   EmailProcessingInput,
   EmailProcessingResult
 } from '../shared/types';
-import { ACTIVITY_TIMEOUTS, RETRY_POLICIES, TASK_QUEUES } from '../shared/constants';
+import { ACTIVITY_TIMEOUTS, RETRY_POLICIES, TASK_QUEUES, WORKFLOW_IDS } from '../shared/constants';
 import { transactionPipelineWorkflow } from './transaction-pipeline.workflow';
 
 // Proxy activities with their respective configurations
@@ -118,7 +118,7 @@ export async function emailProcessingWorkflow(
           transactionPipelineWorkflow,
           {
             taskQueue: TASK_QUEUES.PIPELINE,
-            workflowId: `pipeline-email-${gmailMessageId}`,
+            workflowId: `${WORKFLOW_IDS.PIPELINE_PREFIX}-${gmailMessageId}`,
             args: [{
               userId: input.userId,
               emailId: gmailMessageId,

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { getTemporalClient } from '../config/temporal-client';
 import { PipelineStep } from '../../../temporal-workflows/src/models/pipeline-step.model';
-import { TASK_QUEUES } from '../../../temporal-workflows/src/shared/constants';
+import { TASK_QUEUES, WORKFLOW_IDS } from '../../../temporal-workflows/src/shared/constants';
 import { logger } from '../utils/logger';
 
 /**
@@ -123,7 +123,7 @@ export async function runPipelineForEmail(req: Request, res: Response): Promise<
     }
 
     const client = await getTemporalClient();
-    const workflowId = `pipeline-email-${emailId}-manual`;
+    const workflowId = `${WORKFLOW_IDS.PIPELINE_PREFIX}-${emailId}-manual`;
 
     const handle = await client.workflow.start(transactionPipelineWorkflow, {
       taskQueue: TASK_QUEUES.PIPELINE,

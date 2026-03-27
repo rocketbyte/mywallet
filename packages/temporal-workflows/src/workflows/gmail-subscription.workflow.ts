@@ -49,7 +49,8 @@ import {
   GMAIL_SYNC_RETRY_POLICIES,
   GMAIL_WATCH_CONFIG,
   GMAIL_SIGNALS,
-  TOKEN_REFRESH_CONFIG
+  TOKEN_REFRESH_CONFIG,
+  WORKFLOW_IDS
 } from '../shared/constants';
 
 // ---------------------------------------------------------------------------
@@ -353,7 +354,7 @@ export async function gmailSubscriptionWorkflow(
             await workflowStarterActivities.startEmailProcessingWorkflow({
               userId: input.userId,
               emailIds: changes.messages.map(m => m.id),
-              workflowIdPrefix: `email-batch-${input.userId}`
+              workflowIdPrefix: `${WORKFLOW_IDS.EMAIL_PROCESSING_PREFIX}-${input.userId}`
             });
           }
 
