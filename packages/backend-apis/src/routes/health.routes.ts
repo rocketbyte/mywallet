@@ -40,7 +40,6 @@ router.get('/health/deep', async (req, res) => {
     api: 'ok'
   };
 
-  // Check Temporal connection
   try {
     await getTemporalClient();
     checks.temporal = 'connected';
@@ -48,7 +47,8 @@ router.get('/health/deep', async (req, res) => {
     checks.temporal = 'disconnected';
   }
 
-  const allHealthy = Object.values(checks).every(v => v === 'ok' || v === 'connected');
+  const healthyStatus = ['ok', 'connected'];
+  const allHealthy = Object.values(checks).every(v => healthyStatus.includes(v as string));
 
   res.status(allHealthy ? 200 : 503).json({
     status: allHealthy ? 'ok' : 'degraded',

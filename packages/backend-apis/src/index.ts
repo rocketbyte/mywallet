@@ -1,4 +1,3 @@
-// IMPORTANT: Load environment variables FIRST before any other imports
 import './config/environment';
 
 import express from 'express';
@@ -19,18 +18,19 @@ const app = express();
 // This ensures we can load ESM-only modules in a CommonJS environment
 const esmImport = new Function('path', 'return import(path)');
 
-// Connect to MongoDB
 async function connectMongoDB() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://admin:admin123@localhost:27017/mywallet?authSource=admin');
-    logger.info('✅ Connected to MongoDB');
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI is not defined');
+    }
+    await mongoose.connect(process.env.MONGODB_URI);
+    logger.info('Connected to MongoDB');
   } catch (error) {
-    logger.error('❌ Failed to connect to MongoDB', { error });
+    logger.error('Failed to connect to MongoDB', { error });
     process.exit(1);
   }
 }
 
-// Security & parsing middleware
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }, // Essential for loading assets like Redoc/Scalar from CDNs
@@ -94,15 +94,6 @@ app.get('/docs/openapi.json', (req, res) => {
   res.send(swaggerSpec);
 });
 
-app.get(
-  '/docs/reference',
-  redocMiddleware({
-    title: 'MyWallet API Reference',
-    spec: swaggerSpec,
-  })
-);
-
-
 app.use(
   '/docs/playground',
   async (req, res, next) => {
@@ -137,24 +128,24 @@ const PORT = config.port;
 // Connect to MongoDB and start server
 connectMongoDB().then(() => {
   app.listen(PORT, () => {
-    logger.info(`🚀 MyWallet API Server listening on port ${PORT}`);
-    logger.info(`📍 Environment: ${config.nodeEnv}`);
-    logger.info(`⏰ Temporal address: ${config.temporal.address}`);
-    logger.info(`\n✅ Ready to accept requests!\n`);
+    logger.info(`MyWallet API Server listening on port ${PORT}`);
+    logger.info(`Environment: ${config.nodeEnv}`);
+    logger.info(`Temporal address: ${config.temporal.address}`);
+    logger.info(`\nReady to accept requests!\n`);
   });
 });
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-  logger.info('🛑 Shutting down API server...');
+  logger.info('Shutting down API server...');
   await mongoose.disconnect();
-  logger.info('✅ Disconnected from MongoDB');
+  logger.info('Disconnected from MongoDB');
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  logger.info('🛑 Shutting down API server...');
+  logger.info('Shutting down API server...');
   await mongoose.disconnect();
-  logger.info('✅ Disconnected from MongoDB');
+  logger.info('Disconnected from MongoDB');
   process.exit(0);
 });
