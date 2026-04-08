@@ -53,7 +53,7 @@ export const createGmailActivities = (gmailClient: GmailClient) => {
      * Mark email as processed (add label)
      */
     async markEmailAsProcessed(emailId: string): Promise<void> {
-      await gmailClient.addLabel(emailId, 'MYWALLET_PROCESSED');
+      await gmailClient.addLabel(emailId, 'WALLET_PROCESSED');
       console.log(`Marked email ${emailId} as processed`);
     }
   };

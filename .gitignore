@@ -55,3 +55,6 @@ docs
 
 # Kubernetes secrets
 k8s/mywallet/values-secrets.yaml
+
+# Misc
+IMPLEMENTATION_STATUS.md

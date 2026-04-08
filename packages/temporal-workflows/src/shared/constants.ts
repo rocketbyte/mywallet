@@ -9,8 +9,8 @@ export const TASK_QUEUES = {
 
 // Workflow ID Prefixes
 export const WORKFLOW_IDS = {
-  EMAIL_PROCESSING_PREFIX: 'email-batch-',
-  PIPELINE_PREFIX: 'pipeline-email-'
+  EMAIL_PROCESSING_PREFIX: 'email-processing',
+  PIPELINE_PREFIX: 'pipeline-agent'
 } as const;
 
 // Activity Timeouts
