@@ -63,7 +63,7 @@ export function createTransactionActivities(container: DependencyContainer) {
         currency: transaction.currency,
         category: transaction.category,
         transactionType: transaction.transactionType,
-        accountNumber: transaction.accountNumber,
+        accountNumber: transaction.accountNumber ?? '',
         confidence: transaction.confidence,
         rawResponse: transaction.rawData || {}
       };

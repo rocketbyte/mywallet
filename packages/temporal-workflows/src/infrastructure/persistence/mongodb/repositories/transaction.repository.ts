@@ -167,7 +167,7 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
       doc.category,
       doc.transactionType,
       doc.accountNumber,
-      doc.confidence,
+      doc.confidence ?? 0,
       doc.bankName,
       doc.subcategory,
       doc.extractedData

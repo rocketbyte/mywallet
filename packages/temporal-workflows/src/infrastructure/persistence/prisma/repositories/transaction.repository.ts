@@ -21,7 +21,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
   async save(transaction: Transaction): Promise<Transaction> {
     const record = await this.prisma.transaction.create({
       data: {
-        emailId: transaction.emailId,
+        emailId: transaction.emailId ?? '',
         transactionDate: transaction.transactionDate,
         merchant: transaction.merchant,
         amount: transaction.amount,
@@ -29,7 +29,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
         category: transaction.category,
         subcategory: transaction.subcategory,
         transactionType: transaction.transactionType,
-        accountNumber: transaction.accountNumber,
+        accountNumber: transaction.accountNumber ?? '',
         bankName: transaction.bankName || '',
         extractedData: (transaction.rawData as any) || {},
         confidence: transaction.confidence,

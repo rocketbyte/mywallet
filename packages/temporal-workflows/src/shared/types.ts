@@ -80,7 +80,7 @@ export interface SaveTransactionInput {
 
 export interface SavedTransaction {
   id: string;
-  emailId: string;
+  emailId?: string;
   transactionDate: Date;
   merchant: string;
   amount: number;
