@@ -86,8 +86,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-app.use('/api', routes);
+// Routes — Basic Auth on /api/*, except endpoints called by external systems
+// that cannot send Basic Auth headers (k8s probes, Google Pub/Sub, OAuth redirect).
+const openApiPaths: RegExp[] = [
+  /^\/health(\/.*)?$/,
+  /^\/gmail\/webhook\/?$/,
+  /^\/auth\/gmail\/callback\/?$/,
+];
+app.use(
+  '/api',
+  (req, res, next) => {
+    if (openApiPaths.some((re) => re.test(req.path))) return next();
+    return docsAuth(req, res, next);
+  },
+  routes
+);
 
 // Documentation (protected by Basic Auth)
 app.get('/docs/openapi.json', docsAuth, (req, res) => {
