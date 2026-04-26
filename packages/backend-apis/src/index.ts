@@ -11,6 +11,7 @@ import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { swaggerSpec } from './config/swagger';
 import { redocMiddleware } from './middleware/redoc';
+import { docsAuth } from './middleware/docs-auth';
 
 const app = express();
 
@@ -88,14 +89,15 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api', routes);
 
-// Documentation
-app.get('/docs/openapi.json', (req, res) => {
+// Documentation (protected by Basic Auth)
+app.get('/docs/openapi.json', docsAuth, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
 
 app.use(
   '/docs/playground',
+  docsAuth,
   async (req, res, next) => {
     try {
       const { apiReference } = await esmImport('@scalar/express-api-reference');

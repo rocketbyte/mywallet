@@ -26,7 +26,7 @@ export class BudgetController {
       res.status(201).json({ budget });
     } catch (error) {
       logger.error('Failed to upsert budget', { error });
-      res.status(500).json({ error: 'Failed to save budget' });
+      res.status(500).json({ error: 'Failed to save budget', detail: String(error) });
     }
   }
 

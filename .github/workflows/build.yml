@@ -171,6 +171,8 @@ jobs:
       - name: Deploy via Helm
         env:
           HELM_VALUES_SECRETS: ${{ secrets.HELM_VALUES_SECRETS }}
+          DOCS_USER: ${{ secrets.DOCS_USER }}
+          DOCS_PASSWORD: ${{ secrets.DOCS_PASSWORD }}
         run: |
           echo "$HELM_VALUES_SECRETS" > /tmp/values-secrets.yaml
 
@@ -183,7 +185,9 @@ jobs:
             --values k8s/mywallet/values.yaml \
             --values /tmp/values-secrets.yaml \
             --set backend.image.tag="${IMAGE_TAG}" \
-            --set worker.image.tag="${IMAGE_TAG}"
+            --set worker.image.tag="${IMAGE_TAG}" \
+            --set secrets.docs.user="${DOCS_USER}" \
+            --set secrets.docs.password="${DOCS_PASSWORD}"
 
           rm /tmp/values-secrets.yaml
 

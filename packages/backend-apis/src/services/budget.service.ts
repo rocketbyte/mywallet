@@ -17,7 +17,7 @@ export interface BudgetDTO {
 }
 
 export interface UpsertBudgetInput {
-  period_start: string;
+  period_start?: string;
   limit_amount: number;
   categories?: { category: string; budget: number }[];
 }

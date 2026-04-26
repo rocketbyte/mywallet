@@ -28,5 +28,10 @@ export const config = {
 
   logging: {
     level: process.env.LOG_LEVEL || 'info'
+  },
+
+  docs: {
+    user: process.env.DOCS_USER || '',
+    password: process.env.DOCS_PASSWORD || ''
   }
 };
