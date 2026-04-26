@@ -59,7 +59,7 @@ export class BudgetService {
   }
 
   async upsert(userId: string, input: UpsertBudgetInput): Promise<BudgetDTO> {
-    const date = new Date(input.period_start);
+    const date = input.period_start ? new Date(input.period_start) : new Date();
     const month = date.getMonth() + 1;
     const year = date.getFullYear();
     const categories = (input.categories ?? []).map((c) => ({
