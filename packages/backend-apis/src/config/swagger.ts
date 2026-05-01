@@ -42,21 +42,23 @@ This API provides powerful tools to interact with your financial data, automate 
         description: 'Local development server',
       },
     ],
+    security: [{ bearerAuth: [] }],
     components: {
       securitySchemes: {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
+          description: 'Firebase ID token. Obtain on the client via the Firebase Auth SDK and send as `Authorization: Bearer <token>`.',
         },
       },
       parameters: {
         UserId: {
           in: 'header',
           name: 'x-user-id',
-          required: true,
+          required: false,
           schema: { type: 'string' },
-          description: 'User identifier. Required on all authenticated endpoints.',
+          description: 'Dev-only override (active when AUTH_BYPASS=true). Ignored when Firebase auth is enforced.',
           example: 'user_123',
         },
         LimitQuery: {
@@ -198,11 +200,11 @@ This API provides powerful tools to interact with your financial data, automate 
       },
       responses: {
         UnauthorizedError: {
-          description: 'userId is missing. Provide via `x-user-id` header.',
+          description: 'Missing or invalid Firebase ID token.',
           content: {
             'application/json': {
               schema: { '$ref': '#/components/schemas/ErrorResponse' },
-              example: { error: 'Unauthorized', message: 'userId is required. Provide via authentication or x-user-id header.' },
+              example: { error: 'Unauthorized', message: 'Invalid or expired token' },
             },
           },
         },

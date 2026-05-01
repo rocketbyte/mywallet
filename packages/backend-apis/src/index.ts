@@ -12,6 +12,8 @@ import { logger } from './utils/logger';
 import { swaggerSpec } from './config/swagger';
 import { redocMiddleware } from './middleware/redoc';
 import { docsAuth } from './middleware/docs-auth';
+import { firebaseAuthMiddleware } from './middleware/firebase-auth';
+import { initFirebase } from './config/firebase';
 
 const app = express();
 
@@ -86,8 +88,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes — Basic Auth on /api/*, except endpoints called by external systems
-// that cannot send Basic Auth headers (k8s probes, Google Pub/Sub, OAuth redirect).
+// Routes — Firebase ID token auth on /api/*, except endpoints called by external
+// systems that cannot send user tokens (k8s probes, Google Pub/Sub, OAuth redirect).
 const openApiPaths: RegExp[] = [
   /^\/health(\/.*)?$/,
   /^\/gmail\/webhook\/?$/,
@@ -97,7 +99,7 @@ app.use(
   '/api',
   (req, res, next) => {
     if (openApiPaths.some((re) => re.test(req.path))) return next();
-    return docsAuth(req, res, next);
+    return firebaseAuthMiddleware(req, res, next);
   },
   routes
 );
@@ -139,6 +141,9 @@ app.use(
 app.use(errorHandler);
 
 const PORT = config.port;
+
+// Initialize Firebase Admin (fails fast if credentials are misconfigured).
+initFirebase();
 
 // Connect to MongoDB and start server
 connectMongoDB().then(() => {

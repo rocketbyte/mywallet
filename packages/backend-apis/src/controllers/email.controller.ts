@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Connection } from 'mongoose';
 import { createEmailActivities } from '../../../temporal-workflows/src/activities/database/email.activities';
 import { Email } from '../../../temporal-workflows/src/models';
+import { getUserId } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 
 export class EmailController {
@@ -17,15 +18,7 @@ export class EmailController {
    */
   async getAllEmails(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
+      const userId = getUserId(req);
 
       const {
         limit = '50',
@@ -74,15 +67,7 @@ export class EmailController {
    */
   async getEmailById(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
+      const userId = getUserId(req);
 
       const { id } = req.params;
 
@@ -112,15 +97,7 @@ export class EmailController {
    */
   async searchEmails(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
+      const userId = getUserId(req);
 
       const {
         q: searchTerm,
@@ -169,15 +146,7 @@ export class EmailController {
    */
   async getEmailStats(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
+      const userId = getUserId(req);
 
       const [total, processed, unprocessed] = await Promise.all([
         Email.countDocuments({ userId }),

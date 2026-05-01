@@ -5,6 +5,7 @@ import { scheduledEmailProcessingWorkflow } from '../../../temporal-workflows/sr
 import { TASK_QUEUES } from '../../../temporal-workflows/src/shared/constants';
 import { createScheduleActivities } from '../../../temporal-workflows/src/activities/database/schedule.activities';
 import { ScheduleConfig } from '../../../temporal-workflows/src/models';
+import { getUserId } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 
 export class ScheduleController {
@@ -20,17 +21,9 @@ export class ScheduleController {
    */
   async createSchedule(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+      const userId = getUserId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
-
-      const {
+const {
         name,
         description,
         searchQuery = 'subject:"Usaste tu tarjeta de credito"',
@@ -123,17 +116,9 @@ export class ScheduleController {
    */
   async deleteSchedule(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+      const userId = getUserId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
-
-      const { scheduleId } = req.params;
+const { scheduleId } = req.params;
 
       // Verify schedule belongs to this user
       const config = await this.scheduleActivities.getScheduleConfig(scheduleId);
@@ -177,17 +162,9 @@ export class ScheduleController {
    */
   async getSchedule(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+      const userId = getUserId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
-
-      const { scheduleId } = req.params;
+const { scheduleId } = req.params;
 
       // Get configuration from MongoDB
       const config = await this.scheduleActivities.getScheduleConfig(scheduleId);
@@ -251,17 +228,9 @@ export class ScheduleController {
    */
   async listSchedules(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+      const userId = getUserId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
-
-      // Get schedules for this user only
+// Get schedules for this user only
       const configs = await ScheduleConfig.find({ userId });
 
       const client = await getTemporalClient();
@@ -325,17 +294,9 @@ export class ScheduleController {
    */
   async pauseSchedule(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+      const userId = getUserId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
-
-      const { scheduleId } = req.params;
+const { scheduleId } = req.params;
 
       // Verify schedule belongs to this user
       const config = await ScheduleConfig.findOne({ scheduleId, userId });
@@ -381,17 +342,9 @@ export class ScheduleController {
    */
   async unpauseSchedule(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+      const userId = getUserId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
-
-      const { scheduleId } = req.params;
+const { scheduleId } = req.params;
 
       // Verify schedule belongs to this user
       const config = await ScheduleConfig.findOne({ scheduleId, userId });
@@ -437,17 +390,9 @@ export class ScheduleController {
    */
   async updateSchedule(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
+      const userId = getUserId(req);
 
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
-
-      const { scheduleId } = req.params;
+const { scheduleId } = req.params;
       const { name, description, searchQuery, maxResults, afterDate } = req.body;
 
       // Update MongoDB configuration

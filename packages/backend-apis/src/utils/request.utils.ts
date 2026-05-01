@@ -1,7 +1,11 @@
 import { Request } from 'express';
 
 export function getUserId(req: Request): string {
-  return (req as any).user?.id || (req.headers['x-user-id'] as string);
+  const userId = (req as any).user?.id;
+  if (!userId) {
+    throw new Error('No authenticated user on request — firebaseAuthMiddleware must run before this handler');
+  }
+  return userId;
 }
 
 export function parsePagination(query: Record<string, any>): { limit: number; offset: number } {

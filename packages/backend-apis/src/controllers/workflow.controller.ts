@@ -3,20 +3,13 @@ import { getTemporalClient } from '../config/temporal-client';
 import { emailProcessingWorkflow } from '../../../temporal-workflows/src/workflows';
 import { TASK_QUEUES, WORKFLOW_IDS } from '../../../temporal-workflows/src/shared/constants';
 import { EmailProcessingInput } from '../../../temporal-workflows/src/shared/types';
+import { getUserId } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 
 export class WorkflowController {
   async startEmailProcessing(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      if (!userId) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'userId is required. Provide via authentication or x-user-id header.'
-        });
-      }
+      const userId = getUserId(req);
 
       const { searchQuery, maxResults, afterDate } = req.body;
 

@@ -105,11 +105,11 @@ worker:
 
   resources:
     requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
       cpu: 500m
       memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 1Gi
 
   # Security context
   securityContext:
@@ -124,6 +124,8 @@ worker:
   env:
     NODE_ENV: production
     LOG_LEVEL: info
+    # Cap V8 old space below the cgroup limit so GC kicks in before OOMKill
+    NODE_OPTIONS: "--max-old-space-size=768"
 
 # Pipeline Worker — separate pod for AI extraction (serial, 1 task at a time)
 pipelineWorker:

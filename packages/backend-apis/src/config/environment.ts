@@ -33,5 +33,13 @@ export const config = {
   docs: {
     user: process.env.DOCS_USER || '',
     password: process.env.DOCS_PASSWORD || ''
-  }
+  },
+
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID || '',
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
+    // Private key in env files is escaped with \n; convert back to real newlines.
+    privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    authBypass: process.env.AUTH_BYPASS === 'true',
+  },
 };
