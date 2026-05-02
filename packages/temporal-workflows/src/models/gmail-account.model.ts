@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IGmailAccount extends Document {
+export interface GmailAccountInterface extends Document {
   // User Association
   userId: string;                    // Unique user identifier
   email: string;                     // Gmail address
@@ -33,7 +33,7 @@ export interface IGmailAccount extends Document {
   updatedAt: Date;
 }
 
-const GmailAccountSchema = new Schema<IGmailAccount>({
+const GmailAccountSchema = new Schema<GmailAccountInterface>({
   userId: {
     type: String,
     required: true,
@@ -110,4 +110,4 @@ const GmailAccountSchema = new Schema<IGmailAccount>({
 GmailAccountSchema.index({ isActive: 1, watchExpiration: 1 });
 GmailAccountSchema.index({ userId: 1, isActive: 1 });
 
-export const GmailAccount = model<IGmailAccount>('GmailAccount', GmailAccountSchema);
+export const GmailAccount = model<GmailAccountInterface>('GmailAccount', GmailAccountSchema);

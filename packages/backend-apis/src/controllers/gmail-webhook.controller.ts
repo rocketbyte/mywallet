@@ -8,17 +8,17 @@ import {
 } from '../../../temporal-workflows/src/shared/types';
 import { GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX, GMAIL_SIGNALS, GMAIL_SYNC_TASK_QUEUE } from '../../../temporal-workflows/src/shared/constants';
 import { GmailAccount } from '../../../temporal-workflows/src/models/gmail-account.model';
-import { IEmailProvider } from '../providers/types';
+import { EmailProviderInterface } from '../providers/types';
 import { logger } from '../utils/logger';
 
 /**
  * Handles Gmail-specific operations:
  * - Pub/Sub webhook processing (Gmail-specific format — stays here)
- * - Account link / unlink / status delegated to IEmailProvider
+ * - Account link / unlink / status delegated to EmailProviderInterface
  *   so the same pattern works for Outlook/Yahoo in the future.
  */
 export class GmailWebhookController {
-  constructor(private readonly provider: IEmailProvider) {}
+  constructor(private readonly provider: EmailProviderInterface) {}
 
   /**
    * POST /api/gmail/webhook

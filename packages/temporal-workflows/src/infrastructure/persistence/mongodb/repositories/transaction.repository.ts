@@ -1,16 +1,16 @@
 /**
  * MongoDB Transaction Repository (Layer 3 - Interface Adapters)
- * Implements ITransactionRepository interface
+ * Implements TransactionRepositoryInterface interface
  * Maps between Domain entities and Mongoose documents
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { ITransactionRepository, TransactionFilters, StatsParams, TransactionStats } from '../../../../application/interfaces/repositories/itransaction-repository';
+import { TransactionRepositoryInterface, TransactionFilters, StatsParams, TransactionStats } from '../../../../application/interfaces/repositories/itransaction-repository';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
-import { Transaction as TransactionModel, ITransaction } from '../../../../models/transaction.model';
+import { Transaction as TransactionModel, TransactionInterface } from '../../../../models/transaction.model';
 
 @injectable()
-export class MongoDBTransactionRepository implements ITransactionRepository {
+export class MongoDBTransactionRepository implements TransactionRepositoryInterface {
   constructor(
     @inject('MongoConnection') private connection: Connection
   ) {}
@@ -156,7 +156,7 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
   /**
    * Map Mongoose document to Domain entity
    */
-  private toDomain(doc: ITransaction): Transaction {
+  private toDomain(doc: TransactionInterface): Transaction {
     return new Transaction(
       doc._id.toString(),
       doc.emailId,

@@ -1,11 +1,11 @@
 /**
  * Prisma Email Repository (Layer 3 - Interface Adapters)
- * Implements IEmailRepository — drop-in replacement for MongoDBEmailRepository.
+ * Implements EmailRepositoryInterface — drop-in replacement for MongoDBEmailRepository.
  */
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient } from '@prisma/client';
 import {
-  IEmailRepository,
+  EmailRepositoryInterface,
   EmailMetadata,
   SavedEmail,
   ProcessingStatus,
@@ -13,7 +13,7 @@ import {
 import { Email } from '../../../../domain/entities/email.entity';
 
 @injectable()
-export class PrismaEmailRepository implements IEmailRepository {
+export class PrismaEmailRepository implements EmailRepositoryInterface {
   constructor(
     @inject('PrismaClient') private prisma: PrismaClient
   ) {}

@@ -1,11 +1,11 @@
 /**
  * Prisma Transaction Repository (Layer 3 - Interface Adapters)
- * Implements ITransactionRepository — drop-in replacement for MongoDBTransactionRepository.
+ * Implements TransactionRepositoryInterface — drop-in replacement for MongoDBTransactionRepository.
  */
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient } from '@prisma/client';
 import {
-  ITransactionRepository,
+  TransactionRepositoryInterface,
   TransactionFilters,
   StatsParams,
   TransactionStats,
@@ -13,7 +13,7 @@ import {
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 
 @injectable()
-export class PrismaTransactionRepository implements ITransactionRepository {
+export class PrismaTransactionRepository implements TransactionRepositoryInterface {
   constructor(
     @inject('PrismaClient') private prisma: PrismaClient
   ) {}

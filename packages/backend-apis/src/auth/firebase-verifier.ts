@@ -1,15 +1,18 @@
 import admin from 'firebase-admin';
 import type { Request } from 'express';
-import type { AuthUser, FirebaseCredentials, IAuthVerifier } from './types';
+import type { AuthUser, FirebaseCredentials, AuthVerifierInterface, UserResolverInterface, UserProfile } from './types';
 import { UnauthorizedError } from './errors';
 import { logger } from '../utils/logger';
 
 const BEARER_PREFIX = 'Bearer ';
 
-export class FirebaseAuthVerifier implements IAuthVerifier {
+export class FirebaseAuthVerifier implements AuthVerifierInterface {
   private readonly app: admin.app.App;
 
-  constructor(credentials: FirebaseCredentials) {
+  constructor(
+    credentials: FirebaseCredentials,
+    private readonly userResolver: UserResolverInterface,
+  ) {
     if (!credentials.projectId || !credentials.clientEmail || !credentials.privateKey) {
       throw new Error(
         'Firebase Admin credentials missing. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY (or enable AUTH_BYPASS=true for local dev).'
@@ -24,16 +27,22 @@ export class FirebaseAuthVerifier implements IAuthVerifier {
 
   async verify(req: Request): Promise<AuthUser> {
     const token = this.extractBearerToken(req.headers.authorization);
+    const decoded = await this.verifyToken(token);
+
+    const profile: UserProfile = {
+      authUid: decoded.uid,
+      email: decoded.email,
+      displayName: decoded.name,
+      emailVerified: decoded.email_verified,
+    };
+    return this.userResolver.resolve(profile);
+  }
+
+  private async verifyToken(token: string): Promise<admin.auth.DecodedIdToken> {
     try {
-      const decoded = await this.app.auth().verifyIdToken(token);
-      return {
-        id: decoded.uid,
-        email: decoded.email,
-        name: decoded.name,
-        emailVerified: decoded.email_verified,
-      };
+      return await this.app.auth().verifyIdToken(token);
     } catch (err: any) {
-      logger.warn('Firebase token verification failed', {
+      logger.warn('Token verification failed', {
         code: err?.code,
         message: err?.message,
       });

@@ -13,19 +13,19 @@ import { logger } from '../../utils/logger';
 import {
   AuthorizationContext,
   AuthState,
-  IEmailProvider,
+  EmailProviderInterface,
   LinkAccountInput,
   LinkAccountResult,
   AccountStatus
 } from '../types';
 
 /**
- * Gmail implementation of IEmailProvider.
+ * Gmail implementation of EmailProviderInterface.
  * Handles the full Gmail OAuth flow and Temporal workflow lifecycle.
  * Adding Outlook/Yahoo later means creating a parallel implementation
- * of IEmailProvider — no changes needed here.
+ * of EmailProviderInterface — no changes needed here.
  */
-export class GmailProvider implements IEmailProvider {
+export class GmailProvider implements EmailProviderInterface {
   readonly type = 'gmail';
 
   private readonly oauth2Client = new google.auth.OAuth2(

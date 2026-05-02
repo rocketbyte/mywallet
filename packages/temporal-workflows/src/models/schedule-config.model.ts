@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IScheduleConfig extends Document {
+export interface ScheduleConfigInterface extends Document {
   // Tenant Identifier
   userId: string;             // Tenant/User identifier (owner of this schedule)
 
@@ -33,7 +33,7 @@ export interface IScheduleConfig extends Document {
   createdBy: string;          // Future: user ID
 }
 
-const ScheduleConfigSchema = new Schema<IScheduleConfig>({
+const ScheduleConfigSchema = new Schema<ScheduleConfigInterface>({
   userId: { type: String, required: true, index: true },
   scheduleId: {
     type: String,
@@ -79,4 +79,4 @@ const ScheduleConfigSchema = new Schema<IScheduleConfig>({
 // Index for querying user's schedules
 ScheduleConfigSchema.index({ userId: 1, isActive: 1 });
 
-export const ScheduleConfig = model<IScheduleConfig>('ScheduleConfig', ScheduleConfigSchema);
+export const ScheduleConfig = model<ScheduleConfigInterface>('ScheduleConfig', ScheduleConfigSchema);

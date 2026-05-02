@@ -6,20 +6,20 @@
 import { injectable, inject } from 'tsyringe';
 import { Email } from '../../../domain/entities/email.entity';
 import { Transaction } from '../../../domain/entities/transaction.entity';
-import { IEmailGateway, EmailSearchParams } from '../../interfaces/gateways/iemail-gateway';
-import { ITransactionExtractorGateway } from '../../interfaces/gateways/iai-gateway';
-import { ITransactionRepository } from '../../interfaces/repositories/itransaction-repository';
-import { IEmailRepository } from '../../interfaces/repositories/iemail-repository';
-import { IPatternRepository } from '../../interfaces/repositories/ipattern-repository';
+import { EmailGatewayInterface, EmailSearchParams } from '../../interfaces/gateways/iemail-gateway';
+import { TransactionExtractorGatewayInterface } from '../../interfaces/gateways/iai-gateway';
+import { TransactionRepositoryInterface } from '../../interfaces/repositories/itransaction-repository';
+import { EmailRepositoryInterface } from '../../interfaces/repositories/iemail-repository';
+import { PatternRepositoryInterface } from '../../interfaces/repositories/ipattern-repository';
 
 @injectable()
 export class ProcessEmailUseCase {
   constructor(
-    @inject('IEmailGateway') private emailGateway: IEmailGateway,
-    @inject('ITransactionExtractorGateway') private transactionExtractor: ITransactionExtractorGateway,
-    @inject('ITransactionRepository') private transactionRepo: ITransactionRepository,
-    @inject('IEmailRepository') private emailRepo: IEmailRepository,
-    @inject('IPatternRepository') private patternRepo: IPatternRepository
+    @inject('EmailGatewayInterface') private emailGateway: EmailGatewayInterface,
+    @inject('TransactionExtractorGatewayInterface') private transactionExtractor: TransactionExtractorGatewayInterface,
+    @inject('TransactionRepositoryInterface') private transactionRepo: TransactionRepositoryInterface,
+    @inject('EmailRepositoryInterface') private emailRepo: EmailRepositoryInterface,
+    @inject('PatternRepositoryInterface') private patternRepo: PatternRepositoryInterface
   ) {}
 
   /**

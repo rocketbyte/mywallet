@@ -12,7 +12,7 @@ import {
  * Defines the contract for an external Mail Sync provider (e.g. Gmail Push Notifications)
  * Decouples the application logic and Temporal activities from a specific Mail Provider.
  */
-export interface IMailSyncGateway {
+export interface MailSyncGatewayInterface {
   /**
    * Refreshes the mail provider access token using a refresh token.
    */

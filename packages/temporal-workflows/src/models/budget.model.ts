@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IBudget extends Document {
+export interface BudgetInterface extends Document {
   userId: string;
   month?: number;
   year?: number;
@@ -17,8 +17,8 @@ export interface IBudget extends Document {
   updatedAt: Date;
 }
 
-const BudgetSchema = new Schema<IBudget>({
-  userId: { type: String, index: true },
+const BudgetSchema = new Schema<BudgetInterface>({
+  userId: { type: String, required: true, index: true },
   month: { type: Number, min: 1, max: 12 },
   year: { type: Number },
   categories: [{
@@ -37,4 +37,4 @@ const BudgetSchema = new Schema<IBudget>({
 
 BudgetSchema.index({ userId: 1, year: 1, month: 1 }, { unique: true });
 
-export const Budget = model<IBudget>('Budget', BudgetSchema);
+export const Budget = model<BudgetInterface>('Budget', BudgetSchema);

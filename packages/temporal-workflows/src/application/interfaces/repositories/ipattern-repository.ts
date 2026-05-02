@@ -6,7 +6,7 @@
 import { Email } from '../../../domain/entities/email.entity';
 import { EmailPattern } from '../../../domain/entities/email-pattern.entity';
 
-export interface IPatternRepository {
+export interface PatternRepositoryInterface {
   /**
    * Find pattern matching an email
    * Returns the best matching pattern based on priority and match score

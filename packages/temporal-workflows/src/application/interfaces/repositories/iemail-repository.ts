@@ -5,7 +5,7 @@
  */
 import { Email } from '../../../domain/entities/email.entity';
 
-export interface IEmailRepository {
+export interface EmailRepositoryInterface {
   /**
    * Save an email to persistence
    */

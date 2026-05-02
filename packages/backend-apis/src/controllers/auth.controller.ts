@@ -4,7 +4,7 @@ import {
   AuthState,
   EmailProviderRegistry,
   UnsupportedProviderError,
-  type IEmailProvider,
+  type EmailProviderInterface,
 } from '../providers';
 import { logger } from '../utils/logger';
 import {
@@ -28,7 +28,7 @@ interface ConnectInput {
 
 /**
  * Drives the OAuth-based account linking flow for any registered email
- * provider. Provider-specific behavior lives behind IEmailProvider — this
+ * provider. Provider-specific behavior lives behind EmailProviderInterface — this
  * controller stays generic.
  */
 export class AuthController {
@@ -61,7 +61,7 @@ export class AuthController {
    */
   async handleCallback(req: Request, res: Response): Promise<void> {
     const providerType = req.params.provider;
-    let provider: IEmailProvider;
+    let provider: EmailProviderInterface;
     try {
       provider = this.registry.get(providerType);
     } catch (err) {
@@ -168,7 +168,7 @@ export class AuthController {
   }
 
   private async autoLink(
-    provider: IEmailProvider,
+    provider: EmailProviderInterface,
     userId: string,
     email: string,
     refreshToken: string,

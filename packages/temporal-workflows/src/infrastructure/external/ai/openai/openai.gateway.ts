@@ -1,14 +1,14 @@
 /**
  * OpenAI Gateway (Layer 4 - Frameworks & Drivers)
- * Implements IAIGateway interface for OpenAI
+ * Implements AIGatewayInterface interface for OpenAI
  * Handles OpenAI-specific API interactions
  */
 import { injectable, inject } from 'tsyringe';
 import OpenAI from 'openai';
-import { IAIGateway, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/iai-gateway';
+import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/iai-gateway';
 
 @injectable()
-export class OpenAIGateway implements IAIGateway {
+export class OpenAIGateway implements AIGatewayInterface {
   private client: OpenAI;
   private modelName: string;
   private endpoint: string;

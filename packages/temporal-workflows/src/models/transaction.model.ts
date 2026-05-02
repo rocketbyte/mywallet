@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface ITransaction extends Document {
+export interface TransactionInterface extends Document {
   userId: string;
 
   // Source (optional for manual transactions)
@@ -44,7 +44,7 @@ export interface ITransaction extends Document {
   updatedAt: Date;
 }
 
-const TransactionSchema = new Schema<ITransaction>({
+const TransactionSchema = new Schema<TransactionInterface>({
   userId: { type: String, required: true, index: true },
   emailId: { type: String },
   emailSubject: { type: String },
@@ -87,4 +87,4 @@ TransactionSchema.index({ userId: 1, transactionDate: -1, category: 1 });
 TransactionSchema.index({ userId: 1, workflowId: 1 }, { sparse: true });
 TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 }, { sparse: true });
 
-export const Transaction = model<ITransaction>('Transaction', TransactionSchema);
+export const Transaction = model<TransactionInterface>('Transaction', TransactionSchema);

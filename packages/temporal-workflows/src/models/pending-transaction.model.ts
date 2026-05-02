@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IPendingTransaction extends Document {
+export interface PendingTransactionInterface extends Document {
   userId: string;
   merchant?: string;
   amount?: number;
@@ -14,8 +14,8 @@ export interface IPendingTransaction extends Document {
   updatedAt: Date;
 }
 
-const PendingTransactionSchema = new Schema<IPendingTransaction>({
-  userId: { type: String, index: true },
+const PendingTransactionSchema = new Schema<PendingTransactionInterface>({
+  userId: { type: String, required: true, index: true },
   merchant: { type: String },
   amount: { type: Number },
   category: { type: String },
@@ -29,4 +29,4 @@ const PendingTransactionSchema = new Schema<IPendingTransaction>({
   collection: 'pending_transactions',
 });
 
-export const PendingTransaction = model<IPendingTransaction>('PendingTransaction', PendingTransactionSchema);
+export const PendingTransaction = model<PendingTransactionInterface>('PendingTransaction', PendingTransactionSchema);

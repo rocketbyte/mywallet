@@ -1,6 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 
-export interface IPipelineStep {
+export interface PipelineStepInterface {
   stepKey: string;
   name: string;
   description: string;
@@ -17,7 +17,7 @@ export interface IPipelineStep {
   updatedAt: Date;
 }
 
-const PipelineStepSchema = new Schema<IPipelineStep>(
+const PipelineStepSchema = new Schema<PipelineStepInterface>(
   {
     stepKey: {
       type: String,

@@ -5,7 +5,7 @@
  */
 import { Email } from '../../../domain/entities/email.entity';
 
-export interface IEmailGateway {
+export interface EmailGatewayInterface {
   /**
    * Search for emails matching given parameters
    */

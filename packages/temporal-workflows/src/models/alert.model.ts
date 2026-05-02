@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IAlert extends Document {
+export interface AlertInterface extends Document {
   userId: string;
   kind?: 'over' | 'large' | 'low' | 'tip';
   title?: string;
@@ -10,8 +10,8 @@ export interface IAlert extends Document {
   updatedAt: Date;
 }
 
-const AlertSchema = new Schema<IAlert>({
-  userId: { type: String, index: true },
+const AlertSchema = new Schema<AlertInterface>({
+  userId: { type: String, required: true, index: true },
   kind: { type: String, enum: ['over', 'large', 'low', 'tip'] },
   title: { type: String },
   body: { type: String },
@@ -23,4 +23,4 @@ const AlertSchema = new Schema<IAlert>({
 
 AlertSchema.index({ userId: 1, createdAt: -1 });
 
-export const Alert = model<IAlert>('Alert', AlertSchema);
+export const Alert = model<AlertInterface>('Alert', AlertSchema);

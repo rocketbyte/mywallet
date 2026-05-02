@@ -1,6 +1,6 @@
 import { PipelineStepConfig } from '../../../shared/types';
 
-export interface IPipelineStepRepository {
+export interface PipelineStepRepositoryInterface {
   /**
    * Get a single active step by its key
    * Throws PipelineStepNotFoundError if not found

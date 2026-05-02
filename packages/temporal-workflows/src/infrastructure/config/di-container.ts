@@ -13,15 +13,15 @@ import { Connection } from 'mongoose';
 import { PrismaClient } from '@prisma/client';
 
 // Layer 2 - Application Interfaces (Gateways)
-import { IEmailGateway } from '../../application/interfaces/gateways/iemail-gateway';
-import { IAIGateway, ITransactionExtractorGateway } from '../../application/interfaces/gateways/iai-gateway';
-import { IMailSyncGateway } from '../../application/interfaces/gateways/imail-sync-gateway';
+import { EmailGatewayInterface } from '../../application/interfaces/gateways/iemail-gateway';
+import { AIGatewayInterface, TransactionExtractorGatewayInterface } from '../../application/interfaces/gateways/iai-gateway';
+import { MailSyncGatewayInterface } from '../../application/interfaces/gateways/imail-sync-gateway';
 
 // Layer 2 - Application Interfaces (Repositories)
-import { ITransactionRepository } from '../../application/interfaces/repositories/itransaction-repository';
-import { IEmailRepository } from '../../application/interfaces/repositories/iemail-repository';
-import { IPatternRepository } from '../../application/interfaces/repositories/ipattern-repository';
-import { IPipelineStepRepository } from '../../application/interfaces/repositories/ipipeline-step-repository';
+import { TransactionRepositoryInterface } from '../../application/interfaces/repositories/itransaction-repository';
+import { EmailRepositoryInterface } from '../../application/interfaces/repositories/iemail-repository';
+import { PatternRepositoryInterface } from '../../application/interfaces/repositories/ipattern-repository';
+import { PipelineStepRepositoryInterface } from '../../application/interfaces/repositories/ipipeline-step-repository';
 
 // Layer 3 & 4 - Gmail Implementations
 import { GmailGateway } from '../external/email/gmail/gmail.gateway';
@@ -81,8 +81,8 @@ export class DIContainer {
     if (config.emailProvider === 'gmail') {
       container.register<OAuth2Client>('OAuth2Client', { useValue: config.gmailOAuth2Client! });
       container.register('GmailMapper', { useClass: GmailMapper });
-      container.register<IEmailGateway>('IEmailGateway', { useClass: GmailGateway });
-      container.register<IMailSyncGateway>('IMailSyncGateway', { useClass: GmailSyncGateway });
+      container.register<EmailGatewayInterface>('EmailGatewayInterface', { useClass: GmailGateway });
+      container.register<MailSyncGatewayInterface>('MailSyncGatewayInterface', { useClass: GmailSyncGateway });
     }
 
     // ==================== AI GATEWAY (LiteLLM proxy) ====================
@@ -95,24 +95,24 @@ export class DIContainer {
         endpoint: config.litellmEndpoint,
       },
     });
-    container.register<IAIGateway>('IAIGateway', { useClass: OpenAIGateway });
-    container.register<ITransactionExtractorGateway>('ITransactionExtractorGateway', {
+    container.register<AIGatewayInterface>('AIGatewayInterface', { useClass: OpenAIGateway });
+    container.register<TransactionExtractorGatewayInterface>('TransactionExtractorGatewayInterface', {
       useClass: OpenAITransactionExtractorGateway,
     });
 
     // ==================== REPOSITORIES ====================
     if (config.dbProvider === 'prisma') {
       container.register<PrismaClient>('PrismaClient', { useValue: config.prismaClient! });
-      container.register<ITransactionRepository>('ITransactionRepository', { useClass: PrismaTransactionRepository });
-      container.register<IEmailRepository>('IEmailRepository', { useClass: PrismaEmailRepository });
-      container.register<IPatternRepository>('IPatternRepository', { useClass: PrismaPatternRepository });
-      container.register<IPipelineStepRepository>('IPipelineStepRepository', { useClass: PrismaPipelineStepRepository });
+      container.register<TransactionRepositoryInterface>('TransactionRepositoryInterface', { useClass: PrismaTransactionRepository });
+      container.register<EmailRepositoryInterface>('EmailRepositoryInterface', { useClass: PrismaEmailRepository });
+      container.register<PatternRepositoryInterface>('PatternRepositoryInterface', { useClass: PrismaPatternRepository });
+      container.register<PipelineStepRepositoryInterface>('PipelineStepRepositoryInterface', { useClass: PrismaPipelineStepRepository });
     } else {
       container.register<Connection>('MongoConnection', { useValue: config.mongoConnection! });
-      container.register<ITransactionRepository>('ITransactionRepository', { useClass: MongoDBTransactionRepository });
-      container.register<IEmailRepository>('IEmailRepository', { useClass: MongoDBEmailRepository });
-      container.register<IPatternRepository>('IPatternRepository', { useClass: MongoDBPatternRepository });
-      container.register<IPipelineStepRepository>('IPipelineStepRepository', { useClass: MongoDBPipelineStepRepository });
+      container.register<TransactionRepositoryInterface>('TransactionRepositoryInterface', { useClass: MongoDBTransactionRepository });
+      container.register<EmailRepositoryInterface>('EmailRepositoryInterface', { useClass: MongoDBEmailRepository });
+      container.register<PatternRepositoryInterface>('PatternRepositoryInterface', { useClass: MongoDBPatternRepository });
+      container.register<PipelineStepRepositoryInterface>('PipelineStepRepositoryInterface', { useClass: MongoDBPipelineStepRepository });
     }
 
     // ==================== USE CASES ====================

@@ -9,7 +9,7 @@ import { Transaction } from '../../../domain/entities/transaction.entity';
 /**
  * Base AI Gateway for generic AI operations
  */
-export interface IAIGateway {
+export interface AIGatewayInterface {
   /**
    * Extract structured data from unstructured text
    */
@@ -50,7 +50,7 @@ export interface ExtractionResult {
  * Specialized gateway for transaction extraction
  * Higher-level abstraction for domain-specific logic
  */
-export interface ITransactionExtractorGateway {
+export interface TransactionExtractorGatewayInterface {
   /**
    * Extract transaction from email using AI
    */

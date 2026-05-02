@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IEmailPattern extends Document {
+export interface EmailPatternInterface extends Document {
   // Pattern Identity
   name: string;
   bankName: string;
@@ -27,7 +27,7 @@ export interface IEmailPattern extends Document {
   updatedAt: Date;
 }
 
-const EmailPatternSchema = new Schema<IEmailPattern>({
+const EmailPatternSchema = new Schema<EmailPatternInterface>({
   name: { type: String, required: true, unique: true },
   bankName: { type: String, required: true },
   accountType: {
@@ -56,4 +56,4 @@ const EmailPatternSchema = new Schema<IEmailPattern>({
 EmailPatternSchema.index({ isActive: 1, priority: -1 });
 EmailPatternSchema.index({ bankName: 1 });
 
-export const EmailPattern = model<IEmailPattern>('EmailPattern', EmailPatternSchema);
+export const EmailPattern = model<EmailPatternInterface>('EmailPattern', EmailPatternSchema);

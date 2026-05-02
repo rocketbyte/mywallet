@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface IEmail extends Document {
+export interface EmailInterface extends Document {
   // Tenant Identifier
   userId: string;            // Tenant/User identifier for multi-tenancy
 
@@ -42,7 +42,7 @@ export interface IEmail extends Document {
   fetchedBy: string;        // Which workflow/schedule fetched it
 }
 
-const EmailSchema = new Schema<IEmail>({
+const EmailSchema = new Schema<EmailInterface>({
   userId: {
     type: String,
     required: true,
@@ -95,4 +95,4 @@ EmailSchema.index({ userId: 1, isProcessed: 1, date: -1 });
 EmailSchema.index({ userId: 1, from: 1, isProcessed: 1 });
 EmailSchema.index({ subject: 'text', body: 'text' }); // Text search index
 
-export const Email = model<IEmail>('Email', EmailSchema);
+export const Email = model<EmailInterface>('Email', EmailSchema);

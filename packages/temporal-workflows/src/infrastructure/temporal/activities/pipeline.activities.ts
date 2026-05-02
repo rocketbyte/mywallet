@@ -12,10 +12,10 @@
 import { Context } from '@temporalio/activity';
 import { DependencyContainer } from 'tsyringe';
 
-import { IAIGateway } from '../../../application/interfaces/gateways/iai-gateway';
-import { IPipelineStepRepository } from '../../../application/interfaces/repositories/ipipeline-step-repository';
-import { ITransactionRepository } from '../../../application/interfaces/repositories/itransaction-repository';
-import { IEmailRepository } from '../../../application/interfaces/repositories/iemail-repository';
+import { AIGatewayInterface } from '../../../application/interfaces/gateways/iai-gateway';
+import { PipelineStepRepositoryInterface } from '../../../application/interfaces/repositories/ipipeline-step-repository';
+import { TransactionRepositoryInterface } from '../../../application/interfaces/repositories/itransaction-repository';
+import { EmailRepositoryInterface } from '../../../application/interfaces/repositories/iemail-repository';
 import {
   ClassifyEmailInput,
   ClassificationResult,
@@ -35,10 +35,10 @@ function renderTemplate(template: string, vars: Record<string, string>): string 
 }
 
 export function createPipelineActivities(container: DependencyContainer) {
-  const aiGateway = container.resolve<IAIGateway>('IAIGateway');
-  const pipelineStepRepo = container.resolve<IPipelineStepRepository>('IPipelineStepRepository');
-  const transactionRepo = container.resolve<ITransactionRepository>('ITransactionRepository');
-  const emailRepo = container.resolve<IEmailRepository>('IEmailRepository');
+  const aiGateway = container.resolve<AIGatewayInterface>('AIGatewayInterface');
+  const pipelineStepRepo = container.resolve<PipelineStepRepositoryInterface>('PipelineStepRepositoryInterface');
+  const transactionRepo = container.resolve<TransactionRepositoryInterface>('TransactionRepositoryInterface');
+  const emailRepo = container.resolve<EmailRepositoryInterface>('EmailRepositoryInterface');
 
   return {
     /**

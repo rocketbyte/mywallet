@@ -41,7 +41,7 @@ export interface AccountStatus {
  * implementing this interface and registering an instance in the
  * EmailProviderRegistry — no other call sites need to change.
  */
-export interface IEmailProvider {
+export interface EmailProviderInterface {
   readonly type: EmailProviderType;
 
   /**

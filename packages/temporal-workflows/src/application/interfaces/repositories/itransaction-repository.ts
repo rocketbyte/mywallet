@@ -5,7 +5,7 @@
  */
 import { Transaction } from '../../../domain/entities/transaction.entity';
 
-export interface ITransactionRepository {
+export interface TransactionRepositoryInterface {
   /**
    * Save a transaction to persistence
    */

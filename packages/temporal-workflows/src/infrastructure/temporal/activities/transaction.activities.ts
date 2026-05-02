@@ -7,8 +7,8 @@ import { Context } from '@temporalio/activity';
 import { DependencyContainer } from 'tsyringe';
 
 // Gateways (Application Layer Interfaces)
-import { ITransactionExtractorGateway } from '../../../application/interfaces/gateways/iai-gateway';
-import { ITransactionRepository } from '../../../application/interfaces/repositories/itransaction-repository';
+import { TransactionExtractorGatewayInterface } from '../../../application/interfaces/gateways/iai-gateway';
+import { TransactionRepositoryInterface } from '../../../application/interfaces/repositories/itransaction-repository';
 
 // Domain Entities
 import { Email } from '../../../domain/entities/email.entity';
@@ -28,8 +28,8 @@ import {
  */
 export function createTransactionActivities(container: DependencyContainer) {
   // Resolve dependencies from DI Container
-  const extractorGateway = container.resolve<ITransactionExtractorGateway>('ITransactionExtractorGateway');
-  const transactionRepository = container.resolve<ITransactionRepository>('ITransactionRepository');
+  const extractorGateway = container.resolve<TransactionExtractorGatewayInterface>('TransactionExtractorGatewayInterface');
+  const transactionRepository = container.resolve<TransactionRepositoryInterface>('TransactionRepositoryInterface');
 
   return {
     /**

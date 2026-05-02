@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface ITenant extends Document {
+export interface TenantInterface extends Document {
   userId: string;
   email?: string;
   fullName?: string;
@@ -12,8 +12,8 @@ export interface ITenant extends Document {
   updatedAt: Date;
 }
 
-const TenantSchema = new Schema<ITenant>({
-  userId: { type: String, unique: true, index: true },
+const TenantSchema = new Schema<TenantInterface>({
+  userId: { type: String, required: true, unique: true, index: true },
   email: { type: String },
   fullName: { type: String },
   currency: { type: String, default: 'USD' },
@@ -25,4 +25,4 @@ const TenantSchema = new Schema<ITenant>({
   collection: 'tenants',
 });
 
-export const Tenant = model<ITenant>('Tenant', TenantSchema);
+export const Tenant = model<TenantInterface>('Tenant', TenantSchema);
