@@ -92,7 +92,7 @@ app.use((req, res, next) => {
 const openApiPaths: RegExp[] = [
   /^\/health(\/.*)?$/,
   /^\/gmail\/webhook\/?$/,
-  /^\/auth\/gmail\/callback\/?$/,
+  /^\/auth\/[^/]+\/callback\/?$/, // OAuth callback — provider-agnostic, called by Google/etc.
 ];
 const authMiddleware = requireAuth(createAuthVerifier());
 app.use(

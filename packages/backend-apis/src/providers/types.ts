@@ -1,3 +1,16 @@
+export type EmailProviderType = 'gmail' | 'outlook';
+
+export interface AuthorizationContext {
+  userId: string;
+  email: string;
+}
+
+export interface AuthState {
+  userId: string;
+  email: string;
+  provider: EmailProviderType;
+}
+
 export interface LinkAccountInput {
   userId: string;
   email: string;
@@ -24,19 +37,23 @@ export interface AccountStatus {
 }
 
 /**
- * Contract every email provider must fulfill.
- * Adding a new provider (Outlook, Yahoo, etc.) means implementing this interface
- * and registering it in the corresponding route file.
+ * Contract every email provider must fulfill. Add a new provider by
+ * implementing this interface and registering an instance in the
+ * EmailProviderRegistry — no other call sites need to change.
  */
 export interface IEmailProvider {
-  readonly type: string;
+  readonly type: EmailProviderType;
 
-  /** Returns the OAuth authorization URL. Embeds userId in state so the
-   *  callback can auto-link without an extra API call. */
-  getAuthUrl(userId?: string): string;
+  /**
+   * Returns the OAuth authorization URL. The context is embedded in the
+   * `state` parameter so the callback can verify and auto-link.
+   */
+  getAuthUrl(ctx: AuthorizationContext): string;
 
-  /** Exchanges the authorization code for credentials and returns the
-   *  authenticated email + refresh token. */
+  /**
+   * Exchanges the authorization code for credentials and returns the
+   * authenticated email + refresh token.
+   */
   exchangeCode(code: string): Promise<{ email: string; refreshToken: string }>;
 
   /** Starts the provider-specific sync workflow for a user. */
