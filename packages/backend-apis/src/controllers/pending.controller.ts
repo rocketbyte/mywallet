@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { PendingService } from '../services/pending.service';
-import { getUserId } from '../utils/request.utils';
+import { getUserId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class PendingController {

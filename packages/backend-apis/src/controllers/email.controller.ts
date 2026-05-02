@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Connection } from 'mongoose';
 import { createEmailActivities } from '../../../temporal-workflows/src/activities/database/email.activities';
 import { Email } from '../../../temporal-workflows/src/models';
-import { getUserId } from '../utils/request.utils';
+import { getUserId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class EmailController {

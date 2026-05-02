@@ -12,8 +12,7 @@ import { logger } from './utils/logger';
 import { swaggerSpec } from './config/swagger';
 import { redocMiddleware } from './middleware/redoc';
 import { docsAuth } from './middleware/docs-auth';
-import { firebaseAuthMiddleware } from './middleware/firebase-auth';
-import { initFirebase } from './config/firebase';
+import { createAuthVerifier, requireAuth } from './auth';
 
 const app = express();
 
@@ -95,11 +94,12 @@ const openApiPaths: RegExp[] = [
   /^\/gmail\/webhook\/?$/,
   /^\/auth\/gmail\/callback\/?$/,
 ];
+const authMiddleware = requireAuth(createAuthVerifier());
 app.use(
   '/api',
   (req, res, next) => {
     if (openApiPaths.some((re) => re.test(req.path))) return next();
-    return firebaseAuthMiddleware(req, res, next);
+    return authMiddleware(req, res, next);
   },
   routes
 );
@@ -141,9 +141,6 @@ app.use(
 app.use(errorHandler);
 
 const PORT = config.port;
-
-// Initialize Firebase Admin (fails fast if credentials are misconfigured).
-initFirebase();
 
 // Connect to MongoDB and start server
 connectMongoDB().then(() => {

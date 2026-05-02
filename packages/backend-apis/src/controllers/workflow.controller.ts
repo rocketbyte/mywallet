@@ -3,7 +3,7 @@ import { getTemporalClient } from '../config/temporal-client';
 import { emailProcessingWorkflow } from '../../../temporal-workflows/src/workflows';
 import { TASK_QUEUES, WORKFLOW_IDS } from '../../../temporal-workflows/src/shared/constants';
 import { EmailProcessingInput } from '../../../temporal-workflows/src/shared/types';
-import { getUserId } from '../utils/request.utils';
+import { getUserId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class WorkflowController {

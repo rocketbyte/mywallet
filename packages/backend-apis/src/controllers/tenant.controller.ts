@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { TenantService } from '../services/tenant.service';
-import { getUserId } from '../utils/request.utils';
+import { getUserId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class TenantController {

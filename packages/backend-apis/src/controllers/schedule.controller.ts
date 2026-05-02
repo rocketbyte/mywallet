@@ -5,7 +5,7 @@ import { scheduledEmailProcessingWorkflow } from '../../../temporal-workflows/sr
 import { TASK_QUEUES } from '../../../temporal-workflows/src/shared/constants';
 import { createScheduleActivities } from '../../../temporal-workflows/src/activities/database/schedule.activities';
 import { ScheduleConfig } from '../../../temporal-workflows/src/models';
-import { getUserId } from '../utils/request.utils';
+import { getUserId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class ScheduleController {

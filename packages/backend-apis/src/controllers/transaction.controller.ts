@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { TransactionService } from '../services/transaction.service';
-import { getUserId, parsePagination } from '../utils/request.utils';
+import { getUserId } from '../auth';
+import { parsePagination } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 
 export class TransactionController {

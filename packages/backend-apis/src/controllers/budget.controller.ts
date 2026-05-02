@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { BudgetService } from '../services/budget.service';
-import { getUserId } from '../utils/request.utils';
+import { getUserId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class BudgetController {
