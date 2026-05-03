@@ -1,19 +1,32 @@
 import { User, type UserInterface } from '../../../temporal-workflows/src/models';
-import type { AuthUser, UserResolverInterface, UserProfile } from './types';
+import type {
+  AuthUser,
+  TenantProvisionerInterface,
+  UserResolverInterface,
+  UserProfile,
+} from './types';
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
+
+interface MongoUserResolverOptions {
+  ttlMs?: number;
+  tenantProvisioner?: TenantProvisionerInterface;
+}
 
 /**
  * Mongo-backed UserResolverInterface. Idempotent first-login provisioning via upsert,
  * with a small in-process TTL cache so we don't hit the database on every
- * authenticated request.
+ * authenticated request. When a tenantProvisioner is supplied, ensures the
+ * user's Tenant row exists alongside the User record.
  */
 export class MongoUserResolver implements UserResolverInterface {
   private readonly cache = new Map<string, { user: AuthUser; expiresAt: number }>();
   private readonly ttlMs: number;
+  private readonly tenantProvisioner?: TenantProvisionerInterface;
 
-  constructor(opts: { ttlMs?: number } = {}) {
+  constructor(opts: MongoUserResolverOptions = {}) {
     this.ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
+    this.tenantProvisioner = opts.tenantProvisioner;
   }
 
   async resolve(profile: UserProfile): Promise<AuthUser> {
@@ -22,6 +35,7 @@ export class MongoUserResolver implements UserResolverInterface {
 
     const doc = await this.upsert(profile);
     const user = this.toAuthUser(doc);
+    if (this.tenantProvisioner) await this.tenantProvisioner.ensureForUser(user);
     this.cache.set(profile.authUid, { user, expiresAt: Date.now() + this.ttlMs });
     return user;
   }

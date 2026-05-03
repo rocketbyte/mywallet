@@ -89,26 +89,4 @@ router.post('/connect', (req, res) => controller.connect(req, res));
  */
 router.get('/:provider/callback', (req, res) => controller.handleCallback(req, res));
 
-/**
- * @openapi
- * /auth/gmail:
- *   get:
- *     deprecated: true
- *     summary: '[Deprecated] Get Gmail OAuth URL — use POST /auth/connect'
- *     description: |
- *       Retained only for backward compatibility with existing manual flows.
- *       New integrations must call `POST /api/auth/connect` with `{ email, provider }`.
- *     tags: [Auth]
- *     parameters:
- *       - in: query
- *         name: userId
- *         schema: { type: string }
- *       - in: query
- *         name: email
- *         schema: { type: string, format: email }
- *     responses:
- *       200: { description: HTML page or `{ authUrl, provider, deprecated }` JSON }
- */
-router.get('/gmail', (req, res) => controller.getAuthUrlLegacy(req, res));
-
 export default router;

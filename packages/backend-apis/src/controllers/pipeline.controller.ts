@@ -72,15 +72,15 @@ export async function upsertPipelineStep(req: Request, res: Response): Promise<v
     }
 
     const updateFields: Record<string, any> = {};
-    if (name !== undefined) updateFields.name = name;
-    if (description !== undefined) updateFields.description = description;
-    if (order !== undefined) updateFields.order = order;
-    if (systemPrompt !== undefined) updateFields.systemPrompt = systemPrompt;
-    if (userPromptTemplate !== undefined) updateFields.userPromptTemplate = userPromptTemplate;
-    if (model !== undefined) updateFields.model = model;
-    if (temperature !== undefined) updateFields.temperature = temperature;
-    if (maxTokens !== undefined) updateFields.maxTokens = maxTokens;
-    if (isActive !== undefined) updateFields.isActive = isActive;
+    if (name) updateFields.name = name;
+    if (description) updateFields.description = description;
+    if (order) updateFields.order = order;
+    if (systemPrompt) updateFields.systemPrompt = systemPrompt;
+    if (userPromptTemplate) updateFields.userPromptTemplate = userPromptTemplate;
+    if (model) updateFields.model = model;
+    if (temperature) updateFields.temperature = temperature;
+    if (maxTokens) updateFields.maxTokens = maxTokens;
+    if (isActive) updateFields.isActive = isActive;
 
     const step = await PipelineStep.findOneAndUpdate(
       { stepKey },

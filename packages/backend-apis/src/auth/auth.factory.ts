@@ -1,6 +1,7 @@
 import { config } from '../config/environment';
 import { BypassAuthVerifier } from './bypass-verifier';
 import { FirebaseAuthVerifier } from './firebase-verifier';
+import { MongoTenantProvisioner } from './tenant.provisioner';
 import { MongoUserResolver } from './user.resolver';
 import type { AuthVerifierInterface, UserResolverInterface } from './types';
 
@@ -8,7 +9,9 @@ let resolverSingleton: UserResolverInterface | null = null;
 
 export function getUserResolver(): UserResolverInterface {
   if (!resolverSingleton) {
-    resolverSingleton = new MongoUserResolver();
+    resolverSingleton = new MongoUserResolver({
+      tenantProvisioner: new MongoTenantProvisioner(),
+    });
   }
   return resolverSingleton;
 }

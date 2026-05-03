@@ -21,22 +21,6 @@ const baseStyle = `
   code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: monospace; color: #d32f2f; }
 `;
 
-export function renderAuthLandingPage(authUrl: string, userId?: string): string {
-  const note = userId
-    ? `<div class="info"><strong>Auto-link enabled:</strong> After granting access, the account will be linked automatically for user <code>${userId}</code>.</div>`
-    : `<div class="warn">No <code>userId</code> provided. You will receive a refresh token to link manually.</div>`;
-
-  return `<!DOCTYPE html><html><head><title>OAuth</title><style>${baseStyle}</style></head>
-  <body><div class="card">
-    <h1 style="color:#4285f4">🔐 Email Authorization</h1>
-    ${note}
-    <a href="${authUrl}" class="btn btn-primary">Authorize Access</a>
-    <details style="margin-top:20px"><summary>Show authorization URL</summary>
-      <code style="word-break:break-all;display:block;margin-top:8px">${authUrl}</code>
-    </details>
-  </div></body></html>`;
-}
-
 export function renderAutoLinkedPage(provider: string, email: string, userId: string, workflowId: string): string {
   return `<!DOCTYPE html><html><head><title>Linked</title><style>${baseStyle}</style></head>
   <body><div class="card">

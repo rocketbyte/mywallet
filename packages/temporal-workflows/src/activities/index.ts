@@ -3,7 +3,6 @@ export { createGmailActivities, type GmailActivities } from './gmail/gmail.activ
 export { createOpenAIActivities, type OpenAIActivities } from './openai/openai.activities';
 export { createMongoDBActivities, type MongoDBActivities } from './database/mongodb.activities';
 export { createEmailActivities, type EmailActivities } from './database/email.activities';
-export { createScheduleActivities, type ScheduleActivities } from './database/schedule.activities';
 export { createWorkflowStarterActivities, type WorkflowStarterActivities } from './workflow/workflow-starter.activities';
 
 // Export clients

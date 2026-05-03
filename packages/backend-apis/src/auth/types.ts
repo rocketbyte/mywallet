@@ -49,6 +49,15 @@ export interface AuthVerifierInterface {
   verify(req: Request): Promise<AuthUser>;
 }
 
+/**
+ * Idempotently ensures a tenant record exists for a freshly resolved user.
+ * Invoked from the user resolver so any authenticated request can assume
+ * its Tenant row is already there.
+ */
+export interface TenantProvisionerInterface {
+  ensureForUser(user: AuthUser): Promise<void>;
+}
+
 declare module 'express-serve-static-core' {
   interface Request {
     user?: AuthUser;

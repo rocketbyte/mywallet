@@ -69,19 +69,6 @@ export const RATE_LIMITS = {
   EMAIL_PROCESSING_DELAY_MS: 100
 } as const;
 
-// Schedule IDs
-export const SCHEDULE_IDS = {
-  EMAIL_PROCESSING_PREFIX: 'email-schedule/'
-} as const;
-
-// Default Schedule Configuration
-export const DEFAULT_SCHEDULE_CONFIG = {
-  SEARCH_QUERY: 'subject:"Usaste tu tarjeta de credito"',
-  CRON_EXPRESSION: '* * * * *',  // Every minute
-  MAX_RESULTS: 50,
-  SKIP_PROCESSED: true
-} as const;
-
 // ==================== Gmail Sync Constants ====================
 
 // Task Queue for Gmail Sync

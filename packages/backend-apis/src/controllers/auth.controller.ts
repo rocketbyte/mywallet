@@ -8,7 +8,6 @@ import {
 } from '../providers';
 import { logger } from '../utils/logger';
 import {
-  renderAuthLandingPage,
   renderAutoLinkedPage,
   renderCallbackErrorPage,
   renderErrorPage,
@@ -107,39 +106,6 @@ export class AuthController {
     } catch (err) {
       logger.error('OAuth callback failed', { err });
       res.status(500).send(renderCallbackErrorPage((err as Error).message));
-    }
-  }
-
-  /**
-   * GET /api/auth/gmail — DEPRECATED.
-   * Retained only for backward compatibility with existing manual flows.
-   * New integrations must call POST /api/auth/connect.
-   */
-  getAuthUrlLegacy(req: Request, res: Response): void {
-    try {
-      const provider = this.registry.get('gmail');
-      const userId = (req.query.userId as string | undefined)?.trim();
-      const email = (req.query.email as string | undefined)?.trim();
-
-      logger.warn('Deprecated GET /auth/gmail endpoint used — clients should migrate to POST /api/auth/connect', {
-        userId,
-      });
-
-      // Legacy behavior: userId is optional, email may be missing entirely.
-      // Provide an empty string so the provider can still build a URL without
-      // login_hint when caller is in the legacy manual flow.
-      const authUrl = provider.getAuthUrl({
-        userId: userId ?? '',
-        email: email ?? '',
-      });
-
-      if (req.headers.accept?.includes('application/json')) {
-        res.json({ authUrl, provider: provider.type, deprecated: true });
-        return;
-      }
-      res.send(renderAuthLandingPage(authUrl, userId));
-    } catch (error) {
-      this.respondWithError(res, error, 'Failed to generate authorization URL');
     }
   }
 

@@ -196,59 +196,6 @@ export interface EmailQueryInput {
   endDate?: Date;
 }
 
-// Scheduled Workflow Types
-export interface ScheduledEmailProcessingInput {
-  userId: string;            // NEW: Tenant identifier
-  scheduleId: string;
-  searchQuery: string;
-  maxResults: number;
-  afterDate?: Date;
-  skipProcessed: boolean;
-}
-
-export interface ScheduledEmailProcessingResult {
-  scheduleId: string;
-  runTimestamp: Date;
-  emailsFetched: number;
-  emailsStored: number;
-  emailsProcessed: number;
-  emailsFailed: number;
-  duplicatesSkipped: number;
-  transactions: SavedTransaction[];
-  errors: Array<{
-    emailId: string;
-    error: string;
-  }>;
-}
-
-// Schedule Management Types
-export interface CreateScheduleInput {
-  name: string;
-  description?: string;
-  searchQuery: string;
-  cronExpression?: string;
-  maxResults?: number;
-  afterDate?: Date;
-}
-
-export interface ScheduleInfo {
-  scheduleId: string;
-  name: string;
-  description?: string;
-  isActive: boolean;
-  searchQuery: string;
-  cronExpression: string;
-  nextRunTime?: Date;
-  lastRunAt?: Date;
-  lastRunStatus?: string;
-  stats: {
-    totalRuns: number;
-    totalEmailsFetched: number;
-    totalEmailsProcessed: number;
-    totalErrors: number;
-  };
-}
-
 // ==================== Gmail Sync Types ====================
 
 // Workflow Inputs/Outputs

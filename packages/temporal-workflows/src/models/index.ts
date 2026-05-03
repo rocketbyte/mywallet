@@ -6,5 +6,4 @@ export { Alert, AlertInterface } from './alert.model';
 export { PendingTransaction, PendingTransactionInterface } from './pending-transaction.model';
 export { Tenant, TenantInterface } from './tenant.model';
 export { Email, EmailInterface } from './email.model';
-export { ScheduleConfig, ScheduleConfigInterface } from './schedule-config.model';
 export { PipelineStep, PipelineStepInterface } from './pipeline-step.model';
