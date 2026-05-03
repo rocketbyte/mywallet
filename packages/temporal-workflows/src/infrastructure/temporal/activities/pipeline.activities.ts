@@ -12,10 +12,10 @@
 import { Context } from '@temporalio/activity';
 import { DependencyContainer } from 'tsyringe';
 
-import { AIGatewayInterface } from '../../../application/interfaces/gateways/iai-gateway';
-import { PipelineStepRepositoryInterface } from '../../../application/interfaces/repositories/ipipeline-step-repository';
-import { TransactionRepositoryInterface } from '../../../application/interfaces/repositories/itransaction-repository';
-import { EmailRepositoryInterface } from '../../../application/interfaces/repositories/iemail-repository';
+import { AIGatewayInterface } from '../../../application/interfaces/gateways/ai-gateway.interface';
+import { PipelineStepRepositoryInterface } from '../../../application/interfaces/repositories/pipeline-step-repository.interface';
+import { TransactionRepositoryInterface } from '../../../application/interfaces/repositories/transaction-repository.interface';
+import { EmailRepositoryInterface } from '../../../application/interfaces/repositories/email-repository.interface';
 import {
   ClassifyEmailInput,
   ClassificationResult,

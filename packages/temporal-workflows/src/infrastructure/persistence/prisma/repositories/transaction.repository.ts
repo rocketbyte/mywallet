@@ -9,7 +9,7 @@ import {
   TransactionFilters,
   StatsParams,
   TransactionStats,
-} from '../../../../application/interfaces/repositories/itransaction-repository';
+} from '../../../../application/interfaces/repositories/transaction-repository.interface';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 
 @injectable()

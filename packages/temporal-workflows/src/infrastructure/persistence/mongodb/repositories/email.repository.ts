@@ -5,7 +5,7 @@
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { EmailRepositoryInterface, EmailMetadata, SavedEmail, ProcessingStatus } from '../../../../application/interfaces/repositories/iemail-repository';
+import { EmailRepositoryInterface, EmailMetadata, SavedEmail, ProcessingStatus } from '../../../../application/interfaces/repositories/email-repository.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { Email as EmailModel, EmailInterface } from '../../../../models/email.model';
 

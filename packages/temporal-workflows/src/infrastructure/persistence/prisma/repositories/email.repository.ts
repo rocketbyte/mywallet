@@ -9,7 +9,7 @@ import {
   EmailMetadata,
   SavedEmail,
   ProcessingStatus,
-} from '../../../../application/interfaces/repositories/iemail-repository';
+} from '../../../../application/interfaces/repositories/email-repository.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 
 @injectable()

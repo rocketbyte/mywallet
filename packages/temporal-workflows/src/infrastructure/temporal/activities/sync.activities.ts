@@ -7,7 +7,7 @@ import { DependencyContainer } from 'tsyringe';
 import { Connection } from 'mongoose';
 
 // Application Interfaces
-import { MailSyncGatewayInterface } from '../../../application/interfaces/gateways/imail-sync-gateway';
+import { MailSyncGatewayInterface } from '../../../application/interfaces/gateways/mail-sync-gateway.interface';
 
 // Domain Models (Mongoose)
 import { GmailAccount } from '../../../models/gmail-account.model';

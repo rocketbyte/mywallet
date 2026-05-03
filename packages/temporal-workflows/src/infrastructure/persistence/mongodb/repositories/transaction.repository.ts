@@ -5,7 +5,7 @@
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { TransactionRepositoryInterface, TransactionFilters, StatsParams, TransactionStats } from '../../../../application/interfaces/repositories/itransaction-repository';
+import { TransactionRepositoryInterface, TransactionFilters, StatsParams, TransactionStats } from '../../../../application/interfaces/repositories/transaction-repository.interface';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 import { Transaction as TransactionModel, TransactionInterface } from '../../../../models/transaction.model';
 

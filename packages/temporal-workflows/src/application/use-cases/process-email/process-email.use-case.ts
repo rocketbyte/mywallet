@@ -6,11 +6,11 @@
 import { injectable, inject } from 'tsyringe';
 import { Email } from '../../../domain/entities/email.entity';
 import { Transaction } from '../../../domain/entities/transaction.entity';
-import { EmailGatewayInterface, EmailSearchParams } from '../../interfaces/gateways/iemail-gateway';
-import { TransactionExtractorGatewayInterface } from '../../interfaces/gateways/iai-gateway';
-import { TransactionRepositoryInterface } from '../../interfaces/repositories/itransaction-repository';
-import { EmailRepositoryInterface } from '../../interfaces/repositories/iemail-repository';
-import { PatternRepositoryInterface } from '../../interfaces/repositories/ipattern-repository';
+import { EmailGatewayInterface, EmailSearchParams } from '../../interfaces/gateways/email-gateway.interface';
+import { TransactionExtractorGatewayInterface } from '../../interfaces/gateways/ai-gateway.interface';
+import { TransactionRepositoryInterface } from '../../interfaces/repositories/transaction-repository.interface';
+import { EmailRepositoryInterface } from '../../interfaces/repositories/email-repository.interface';
+import { PatternRepositoryInterface } from '../../interfaces/repositories/pattern-repository.interface';
 
 @injectable()
 export class ProcessEmailUseCase {

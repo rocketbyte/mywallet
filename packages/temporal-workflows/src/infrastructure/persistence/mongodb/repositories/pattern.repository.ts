@@ -5,7 +5,7 @@
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { PatternRepositoryInterface } from '../../../../application/interfaces/repositories/ipattern-repository';
+import { PatternRepositoryInterface } from '../../../../application/interfaces/repositories/pattern-repository.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { EmailPattern } from '../../../../domain/entities/email-pattern.entity';
 import { EmailPattern as EmailPatternModel, EmailPatternInterface } from '../../../../models/email-pattern.model';

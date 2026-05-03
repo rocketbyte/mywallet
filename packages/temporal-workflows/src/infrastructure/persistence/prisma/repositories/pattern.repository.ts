@@ -4,7 +4,7 @@
  */
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient } from '@prisma/client';
-import { PatternRepositoryInterface } from '../../../../application/interfaces/repositories/ipattern-repository';
+import { PatternRepositoryInterface } from '../../../../application/interfaces/repositories/pattern-repository.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { EmailPattern } from '../../../../domain/entities/email-pattern.entity';
 

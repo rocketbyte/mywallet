@@ -6,7 +6,7 @@
 import { injectable, inject } from 'tsyringe';
 import { google, gmail_v1 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import { EmailGatewayInterface, EmailSearchParams } from '../../../../application/interfaces/gateways/iemail-gateway';
+import { EmailGatewayInterface, EmailSearchParams } from '../../../../application/interfaces/gateways/email-gateway.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { GmailMapper } from './gmail.mapper';
 

@@ -5,7 +5,7 @@
  */
 import { injectable, inject } from 'tsyringe';
 import OpenAI from 'openai';
-import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/iai-gateway';
+import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/ai-gateway.interface';
 
 @injectable()
 export class OpenAIGateway implements AIGatewayInterface {

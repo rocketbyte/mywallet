@@ -7,8 +7,8 @@ import { Context } from '@temporalio/activity';
 import { DependencyContainer } from 'tsyringe';
 
 // Gateways (Application Layer Interfaces)
-import { TransactionExtractorGatewayInterface } from '../../../application/interfaces/gateways/iai-gateway';
-import { TransactionRepositoryInterface } from '../../../application/interfaces/repositories/itransaction-repository';
+import { TransactionExtractorGatewayInterface } from '../../../application/interfaces/gateways/ai-gateway.interface';
+import { TransactionRepositoryInterface } from '../../../application/interfaces/repositories/transaction-repository.interface';
 
 // Domain Entities
 import { Email } from '../../../domain/entities/email.entity';

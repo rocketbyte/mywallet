@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { injectable, inject } from 'tsyringe';
-import { MailSyncGatewayInterface } from '../../../../application/interfaces/gateways/imail-sync-gateway';
+import { MailSyncGatewayInterface } from '../../../../application/interfaces/gateways/mail-sync-gateway.interface';
 import {
   FetchGmailChangesInput,
   FetchGmailChangesOutput,

@@ -4,7 +4,7 @@
  * Handles transaction extraction logic
  */
 import { injectable, inject } from 'tsyringe';
-import { TransactionExtractorGatewayInterface, ExtractionContext } from '../../../../application/interfaces/gateways/iai-gateway';
+import { TransactionExtractorGatewayInterface, ExtractionContext } from '../../../../application/interfaces/gateways/ai-gateway.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 import { OpenAIGateway } from './openai.gateway';

@@ -4,7 +4,7 @@
  * Supports remote Ollama servers
  */
 import { injectable, inject } from 'tsyringe';
-import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/iai-gateway';
+import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/ai-gateway.interface';
 import { OllamaClient } from './ollama-client';
 
 @injectable()

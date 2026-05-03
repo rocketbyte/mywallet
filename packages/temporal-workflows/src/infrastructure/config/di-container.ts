@@ -13,15 +13,15 @@ import { Connection } from 'mongoose';
 import { PrismaClient } from '@prisma/client';
 
 // Layer 2 - Application Interfaces (Gateways)
-import { EmailGatewayInterface } from '../../application/interfaces/gateways/iemail-gateway';
-import { AIGatewayInterface, TransactionExtractorGatewayInterface } from '../../application/interfaces/gateways/iai-gateway';
-import { MailSyncGatewayInterface } from '../../application/interfaces/gateways/imail-sync-gateway';
+import { EmailGatewayInterface } from '../../application/interfaces/gateways/email-gateway.interface';
+import { AIGatewayInterface, TransactionExtractorGatewayInterface } from '../../application/interfaces/gateways/ai-gateway.interface';
+import { MailSyncGatewayInterface } from '../../application/interfaces/gateways/mail-sync-gateway.interface';
 
 // Layer 2 - Application Interfaces (Repositories)
-import { TransactionRepositoryInterface } from '../../application/interfaces/repositories/itransaction-repository';
-import { EmailRepositoryInterface } from '../../application/interfaces/repositories/iemail-repository';
-import { PatternRepositoryInterface } from '../../application/interfaces/repositories/ipattern-repository';
-import { PipelineStepRepositoryInterface } from '../../application/interfaces/repositories/ipipeline-step-repository';
+import { TransactionRepositoryInterface } from '../../application/interfaces/repositories/transaction-repository.interface';
+import { EmailRepositoryInterface } from '../../application/interfaces/repositories/email-repository.interface';
+import { PatternRepositoryInterface } from '../../application/interfaces/repositories/pattern-repository.interface';
+import { PipelineStepRepositoryInterface } from '../../application/interfaces/repositories/pipeline-step-repository.interface';
 
 // Layer 3 & 4 - Gmail Implementations
 import { GmailGateway } from '../external/email/gmail/gmail.gateway';

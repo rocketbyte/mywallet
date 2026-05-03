@@ -10,9 +10,9 @@ import { DependencyContainer } from 'tsyringe';
 import { ProcessEmailUseCase } from '../../../application/use-cases/process-email/process-email.use-case';
 
 // Gateways (Application Layer Interfaces)
-import { EmailGatewayInterface } from '../../../application/interfaces/gateways/iemail-gateway';
-import { PatternRepositoryInterface } from '../../../application/interfaces/repositories/ipattern-repository';
-import { EmailRepositoryInterface } from '../../../application/interfaces/repositories/iemail-repository';
+import { EmailGatewayInterface } from '../../../application/interfaces/gateways/email-gateway.interface';
+import { PatternRepositoryInterface } from '../../../application/interfaces/repositories/pattern-repository.interface';
+import { EmailRepositoryInterface } from '../../../application/interfaces/repositories/email-repository.interface';
 
 // Domain Entities
 import { Email } from '../../../domain/entities/email.entity';

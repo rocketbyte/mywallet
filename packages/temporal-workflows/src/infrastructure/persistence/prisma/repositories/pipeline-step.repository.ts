@@ -8,7 +8,7 @@ import {
   PipelineStepRepositoryInterface,
   PipelineStepNotFoundError,
   PipelineStepInactiveError,
-} from '../../../../application/interfaces/repositories/ipipeline-step-repository';
+} from '../../../../application/interfaces/repositories/pipeline-step-repository.interface';
 import { PipelineStepConfig } from '../../../../shared/types';
 
 @injectable()
