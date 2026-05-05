@@ -22,6 +22,13 @@ export interface TransactionRepositoryInterface {
   findByEmailId(userId: string, emailId: string): Promise<Transaction | null>;
 
   /**
+   * Find a recently-stored transaction matching the same exact amount, currency,
+   * and direction for the same tenant. Used to skip duplicate ingestion (e.g.
+   * the bank sends the same notification twice, or two providers deliver it).
+   */
+  findRecentDuplicate(criteria: RecentDuplicateCriteria): Promise<Transaction | null>;
+
+  /**
    * Find all transactions matching filters
    */
   findAll(filters?: TransactionFilters): Promise<Transaction[]>;
@@ -30,6 +37,17 @@ export interface TransactionRepositoryInterface {
    * Get transaction statistics
    */
   getStats(params: StatsParams): Promise<TransactionStats>;
+}
+
+export interface RecentDuplicateCriteria {
+  userId: string;
+  amount: number;
+  currency: string;
+  transactionType: 'debit' | 'credit';
+  /** Anchor date for the lookback window — typically the new transaction's date. */
+  near: Date;
+  /** Window size in hours, applied symmetrically around `near`. */
+  windowHours: number;
 }
 
 export interface TransactionFilters {

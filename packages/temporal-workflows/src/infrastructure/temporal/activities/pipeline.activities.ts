@@ -24,7 +24,7 @@ import {
   StoreTransactionInput,
   StoredTransactionResult
 } from '../../../shared/types';
-import { PIPELINE_STEP_KEYS } from '../../../shared/constants';
+import { PIPELINE_STEP_KEYS, DUPLICATE_LOOKBACK_HOURS } from '../../../shared/constants';
 
 // ---------------------------------------------------------------------------
 // Template interpolation helper
@@ -147,19 +147,54 @@ export function createPipelineActivities(container: DependencyContainer) {
      *
      * Persists the extracted transaction data via the injected repositories.
      * Marks the source email as processed.
-     * Idempotent — if the transaction already exists for the email it is skipped.
+     *
+     * Skips persistence when:
+     *   1. The same email was already processed for this tenant (idempotency).
+     *   2. A recent transaction with the same amount, currency and direction
+     *      already exists within DUPLICATE_LOOKBACK_HOURS (deduplication).
      */
     async storeTransaction(input: StoreTransactionInput): Promise<StoredTransactionResult> {
       Context.current().heartbeat();
 
-      // Idempotency check — scoped to tenant
-      const existing = await transactionRepo.findByEmailId(input.userId, input.emailId);
-      if (existing) {
+      // 1. Idempotency check — same email re-processed.
+      const existingByEmail = await transactionRepo.findByEmailId(input.userId, input.emailId);
+      if (existingByEmail) {
         return {
-          transactionId: existing.id,
-          merchant: existing.merchant,
-          amount: existing.amount,
-          currency: existing.currency
+          transactionId: existingByEmail.id,
+          merchant: existingByEmail.merchant,
+          amount: existingByEmail.amount,
+          currency: existingByEmail.currency,
+          isDuplicate: true,
+          duplicateReason: 'same-email'
+        };
+      }
+
+      // 2. Recent duplicate check — same amount/currency/type within the lookback window.
+      const recentDuplicate = await transactionRepo.findRecentDuplicate({
+        userId: input.userId,
+        amount: input.rawData.amount,
+        currency: input.rawData.currency,
+        transactionType: input.rawData.transactionType,
+        near: input.rawData.transactionDate,
+        windowHours: DUPLICATE_LOOKBACK_HOURS
+      });
+      if (recentDuplicate) {
+        await emailRepo.updateProcessingStatus(input.emailId, {
+          isProcessed: true,
+          processedAt: new Date(),
+          workflowId: input.workflowId,
+          transactionId: recentDuplicate.id,
+          confidence: input.rawData.confidence,
+          matchedPatternId: input.patternId,
+          matchedPatternName: input.patternName
+        });
+        return {
+          transactionId: recentDuplicate.id,
+          merchant: recentDuplicate.merchant,
+          amount: recentDuplicate.amount,
+          currency: recentDuplicate.currency,
+          isDuplicate: true,
+          duplicateReason: 'recent-same-amount'
         };
       }
 

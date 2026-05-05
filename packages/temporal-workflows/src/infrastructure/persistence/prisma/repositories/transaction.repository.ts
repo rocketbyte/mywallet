@@ -9,6 +9,7 @@ import {
   TransactionFilters,
   StatsParams,
   TransactionStats,
+  RecentDuplicateCriteria,
 } from '../../../../application/interfaces/repositories/transaction-repository.interface';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 
@@ -46,6 +47,25 @@ export class PrismaTransactionRepository implements TransactionRepositoryInterfa
 
   async findByEmailId(userId: string, emailId: string): Promise<Transaction | null> {
     const record = await this.prisma.transaction.findFirst({ where: { userId, emailId } });
+    return record ? this.toDomain(record) : null;
+  }
+
+  async findRecentDuplicate(c: RecentDuplicateCriteria): Promise<Transaction | null> {
+    const windowMs = c.windowHours * 60 * 60 * 1000;
+    const from = new Date(c.near.getTime() - windowMs);
+    const to = new Date(c.near.getTime() + windowMs);
+
+    const record = await this.prisma.transaction.findFirst({
+      where: {
+        userId: c.userId,
+        amount: c.amount,
+        currency: c.currency,
+        transactionType: c.transactionType,
+        transactionDate: { gte: from, lte: to },
+      },
+      orderBy: { transactionDate: 'desc' },
+    });
+
     return record ? this.toDomain(record) : null;
   }
 

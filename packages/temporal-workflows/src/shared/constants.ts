@@ -141,6 +141,10 @@ export const PIPELINE_STEP_KEYS = {
   STORE_TRANSACTION: 'store_transaction'
 } as const;
 
+// Deduplication: skip storage when a transaction with the same userId,
+// transactionType, currency, and exact amount was stored within this window.
+export const DUPLICATE_LOOKBACK_HOURS = 48;
+
 export const PIPELINE_ACTIVITY_TIMEOUTS = {
   // Generous ceiling for slow local LLM inference (Ollama on a Pi can take minutes).
   // Liveness is enforced by heartbeatTimeout — the activity heartbeats every 20s

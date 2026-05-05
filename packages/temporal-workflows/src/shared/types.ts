@@ -433,6 +433,10 @@ export interface StoredTransactionResult {
   merchant: string;
   amount: number;
   currency: string;
+  /** True when persistence was skipped because a duplicate already existed. */
+  isDuplicate?: boolean;
+  /** Why the activity considered the transaction a duplicate. */
+  duplicateReason?: 'same-email' | 'recent-same-amount';
 }
 
 export interface TransactionPipelineInput {
@@ -449,7 +453,7 @@ export interface TransactionPipelineInput {
 
 export interface TransactionPipelineResult {
   emailId: string;
-  status: 'stored' | 'ignored' | 'failed';
+  status: 'stored' | 'duplicate' | 'ignored' | 'failed';
   reason?: string;
   transactionId?: string;
   merchant?: string;

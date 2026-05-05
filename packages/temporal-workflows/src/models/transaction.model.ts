@@ -87,4 +87,10 @@ TransactionSchema.index({ userId: 1, transactionDate: -1, category: 1 });
 TransactionSchema.index({ userId: 1, workflowId: 1 }, { sparse: true });
 TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 }, { sparse: true });
 
+// Supports findRecentDuplicate — exact-match dedup query during pipeline storage.
+TransactionSchema.index(
+  { userId: 1, transactionType: 1, currency: 1, amount: 1, transactionDate: -1 },
+  { name: 'dedup_lookup' }
+);
+
 export const Transaction = model<TransactionInterface>('Transaction', TransactionSchema);

@@ -30,28 +30,42 @@ const DEFAULT_STEPS = [
     temperature: 0.1,
     maxTokens: 300,
     isActive: true,
-    systemPrompt: `You are a financial email classifier. Your job is to determine whether an email is a bank transaction notification.
+    systemPrompt: `You are a strict financial-email classifier. Decide whether ONE email reports a single executed bank or payment transaction.
 
-A bank transaction email typically:
-- Comes from a bank or financial institution
-- Contains information about a debit, credit, transfer, payment, purchase, or refund
-- Mentions an amount, a merchant, or an account
+Return TRUE only when the email reports a discrete movement of money that already occurred. Look for ALL three signals:
+  1. Sender is a bank, card issuer, payment processor, or fintech (e.g. Chase, BHD, Banreservas, Popular, Stripe, PayPal, Wise, MercadoPago, Apple Pay, Zelle).
+  2. Body mentions an executed action: purchase, charge, debit, credit, deposit, transfer, withdrawal, refund, reversal, fee, interest paid, payment received/sent.
+  3. Body contains an amount AND at least one of: merchant, account/card last 4, or transaction reference.
 
-Respond ONLY with a valid JSON object in this exact format:
+Return FALSE for: marketing, statements/summaries (no single discrete movement), account opening/closing, login/security alerts, OTP codes, password resets, invoices/bills not yet paid, fraud-confirmation requests, balance updates without a movement.
+
+Output STRICT JSON only. No prose, no markdown, no code fences. Schema:
 {
-  "isTransaction": true or false,
-  "confidence": 0.0 to 1.0,
+  "isTransaction": boolean,
+  "confidence": number,         // 0..1, calibrated; lower it when signals are weak or inferred
   "transactionType": "credit" | "debit" | "transfer" | "payment" | "refund" | "other" | null,
-  "reasoning": "brief explanation"
-}`,
-    userPromptTemplate: `Classify this email:
+  "reasoning": string           // one short sentence citing the evidence in the email
+}
 
-From: {{email_from}}
+Conventions:
+- "debit"    = money LEFT the customer's account (purchase, withdrawal, fee).
+- "credit"   = money ENTERED the customer's account (deposit, salary, refund received).
+- "transfer" = movement between accounts.
+- "payment"  = bill/third-party payment.
+- "refund"   = money returned from a previous purchase.
+- If isTransaction is false, set transactionType to null.`,
+    userPromptTemplate: `Email to classify:
+
+From:    {{email_from}}
 Subject: {{email_subject}}
-Date: {{email_date}}
+Date:    {{email_date}}
 
 Body:
-{{email_body}}`
+"""
+{{email_body}}
+"""
+
+Return only the JSON object.`
   },
 
   {
@@ -63,40 +77,54 @@ Body:
     temperature: 0.1,
     maxTokens: 600,
     isActive: true,
-    systemPrompt: `You are a financial data extractor. Extract structured transaction information from bank notification emails.
+    systemPrompt: `You are a precise financial-transaction extractor for multi-bank, multi-currency, multi-language emails. Extract the SINGLE primary transaction reported in this email into one structured JSON object.
 
-Rules:
-- Extract the exact amount as a number (no currency symbols, no commas)
-- Use ISO 4217 currency codes (USD, DOP, EUR, etc.)
-- Merchant should be the business name, not the bank name
-- transactionDate should be in ISO 8601 format
-- transactionType must be "debit" or "credit"
-- confidence is your confidence in the extraction from 0.0 to 1.0
-- If a field cannot be determined, use null
+Field rules:
+- merchant: the counterparty (business / person / payee). NEVER the bank itself. Strip processor prefixes ("SQ *", "PAYPAL *", "TST*"), trailing locations, and noise codes ("*1234"). Title-case proper names. If truly unknown, use "Unknown".
+- amount: positive JSON number. No currency symbols, no thousands separators, dot as decimal separator. Use the transaction amount itself, NOT the running balance, NOT the available credit, NOT the total of multiple movements.
+- currency: ISO 4217 (USD, DOP, EUR, MXN, COP, GBP, ARS, BRL, ...). If only a symbol is shown, infer from sender locale; default to "USD" if truly ambiguous.
+- transactionDate: ISO 8601 with timezone. Use the date the bank reports the transaction occurred. If only a date is given, use "T12:00:00Z".
+- transactionType: "debit" if money LEFT the account; "credit" if money ENTERED the account. Refunds received are "credit". Fees charged are "debit".
+- bankName: the issuing institution detected from the sender domain or signature.
+- accountLast4: last 4 digits of the source card/account if shown, else null.
+- referenceNumber: the transaction's bank-issued reference, authorization, confirmation, or ARN code if present, else null. PREFER bank reference over email/message IDs.
+- category: pick the closest from "Food", "Transport", "Shopping", "Bills", "Entertainment", "Healthcare", "Travel", "Education", "Personal", "Other". When unsure, use "Other".
+- description: short human-readable summary, else null.
+- confidence: 0..1, calibrated. Penalize when amount, merchant, or currency had to be inferred rather than observed verbatim.
 
-Respond ONLY with a valid JSON object in this exact format:
+Hard constraints:
+- Output STRICT JSON only. No prose, no markdown, no code fences, no comments.
+- Numbers MUST be JSON numbers; dates MUST be ISO 8601 strings; unknown optional fields MUST be null.
+- NEVER invent values. If unsure of merchant, use "Unknown" and lower the confidence.
+- If the email reports MULTIPLE transactions, extract the PRIMARY one (the subject of the email). Do not aggregate or sum.
+
+Schema:
 {
-  "merchant": "merchant name",
-  "amount": 123.45,
-  "currency": "USD",
-  "transactionDate": "2026-03-25T10:00:00Z",
-  "transactionType": "debit" or "credit",
-  "bankName": "bank name",
-  "accountLast4": "1234" or null,
-  "referenceNumber": "ref number" or null,
-  "category": "Food" | "Transport" | "Shopping" | "Bills" | "Entertainment" | "Healthcare" | "Travel" | "Education" | "Personal" | "Other",
-  "description": "brief description" or null,
-  "confidence": 0.0 to 1.0
+  "merchant": string,
+  "amount": number,
+  "currency": string,                     // ISO 4217
+  "transactionDate": string,              // ISO 8601
+  "transactionType": "debit" | "credit",
+  "bankName": string,
+  "accountLast4": string | null,
+  "referenceNumber": string | null,
+  "category": "Food"|"Transport"|"Shopping"|"Bills"|"Entertainment"|"Healthcare"|"Travel"|"Education"|"Personal"|"Other",
+  "description": string | null,
+  "confidence": number                    // 0..1
 }`,
-    userPromptTemplate: `Extract transaction data from this email:
+    userPromptTemplate: `Extract the primary transaction from this email.
 
-From: {{email_from}}
+From:    {{email_from}}
 Subject: {{email_subject}}
-Date: {{email_date}}
-Transaction type hint: {{transaction_type}}
+Date:    {{email_date}}
+Hint (from classifier): {{transaction_type}}
 
 Body:
-{{email_body}}`
+"""
+{{email_body}}
+"""
+
+Return only the JSON object.`
   },
 
   {

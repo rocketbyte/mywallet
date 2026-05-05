@@ -5,7 +5,7 @@
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { TransactionRepositoryInterface, TransactionFilters, StatsParams, TransactionStats } from '../../../../application/interfaces/repositories/transaction-repository.interface';
+import { TransactionRepositoryInterface, TransactionFilters, StatsParams, TransactionStats, RecentDuplicateCriteria } from '../../../../application/interfaces/repositories/transaction-repository.interface';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 import { Transaction as TransactionModel, TransactionInterface } from '../../../../models/transaction.model';
 
@@ -59,6 +59,26 @@ export class MongoDBTransactionRepository implements TransactionRepositoryInterf
    */
   async findByEmailId(userId: string, emailId: string): Promise<Transaction | null> {
     const doc = await TransactionModel.findOne({ userId, emailId });
+    return doc ? this.toDomain(doc) : null;
+  }
+
+  /**
+   * Find a recently-persisted transaction with the same exact amount, currency
+   * and direction within ± windowHours of `near`.
+   */
+  async findRecentDuplicate(c: RecentDuplicateCriteria): Promise<Transaction | null> {
+    const windowMs = c.windowHours * 60 * 60 * 1000;
+    const from = new Date(c.near.getTime() - windowMs);
+    const to = new Date(c.near.getTime() + windowMs);
+
+    const doc = await TransactionModel.findOne({
+      userId: c.userId,
+      amount: c.amount,
+      currency: c.currency,
+      transactionType: c.transactionType,
+      transactionDate: { $gte: from, $lte: to }
+    }).sort({ transactionDate: -1 });
+
     return doc ? this.toDomain(doc) : null;
   }
 
