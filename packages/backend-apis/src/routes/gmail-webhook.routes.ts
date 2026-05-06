@@ -169,6 +169,31 @@ router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
+/**
+ * @openapi
+ * /gmail/status/me:
+ *   get:
+ *     summary: Get the authenticated user's Gmail sync status
+ *     description: |
+ *       Same payload as `GET /gmail/status/{userId}`, but resolves the user
+ *       from the bearer token so callers don't need to pass an id.
+ *       Returns `404` when the user has not yet linked a Gmail account —
+ *       clients can use this to render a "Link Gmail" CTA.
+ *     tags: [Gmail]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Account status.
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         description: No Gmail account linked for the authenticated user.
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/status/me', (req, res) => controller.getMyStatus(req, res));
+
 router.get('/status/:userId', (req, res) => controller.getStatus(req, res));
 
 export default router;

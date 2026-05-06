@@ -9,6 +9,7 @@ import {
 import { GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX, GMAIL_SIGNALS, GMAIL_SYNC_TASK_QUEUE } from '../../../temporal-workflows/src/shared/constants';
 import { GmailAccount } from '../../../temporal-workflows/src/models/gmail-account.model';
 import { EmailProviderInterface } from '../providers/types';
+import { getUserId } from '../auth';
 import { logger } from '../utils/logger';
 
 /**
@@ -159,6 +160,27 @@ export class GmailWebhookController {
 
       const status = await this.provider.getAccountStatus(userId);
 
+      res.status(200).json(status);
+    } catch (error) {
+      const code = (error as any).code;
+      if (code === 'not_found') {
+        res.status(404).json({ error: 'account_not_found', message: (error as Error).message });
+        return;
+      }
+      logger.error('Error getting Gmail sync status', { error });
+      res.status(500).json({ error: 'status_check_failed', message: (error as Error).message });
+    }
+  }
+
+  /**
+   * GET /api/gmail/status/me
+   * Authed-user variant — derives userId from the bearer token so callers
+   * never have to pass it (and can't impersonate another user by guessing
+   * an id).
+   */
+  async getMyStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const status = await this.provider.getAccountStatus(getUserId(req));
       res.status(200).json(status);
     } catch (error) {
       const code = (error as any).code;
