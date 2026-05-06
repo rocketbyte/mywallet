@@ -51,9 +51,11 @@ export class PrismaTransactionRepository implements TransactionRepositoryInterfa
   }
 
   async findRecentDuplicate(c: RecentDuplicateCriteria): Promise<Transaction | null> {
+    // Temporal payload serialization may deliver `near` as an ISO string.
+    const near = c.near instanceof Date ? c.near : new Date(c.near);
     const windowMs = c.windowHours * 60 * 60 * 1000;
-    const from = new Date(c.near.getTime() - windowMs);
-    const to = new Date(c.near.getTime() + windowMs);
+    const from = new Date(near.getTime() - windowMs);
+    const to = new Date(near.getTime() + windowMs);
 
     const record = await this.prisma.transaction.findFirst({
       where: {
