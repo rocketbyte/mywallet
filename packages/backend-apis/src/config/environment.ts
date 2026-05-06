@@ -42,4 +42,24 @@ export const config = {
     privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
     authBypass: process.env.AUTH_BYPASS === 'true',
   },
+
+  // LiteLLM proxy — same gateway the temporal worker uses. Reads the same
+  // env vars (LITELLM_API_KEY, LITELLM_BASE_URL, OPENAI_MODEL) so anywhere
+  // the worker's AI is configured, the chat endpoint inherits that config.
+  // LITELLM_MASTER_KEY is accepted as a local-dev fallback to match
+  // .env.example. OPENAI_MODEL must be a `model_name` in litellm-config.yaml.
+  litellm: {
+    baseURL: process.env.LITELLM_BASE_URL || '',
+    apiKey: process.env.LITELLM_API_KEY || process.env.LITELLM_MASTER_KEY || '',
+    model: process.env.OPENAI_MODEL || 'cf/llama-3.1-8b-instruct',
+  },
 };
+
+if (!config.litellm.baseURL || !config.litellm.apiKey) {
+  // Don't crash — chat is one feature among many — but warn loudly so the
+  // mismatch is obvious if someone hits POST /api/chat.
+  console.warn(
+    '[chat] LiteLLM not fully configured. Set LITELLM_BASE_URL and LITELLM_API_KEY ' +
+    '(same values the temporal worker uses). Chat requests will fail until both are present.'
+  );
+}
