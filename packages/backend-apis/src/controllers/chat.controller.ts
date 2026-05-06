@@ -1,14 +1,25 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { getUserId } from '../auth';
-import { ChatService, type ChatStreamEvent, type ChatTurn } from '../services/chat/chat.service';
+import { ChatService, type ChatStreamEvent } from '../services/chat/chat.service';
 import { logger } from '../utils/logger';
 
 const SSE_RETRY_MS = 2000;
+const SSE_HEARTBEAT_MS = 15_000;
 
-interface StreamRequestBody {
-  message?: unknown;
-  history?: unknown;
-}
+const MAX_MESSAGE_CHARS = 4_000;
+const MAX_HISTORY_TURNS = 40;
+const MAX_TURN_CHARS = 8_000;
+
+const ChatTurnSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().trim().min(1).max(MAX_TURN_CHARS),
+});
+
+const ChatRequestSchema = z.object({
+  message: z.string().trim().min(1).max(MAX_MESSAGE_CHARS),
+  history: z.array(ChatTurnSchema).max(MAX_HISTORY_TURNS).optional(),
+});
 
 /**
  * Streams chat replies as Server-Sent Events. Each event is a JSON
@@ -20,14 +31,16 @@ export class ChatController {
 
   async stream(req: Request, res: Response): Promise<void> {
     const userId = getUserId(req);
-    const body = (req.body ?? {}) as StreamRequestBody;
 
-    const message = typeof body.message === 'string' ? body.message.trim() : '';
-    if (!message) {
-      res.status(400).json({ error: 'bad_request', message: 'message is required' });
+    const parsed = ChatRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: 'bad_request',
+        message: parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '),
+      });
       return;
     }
-    const history = parseHistory(body.history);
+    const { message, history = [] } = parsed.data;
 
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -41,33 +54,34 @@ export class ChatController {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
-    let aborted = false;
+    // Keep proxies (nginx, ELB) from severing the connection while the
+    // model is still thinking. Comment frames (`:` prefix) are ignored by
+    // the EventSource spec, so the client never sees them.
+    const heartbeat = setInterval(() => {
+      res.write(': ping\n\n');
+    }, SSE_HEARTBEAT_MS);
+
+    // Forward client disconnects to the upstream LLM stream so we stop
+    // burning tokens (and dollars) when the user navigates away.
+    const controller = new AbortController();
+    let clientGone = false;
     req.on('close', () => {
-      aborted = true;
+      clientGone = true;
+      controller.abort();
     });
 
     try {
-      for await (const event of this.service.stream({ userId, message, history })) {
-        if (aborted) break;
+      for await (const event of this.service.stream({ userId, message, history, signal: controller.signal })) {
+        if (clientGone) break;
         send(event);
         if (event.type === 'done' || event.type === 'error') break;
       }
     } catch (err) {
       logger.error('Chat stream failed', { err });
-      if (!aborted) send({ type: 'error', message: (err as Error).message });
+      if (!clientGone) send({ type: 'error', message: (err as Error).message });
     } finally {
-      if (!aborted) res.end();
+      clearInterval(heartbeat);
+      if (!clientGone) res.end();
     }
   }
-}
-
-function parseHistory(raw: unknown): ChatTurn[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((entry) => {
-    if (!entry || typeof entry !== 'object') return [];
-    const role = (entry as { role?: unknown }).role;
-    const content = (entry as { content?: unknown }).content;
-    if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') return [];
-    return [{ role, content }];
-  });
 }

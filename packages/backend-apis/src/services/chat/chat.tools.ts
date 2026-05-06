@@ -29,7 +29,7 @@ export const CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           category: { type: 'string', enum: [...CATEGORY_ENUM] },
           merchantContains: { type: 'string', description: 'Case-insensitive substring match.' },
           type: { type: 'string', enum: ['income', 'expense'] },
-          limit: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10, description: 'Hard-capped at 20 to keep context small. Use get_spending_summary for totals over many transactions.' },
         },
       },
     },
@@ -66,7 +66,7 @@ type ToolExecutor = (userId: string, input: Record<string, unknown>) => Promise<
 
 export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   async query_transactions(userId, input) {
-    const limit = clampInt(input.limit, 1, 50, 20);
+    const limit = clampInt(input.limit, 1, 20, 10);
     const query: Record<string, unknown> = { userId };
 
     const range = buildDateRange(input.startDate, input.endDate);

@@ -20,6 +20,15 @@ export function getAiClient(): OpenAI {
   client = new OpenAI({
     apiKey: config.litellm.apiKey,
     baseURL: config.litellm.baseURL,
+    // Send Anthropic's auth headers as defaults too. The SDK always sets
+    // `Authorization: Bearer <apiKey>` (what OpenAI / LiteLLM expect), but
+    // some deployments route through Anthropic's native API which insists
+    // on `x-api-key` + `anthropic-version`. OpenAI/LiteLLM ignore unknown
+    // headers, so this is safe to send unconditionally.
+    defaultHeaders: {
+      'x-api-key': config.litellm.apiKey,
+      'anthropic-version': '2023-06-01',
+    },
   });
   logger.info('Chat AI client initialized', { baseURL: config.litellm.baseURL, model: config.litellm.model });
   return client;

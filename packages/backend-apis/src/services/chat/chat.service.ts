@@ -7,6 +7,10 @@ import { logger } from '../../utils/logger';
 const MAX_TOOL_TURNS = 5;
 const MAX_TOKENS = 800;
 const HISTORY_LIMIT = 12;
+// Hard cap on the JSON payload of any single tool result. Anything bigger
+// is replaced with a short marker — keeps every follow-up model call's
+// context bounded even if a tool returns more than expected.
+const MAX_TOOL_RESULT_CHARS = 12_000;
 
 export type ChatStreamEvent =
   | { type: 'delta'; text: string }
@@ -24,6 +28,7 @@ export interface ChatStreamRequest {
   userId: string;
   message: string;
   history?: ChatTurn[];
+  signal?: AbortSignal;
 }
 
 interface AccumulatedToolCall {
@@ -56,23 +61,35 @@ export class ChatService {
     ];
 
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-      const stream = await getAiClient().chat.completions.create({
-        model: CHAT_MODEL,
-        max_tokens: MAX_TOKENS,
-        temperature: 0.3,
-        tools: CHAT_TOOLS,
-        messages,
-        stream: true,
-      });
+      if (req.signal?.aborted) return;
+
+      let stream;
+      try {
+        stream = await getAiClient().chat.completions.create(
+          {
+            model: CHAT_MODEL,
+            max_tokens: MAX_TOKENS,
+            temperature: 0.3,
+            tools: CHAT_TOOLS,
+            messages,
+            stream: true,
+          },
+          { signal: req.signal },
+        );
+      } catch (err) {
+        if (isAbort(err)) return;
+        throw err;
+      }
 
       let assistantText = '';
       const toolCalls = new Map<number, AccumulatedToolCall>();
       let finishReason: string | null = null;
 
-      for await (const chunk of stream) {
-        const choice = chunk.choices?.[0];
-        if (!choice) continue;
-        const delta = choice.delta;
+      try {
+        for await (const chunk of stream) {
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+          const delta = choice.delta;
 
         if (typeof delta?.content === 'string' && delta.content) {
           assistantText += delta.content;
@@ -91,7 +108,11 @@ export class ChatService {
           }
         }
 
-        if (choice.finish_reason) finishReason = choice.finish_reason;
+          if (choice.finish_reason) finishReason = choice.finish_reason;
+        }
+      } catch (err) {
+        if (isAbort(err)) return;
+        throw err;
       }
 
       if (toolCalls.size === 0) {
@@ -115,6 +136,8 @@ export class ChatService {
       // Execute each tool and append its result message. Errors are
       // serialised back to the model so it can recover instead of crashing.
       for (const call of calls) {
+        if (req.signal?.aborted) return;
+
         let parsed: Record<string, unknown> = {};
         try {
           parsed = call.arguments ? JSON.parse(call.arguments) : {};
@@ -128,11 +151,12 @@ export class ChatService {
         try {
           if (!exec) throw new Error(`Unknown tool: ${call.name}`);
           const output = await exec(req.userId, parsed);
+          const serialized = capToolResult(output);
           yield { type: 'tool_result', id: call.id, output };
           messages.push({
             role: 'tool',
             tool_call_id: call.id,
-            content: JSON.stringify(output),
+            content: serialized,
           });
         } catch (err) {
           const message = (err as Error).message;
@@ -155,4 +179,25 @@ function trimHistory(history: ChatTurn[]): ChatTurn[] {
   return history
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
     .slice(-HISTORY_LIMIT);
+}
+
+/** True for AbortError thrown by the OpenAI SDK or fetch when our signal fires. */
+function isAbort(err: unknown): boolean {
+  const name = (err as { name?: string })?.name;
+  return name === 'AbortError' || name === 'APIUserAbortError';
+}
+
+/**
+ * Caps the JSON content fed back into the next model call. Tools should
+ * already self-limit their result size, but this is a safety net so a
+ * surprising payload can't blow up downstream context.
+ */
+function capToolResult(output: unknown): string {
+  const json = JSON.stringify(output);
+  if (json.length <= MAX_TOOL_RESULT_CHARS) return json;
+  return JSON.stringify({
+    truncated: true,
+    reason: `Result exceeded ${MAX_TOOL_RESULT_CHARS} chars; ask a narrower question or pass a smaller limit.`,
+    preview: json.slice(0, MAX_TOOL_RESULT_CHARS - 200),
+  });
 }
