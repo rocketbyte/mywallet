@@ -17,14 +17,15 @@ export class BypassAuthVerifier implements AuthVerifierInterface {
   }
 
   async verify(req: Request): Promise<AuthUser> {
-    const authUid = this.firstHeaderValue(req.headers[HEADER_USER_ID]);
-    if (!authUid) {
+    const subject = this.firstHeaderValue(req.headers[HEADER_USER_ID]);
+    if (!subject) {
       throw new UnauthorizedError(`AUTH_BYPASS enabled but ${HEADER_USER_ID} header missing`);
     }
 
     const profile: UserProfile = {
-      authUid,
-      email: this.firstHeaderValue(req.headers[HEADER_USER_EMAIL]) ?? `${authUid}@${FALLBACK_EMAIL_DOMAIN}`,
+      provider: 'bypass',
+      subject,
+      email: this.firstHeaderValue(req.headers[HEADER_USER_EMAIL]) ?? `${subject}@${FALLBACK_EMAIL_DOMAIN}`,
     };
     return this.userResolver.resolve(profile);
   }

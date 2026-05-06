@@ -30,7 +30,8 @@ export class FirebaseAuthVerifier implements AuthVerifierInterface {
     const decoded = await this.verifyToken(token);
 
     const profile: UserProfile = {
-      authUid: decoded.uid,
+      provider: 'firebase',
+      subject: decoded.uid,
       email: decoded.email,
       displayName: decoded.name,
       emailVerified: decoded.email_verified,

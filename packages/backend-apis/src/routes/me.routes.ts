@@ -1,0 +1,58 @@
+import { Router } from 'express';
+import { MeController } from '../controllers/me.controller';
+
+const router = Router();
+const controller = new MeController();
+
+/**
+ * @openapi
+ * /me:
+ *   get:
+ *     summary: Get the authenticated user
+ *     description: |
+ *       Returns the canonical user record for the bearer token's identity,
+ *       including all linked IDP identities. The internal `id` is stable
+ *       across re-authentication and is what every other endpoint scopes
+ *       data on.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Authenticated user.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     email: { type: string }
+ *                     display_name: { type: string, nullable: true }
+ *                     email_verified: { type: boolean }
+ *                     provider:
+ *                       type: string
+ *                       description: IDP that issued the token for the current request.
+ *                       example: firebase
+ *                     identities:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           provider: { type: string, example: firebase }
+ *                           subject: { type: string, description: "Provider-issued user id (OIDC sub)." }
+ *                           linked_at: { type: string, format: date-time }
+ *                     last_login_at: { type: string, format: date-time, nullable: true }
+ *                     created_at: { type: string, format: date-time }
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/', controller.getMe.bind(controller));
+
+export default router;

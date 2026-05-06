@@ -3,11 +3,13 @@ import type { Request } from 'express';
 /**
  * Request-scoped representation of the authenticated principal. `id` is the
  * canonical internal user identifier (User._id) — never the auth-provider
- * UID. `authUid` is kept for traceability and provider-specific actions.
+ * subject. `authUid` is kept for traceability and provider-specific
+ * actions; for current single-IDP flows it equals the verifier's subject.
  */
 export interface AuthUser {
   id: string;
   authUid: string;
+  provider: string;
   email?: string;
   displayName?: string;
   emailVerified?: boolean;
@@ -20,11 +22,15 @@ export interface FirebaseCredentials {
 }
 
 /**
- * Profile claims extracted from a verified auth credential. Fed to the
+ * Profile claims extracted from a verified auth credential. `provider` is
+ * the IDP key (e.g. 'firebase', 'google', 'apple', 'bypass') and `subject`
+ * is the provider's stable user id (the `sub` claim in OIDC). Together
+ * they uniquely identify an external identity. Fed to the
  * UserResolverInterface to upsert the matching internal User record.
  */
 export interface UserProfile {
-  authUid: string;
+  provider: string;
+  subject: string;
   email?: string;
   displayName?: string;
   emailVerified?: boolean;
@@ -37,7 +43,7 @@ export interface UserProfile {
  */
 export interface UserResolverInterface {
   resolve(profile: UserProfile): Promise<AuthUser>;
-  invalidate(authUid: string): void;
+  invalidate(provider: string, subject: string): void;
 }
 
 /**

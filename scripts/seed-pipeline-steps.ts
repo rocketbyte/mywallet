@@ -85,6 +85,10 @@ Field rules:
 - currency: ISO 4217 (USD, DOP, EUR, MXN, COP, GBP, ARS, BRL, ...). If only a symbol is shown, infer from sender locale; default to "USD" if truly ambiguous.
 - transactionDate: ISO 8601 with timezone. Use the date the bank reports the transaction occurred. If only a date is given, use "T12:00:00Z".
 - transactionType: "debit" if money LEFT the account; "credit" if money ENTERED the account. Refunds received are "credit". Fees charged are "debit".
+  • IMPORTANT — do NOT confuse the CARD TYPE with the direction. "Credit card" / "tarjeta de crédito" / "crédito" describes the *payment instrument*, NOT the direction. A purchase made with a credit card is still a "debit" (money is leaving the cardholder's available balance).
+  • Spanish/Portuguese keywords that almost always mean DEBIT (money out): "consumo", "compra", "compraste", "usaste tu tarjeta", "se hizo una transacción", "transacción en", "pago realizado", "cargo", "débito automático", "retiro", "extracción", "comissão", "tarifa".
+  • Spanish/Portuguese keywords that almost always mean CREDIT (money in): "depósito", "abono", "transferencia recibida", "reembolso", "devolución", "salario recibido", "depósito de nómina", "nota de crédito", "estorno".
+  • If the email says "Usaste tu tarjeta", "Se hizo una transacción en {merchant}", or names a real-world merchant (Uber, Amazon, Netflix, supermarket, etc.) → the user SPENT money → "debit". Do not flip to "credit" just because the word "crédito" appears in the card-type description.
 - bankName: the issuing institution detected from the sender domain or signature.
 - accountLast4: last 4 digits of the source card/account if shown, else null.
 - referenceNumber: the transaction's bank-issued reference, authorization, confirmation, or ARN code if present, else null. PREFER bank reference over email/message IDs.

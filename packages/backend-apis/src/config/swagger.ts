@@ -25,6 +25,7 @@ This API provides powerful tools to interact with your financial data, automate 
       },
     },
     tags: [
+      { name: 'Users', description: 'Authenticated user identity and linked IDPs' },
       { name: 'Gmail', description: 'Gmail OAuth and real-time synchronization' },
       { name: 'Emails', description: 'Financial email storage and searching' },
       { name: 'Pipeline', description: 'AI pipeline — manage prompts and manually trigger transaction extraction' },

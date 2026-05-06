@@ -10,10 +10,12 @@ import budgetRoutes from './budget.routes';
 import alertRoutes from './alert.routes';
 import pendingRoutes from './pending.routes';
 import tenantRoutes from './tenant.routes';
+import meRoutes from './me.routes';
 
 const router = Router();
 
 router.use('/', healthRoutes);
+router.use('/me', meRoutes);
 router.use('/workflows', workflowRoutes);
 router.use('/emails', emailRoutes);
 router.use('/gmail', gmailWebhookRoutes);
