@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import { CHAT_MODEL, getAiClient } from './ai-gateway';
+import { CHAT_BASE_URL, CHAT_MODEL, getAiClient } from './ai-gateway';
 import { CHAT_TOOLS, TOOL_EXECUTORS } from './chat.tools';
 import { buildSystemPrompt } from './chat.prompts';
 import { logger } from '../../utils/logger';
@@ -70,7 +70,6 @@ export class ChatService {
             model: CHAT_MODEL,
             max_tokens: MAX_TOKENS,
             temperature: 0.3,
-            tools: CHAT_TOOLS,
             messages,
             stream: true,
           },
@@ -78,7 +77,7 @@ export class ChatService {
         );
       } catch (err) {
         if (isAbort(err)) return;
-        throw err;
+        throw enrichLlmError(err);
       }
 
       let assistantText = '';
@@ -112,7 +111,7 @@ export class ChatService {
         }
       } catch (err) {
         if (isAbort(err)) return;
-        throw err;
+        throw enrichLlmError(err);
       }
 
       if (toolCalls.size === 0) {
@@ -185,6 +184,21 @@ function trimHistory(history: ChatTurn[]): ChatTurn[] {
 function isAbort(err: unknown): boolean {
   const name = (err as { name?: string })?.name;
   return name === 'AbortError' || name === 'APIUserAbortError';
+}
+
+/**
+ * Wraps LLM-gateway errors with the resolved baseURL and model so the
+ * cause is obvious from the response (and the logs) without trawling
+ * env files. The original error is preserved as `cause`.
+ */
+function enrichLlmError(err: unknown): Error {
+  const original = err instanceof Error ? err : new Error(String(err));
+  const wrapped = new Error(
+    `LLM gateway error (model="${CHAT_MODEL}", baseURL="${CHAT_BASE_URL || 'unset'}"): ${original.message}`,
+    { cause: original },
+  );
+  wrapped.name = original.name;
+  return wrapped;
 }
 
 /**

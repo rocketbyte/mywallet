@@ -28,10 +28,17 @@ export function getAiClient(): OpenAI {
     defaultHeaders: {
       'x-api-key': config.litellm.apiKey,
       'anthropic-version': '2023-06-01',
+      // The WAF in front of the gateway blocks the SDK's default
+      // `OpenAI/JS` UA. Override so requests aren't 403'd.
+      'User-Agent': 'mywallet-backend',
     },
   });
-  logger.info('Chat AI client initialized', { baseURL: config.litellm.baseURL, model: config.litellm.model });
+  logger.info('Chat AI client initialized', {
+    baseURL: config.litellm.baseURL,
+    model: config.litellm.model,
+  });
   return client;
 }
 
 export const CHAT_MODEL = config.litellm.model;
+export const CHAT_BASE_URL = config.litellm.baseURL;
