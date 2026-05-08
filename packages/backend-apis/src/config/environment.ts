@@ -52,6 +52,9 @@ export const config = {
     baseURL: process.env.LITELLM_BASE_URL || '',
     apiKey: process.env.LITELLM_API_KEY || process.env.LITELLM_MASTER_KEY || '',
     model: process.env.OPENAI_MODEL || 'cf/llama-3.1-8b-instruct',
+    // Chat uses its own model so the worker pipeline (OPENAI_MODEL) and
+    // the chat endpoint can be tuned independently.
+    chatModel: process.env.CHAT_MODEL || process.env.OPENAI_MODEL || 'cf/llama-3.1-8b-instruct',
   },
 };
 

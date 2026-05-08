@@ -35,10 +35,10 @@ export function getAiClient(): OpenAI {
   });
   logger.info('Chat AI client initialized', {
     baseURL: config.litellm.baseURL,
-    model: config.litellm.model,
+    model: config.litellm.chatModel,
   });
   return client;
 }
 
-export const CHAT_MODEL = config.litellm.model;
+export const CHAT_MODEL = config.litellm.chatModel;
 export const CHAT_BASE_URL = config.litellm.baseURL;

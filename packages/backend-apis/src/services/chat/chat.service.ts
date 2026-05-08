@@ -1,6 +1,6 @@
 import type OpenAI from 'openai';
 import { CHAT_BASE_URL, CHAT_MODEL, getAiClient } from './ai-gateway';
-import { CHAT_TOOLS, TOOL_EXECUTORS } from './chat.tools';
+import { TOOL_EXECUTORS } from './chat.tools';
 import { buildSystemPrompt } from './chat.prompts';
 import { logger } from '../../utils/logger';
 
@@ -11,6 +11,9 @@ const HISTORY_LIMIT = 12;
 // is replaced with a short marker — keeps every follow-up model call's
 // context bounded even if a tool returns more than expected.
 const MAX_TOOL_RESULT_CHARS = 12_000;
+// Number of non-whitespace chars to inspect before deciding whether the
+// model is emitting a tool-call JSON or starting prose.
+const MODE_DETECT_CHARS = 8;
 
 export type ChatStreamEvent =
   | { type: 'delta'; text: string }
@@ -31,22 +34,14 @@ export interface ChatStreamRequest {
   signal?: AbortSignal;
 }
 
-interface AccumulatedToolCall {
-  id: string;
-  name: string;
-  arguments: string;
-}
-
 /**
- * Orchestrates a streaming OpenAI-compatible chat completion against the
- * LiteLLM gateway, looping on `tool_calls` until the model returns a
- * final text response. Yields incremental SSE-friendly events:
- *
- *   delta       — text chunk to append to the streaming bubble
- *   tool_call   — model invoked a tool (UI can show "looking up …")
- *   tool_result — backend executed it (UI can briefly surface)
- *   done        — final stop reason; close the stream
- *   error       — fatal error; close the stream
+ * Streams a chat response from the LiteLLM gateway. The chat model
+ * (Llama 3.1 8B) cannot drive OpenAI's native `tool_calls` reliably, so
+ * tools are not sent on the API request — instead the system prompt
+ * instructs the model to emit a single-line JSON object
+ * (`{"name": "...", "arguments": {...}}`) when it needs data, and this
+ * loop parses that text, executes the tool, feeds the result back, and
+ * iterates until the model returns prose.
  *
  * Tool execution is scoped to the authed `userId` so the model never
  * sees data outside the caller's tenant — the database query *is* the
@@ -80,8 +75,13 @@ export class ChatService {
         throw enrichLlmError(err);
       }
 
+      // Per-turn streaming state. While `mode` is 'unknown' we hold deltas
+      // in `pending` until we have enough characters to tell whether the
+      // model is starting a tool-call JSON or prose. Once decided, prose
+      // is flushed and streamed live; tool calls accumulate silently.
       let assistantText = '';
-      const toolCalls = new Map<number, AccumulatedToolCall>();
+      let pending = '';
+      let mode: 'unknown' | 'tool_call' | 'prose' = 'unknown';
       let finishReason: string | null = null;
 
       try {
@@ -90,22 +90,26 @@ export class ChatService {
           if (!choice) continue;
           const delta = choice.delta;
 
-        if (typeof delta?.content === 'string' && delta.content) {
-          assistantText += delta.content;
-          yield { type: 'delta', text: delta.content };
-        }
+          if (typeof delta?.content === 'string' && delta.content) {
+            assistantText += delta.content;
 
-        if (delta?.tool_calls) {
-          for (const tc of delta.tool_calls) {
-            const idx = tc.index;
-            if (idx == null) continue;
-            const acc = toolCalls.get(idx) ?? { id: '', name: '', arguments: '' };
-            if (tc.id) acc.id = tc.id;
-            if (tc.function?.name) acc.name = tc.function.name;
-            if (tc.function?.arguments) acc.arguments += tc.function.arguments;
-            toolCalls.set(idx, acc);
+            if (mode === 'unknown') {
+              pending += delta.content;
+              const trimmed = pending.trimStart();
+              if (trimmed.length >= MODE_DETECT_CHARS) {
+                if (trimmed.startsWith('{')) {
+                  mode = 'tool_call';
+                } else {
+                  mode = 'prose';
+                  yield { type: 'delta', text: pending };
+                  pending = '';
+                }
+              }
+            } else if (mode === 'prose') {
+              yield { type: 'delta', text: delta.content };
+            }
+            // mode === 'tool_call': accumulate silently in assistantText
           }
-        }
 
           if (choice.finish_reason) finishReason = choice.finish_reason;
         }
@@ -114,60 +118,58 @@ export class ChatService {
         throw enrichLlmError(err);
       }
 
-      if (toolCalls.size === 0) {
+      // Stream ended while still undecided — short reply, classify now.
+      if (mode === 'unknown') {
+        const trimmed = pending.trimStart();
+        if (trimmed.startsWith('{')) {
+          mode = 'tool_call';
+        } else {
+          mode = 'prose';
+          if (pending) yield { type: 'delta', text: pending };
+        }
+      }
+
+      if (mode === 'prose') {
         yield { type: 'done', reason: finishReason ?? 'stop' };
         return;
       }
 
-      // Append the assistant turn that requested tools (must precede the
-      // matching tool messages per OpenAI's contract).
-      const calls = [...toolCalls.values()];
-      messages.push({
-        role: 'assistant',
-        content: assistantText || null,
-        tool_calls: calls.map((c) => ({
-          id: c.id,
-          type: 'function',
-          function: { name: c.name, arguments: c.arguments || '{}' },
-        })),
-      });
-
-      // Execute each tool and append its result message. Errors are
-      // serialised back to the model so it can recover instead of crashing.
-      for (const call of calls) {
-        if (req.signal?.aborted) return;
-
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = call.arguments ? JSON.parse(call.arguments) : {};
-        } catch (err) {
-          logger.warn('Chat tool arguments not valid JSON', { name: call.name, args: call.arguments });
-        }
-
-        yield { type: 'tool_call', id: call.id, name: call.name, input: parsed };
-
-        const exec = TOOL_EXECUTORS[call.name];
-        try {
-          if (!exec) throw new Error(`Unknown tool: ${call.name}`);
-          const output = await exec(req.userId, parsed);
-          const serialized = capToolResult(output);
-          yield { type: 'tool_result', id: call.id, output };
-          messages.push({
-            role: 'tool',
-            tool_call_id: call.id,
-            content: serialized,
-          });
-        } catch (err) {
-          const message = (err as Error).message;
-          logger.warn('Chat tool execution failed', { name: call.name, message });
-          yield { type: 'tool_result', id: call.id, output: { error: message }, isError: true };
-          messages.push({
-            role: 'tool',
-            tool_call_id: call.id,
-            content: JSON.stringify({ error: message }),
-          });
-        }
+      const parsed = parseToolCall(assistantText);
+      if (!parsed) {
+        // Looked like JSON but didn't parse — surface the raw text so the
+        // user isn't stuck with a silent reply, then end the turn.
+        logger.warn('Chat tool-call JSON failed to parse', { raw: assistantText.slice(0, 300) });
+        yield { type: 'delta', text: assistantText };
+        yield { type: 'done', reason: finishReason ?? 'stop' };
+        return;
       }
+
+      const callId = `call_${turn}_${Date.now()}`;
+      yield { type: 'tool_call', id: callId, name: parsed.name, input: parsed.arguments };
+
+      const exec = TOOL_EXECUTORS[parsed.name];
+      let resultPayload: unknown;
+      let isError = false;
+      try {
+        if (!exec) throw new Error(`Unknown tool: ${parsed.name}`);
+        resultPayload = await exec(req.userId, parsed.arguments);
+      } catch (err) {
+        isError = true;
+        const message = (err as Error).message;
+        resultPayload = { error: message };
+        logger.warn('Chat tool execution failed', { name: parsed.name, message });
+      }
+
+      yield { type: 'tool_result', id: callId, output: resultPayload, isError };
+
+      // Feed the call and result back to the model in the same shape the
+      // system prompt advertises. The assistant message preserves the
+      // exact JSON the model emitted; the user message wraps the result.
+      messages.push({ role: 'assistant', content: assistantText.trim() });
+      messages.push({
+        role: 'user',
+        content: capToolResult({ tool_result: parsed.name, data: resultPayload }),
+      });
     }
 
     yield { type: 'error', message: 'Exceeded maximum tool-use iterations' };
@@ -214,4 +216,59 @@ function capToolResult(output: unknown): string {
     reason: `Result exceeded ${MAX_TOOL_RESULT_CHARS} chars; ask a narrower question or pass a smaller limit.`,
     preview: json.slice(0, MAX_TOOL_RESULT_CHARS - 200),
   });
+}
+
+/**
+ * Extracts the first balanced JSON object from a string and parses it
+ * as a `{ name, arguments }` tool call. Tolerates leading/trailing
+ * prose or markdown fences in case the model deviates from the prompt.
+ */
+function parseToolCall(raw: string): { name: string; arguments: Record<string, unknown> } | null {
+  const jsonText = extractFirstJsonObject(raw);
+  if (!jsonText) return null;
+  let obj: unknown;
+  try {
+    obj = JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const o = obj as { name?: unknown; arguments?: unknown };
+  if (typeof o.name !== 'string' || !o.name) return null;
+  const args =
+    o.arguments && typeof o.arguments === 'object' && !Array.isArray(o.arguments)
+      ? (o.arguments as Record<string, unknown>)
+      : {};
+  return { name: o.name, arguments: args };
+}
+
+function extractFirstJsonObject(s: string): string | null {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let start = -1;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) return s.slice(start, i + 1);
+    }
+  }
+  return null;
 }
