@@ -37,16 +37,16 @@ export class AuthController {
       const me: MeDTO = {
         id: String(doc._id),
         email: doc.email,
-        display_name: doc.displayName,
-        email_verified: doc.emailVerified ?? false,
+        displayName: doc.displayName,
+        emailVerified: doc.emailVerified ?? false,
         provider: req.user!.provider,
         identities: (doc.identities ?? []).map((i) => ({
           provider: i.provider,
           subject: i.subject,
-          linked_at: i.linkedAt,
+          linkedAt: i.linkedAt,
         })),
-        last_login_at: doc.lastLoginAt,
-        created_at: doc.createdAt,
+        lastLoginAt: doc.lastLoginAt,
+        createdAt: doc.createdAt,
       };
       res.json({ user: me });
     } catch (error) {

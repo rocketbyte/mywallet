@@ -17,9 +17,9 @@ export class BudgetController {
   }
 
   async upsertBudget(req: Request, res: Response) {
-    const { period_start, limit_amount } = req.body;
-    if (!period_start || limit_amount === undefined) {
-      return res.status(400).json({ error: 'period_start and limit_amount are required' });
+    const { periodStart, limitAmount } = req.body;
+    if (!periodStart || limitAmount === undefined) {
+      return res.status(400).json({ error: 'periodStart and limitAmount are required' });
     }
     try {
       const budget = await this.service.upsert(getDataOwnerId(req), req.body);

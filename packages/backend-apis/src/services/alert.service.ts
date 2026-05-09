@@ -4,12 +4,12 @@ import type { AlertDTO, CreateAlertInput } from '../types/alert.types';
 function toDTO(doc: any): AlertDTO {
   return {
     id: doc._id.toString(),
-    user_id: doc.userId,
+    userId: doc.userId,
     kind: doc.kind,
     title: doc.title,
     body: doc.body,
     read: doc.read,
-    created_at: doc.createdAt,
+    createdAt: doc.createdAt,
   };
 }
 

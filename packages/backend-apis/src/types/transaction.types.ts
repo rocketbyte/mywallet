@@ -1,6 +1,6 @@
 export interface TransactionDTO {
   id: string;
-  user_id: string;
+  userId: string;
   date: string;
   time: string;
   merchant: string;
@@ -9,9 +9,9 @@ export interface TransactionDTO {
   source: string;
   account?: string;
   note?: string;
-  is_income: boolean;
-  ai_confidence?: number;
-  created_at: Date;
+  isIncome: boolean;
+  aiConfidence?: number;
+  createdAt: Date;
 }
 
 export interface TransactionFilters {
@@ -19,6 +19,20 @@ export interface TransactionFilters {
   offset: number;
   category?: string;
   search?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface BalanceFilters {
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface BalanceDTO {
+  credits: number;
+  debits: number;
+  balance: number;
+  count: number;
   startDate?: string;
   endDate?: string;
 }
@@ -32,5 +46,5 @@ export interface CreateTransactionInput {
   source?: string;
   account?: string;
   note?: string;
-  is_income?: boolean;
+  isIncome?: boolean;
 }

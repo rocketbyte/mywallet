@@ -6,15 +6,15 @@ export interface BudgetCategoryDTO {
 
 export interface BudgetDTO {
   id: string;
-  user_id: string;
-  period_start: string;
-  period_end: string;
-  limit_amount: number;
+  userId: string;
+  periodStart: string;
+  periodEnd: string;
+  limitAmount: number;
   categories: BudgetCategoryDTO[];
 }
 
 export interface UpsertBudgetInput {
-  period_start?: string;
-  limit_amount: number;
+  periodStart?: string;
+  limitAmount: number;
   categories?: { category: string; budget: number }[];
 }

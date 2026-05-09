@@ -32,10 +32,10 @@ router.get('/current', controller.getCurrentBudget.bind(controller));
  *         application/json:
  *           schema:
  *             type: object
- *             required: [period_start, limit_amount]
+ *             required: [periodStart, limitAmount]
  *             properties:
- *               period_start: { type: string, format: date, example: '2026-04-01' }
- *               limit_amount: { type: number, example: 3800 }
+ *               periodStart: { type: string, format: date, example: '2026-04-01' }
+ *               limitAmount: { type: number, example: 3800 }
  *               categories:
  *                 type: array
  *                 items:

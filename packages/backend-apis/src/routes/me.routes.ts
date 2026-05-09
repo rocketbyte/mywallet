@@ -31,8 +31,8 @@ const controller = new AuthController(emailProviders);
  *                   properties:
  *                     id: { type: string }
  *                     email: { type: string }
- *                     display_name: { type: string, nullable: true }
- *                     email_verified: { type: boolean }
+ *                     displayName: { type: string, nullable: true }
+ *                     emailVerified: { type: boolean }
  *                     provider:
  *                       type: string
  *                       description: IDP that issued the token for the current request.
@@ -44,9 +44,9 @@ const controller = new AuthController(emailProviders);
  *                         properties:
  *                           provider: { type: string, example: firebase }
  *                           subject: { type: string, description: "Provider-issued user id (OIDC sub)." }
- *                           linked_at: { type: string, format: date-time }
- *                     last_login_at: { type: string, format: date-time, nullable: true }
- *                     created_at: { type: string, format: date-time }
+ *                           linkedAt: { type: string, format: date-time }
+ *                     lastLoginAt: { type: string, format: date-time, nullable: true }
+ *                     createdAt: { type: string, format: date-time }
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       404:

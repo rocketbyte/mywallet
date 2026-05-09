@@ -15,10 +15,10 @@ async function getSpentByCategory(userId: string, month: number, year: number): 
 function toDTO(doc: any, spent: Record<string, number>): BudgetDTO {
   return {
     id: doc._id.toString(),
-    user_id: doc.userId,
-    period_start: periodStart(doc.month, doc.year),
-    period_end: periodEnd(doc.month, doc.year),
-    limit_amount: doc.totalBudget,
+    userId: doc.userId,
+    periodStart: periodStart(doc.month, doc.year),
+    periodEnd: periodEnd(doc.month, doc.year),
+    limitAmount: doc.totalBudget,
     categories: (doc.categories ?? []).map((c: any) => ({
       category: c.category,
       budget: c.budgetAmount,
@@ -39,7 +39,7 @@ export class BudgetService {
   }
 
   async upsert(userId: string, input: UpsertBudgetInput): Promise<BudgetDTO> {
-    const date = input.period_start ? new Date(input.period_start) : new Date();
+    const date = input.periodStart ? new Date(input.periodStart) : new Date();
     const month = date.getMonth() + 1;
     const year = date.getFullYear();
     const categories = (input.categories ?? []).map((c) => ({
@@ -50,7 +50,7 @@ export class BudgetService {
     }));
     const doc = await Budget.findOneAndUpdate(
       { userId, month, year },
-      { $set: { userId, month, year, totalBudget: input.limit_amount, categories, lastCalculatedAt: new Date() } },
+      { $set: { userId, month, year, totalBudget: input.limitAmount, categories, lastCalculatedAt: new Date() } },
       { upsert: true, new: true }
     ).lean();
     const spent = await getSpentByCategory(userId, month, year);
@@ -59,7 +59,7 @@ export class BudgetService {
 
   async update(userId: string, id: string, input: Partial<UpsertBudgetInput>): Promise<BudgetDTO | null> {
     const updates: Record<string, any> = { lastCalculatedAt: new Date() };
-    if (input.limit_amount !== undefined) updates.totalBudget = input.limit_amount;
+    if (input.limitAmount !== undefined) updates.totalBudget = input.limitAmount;
     if (input.categories) {
       updates.categories = input.categories.map((c) => ({
         category: c.category,

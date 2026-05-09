@@ -1,11 +1,11 @@
 export interface AlertDTO {
   id: string;
-  user_id: string;
+  userId: string;
   kind: string;
   title: string;
   body: string;
   read: boolean;
-  created_at: Date;
+  createdAt: Date;
 }
 
 export interface CreateAlertInput {

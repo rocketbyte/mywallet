@@ -8,10 +8,10 @@ export interface ConnectInput {
 export interface MeDTO {
   id: string;
   email: string;
-  display_name?: string;
-  email_verified: boolean;
+  displayName?: string;
+  emailVerified: boolean;
   provider: string;
-  identities: { provider: string; subject: string; linked_at?: Date }[];
-  last_login_at?: Date;
-  created_at: Date;
+  identities: { provider: string; subject: string; linkedAt?: Date }[];
+  lastLoginAt?: Date;
+  createdAt: Date;
 }

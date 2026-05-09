@@ -69,4 +69,17 @@ export class TransactionController {
       res.status(500).json({ error: 'Failed to delete transaction' });
     }
   }
+
+  async getBalance(req: Request, res: Response) {
+    try {
+      const balance = await this.service.getBalance(getDataOwnerId(req), {
+        startDate: req.query.startDate as string | undefined,
+        endDate: req.query.endDate as string | undefined,
+      });
+      res.json(balance);
+    } catch (error) {
+      logger.error('Failed to compute balance', { error });
+      res.status(500).json({ error: 'Failed to compute balance' });
+    }
+  }
 }

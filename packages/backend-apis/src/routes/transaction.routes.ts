@@ -56,7 +56,7 @@ router.get('/', controller.getTransactions.bind(controller));
  *               source: { type: string, enum: [email, sms, manual, chat] }
  *               account: { type: string }
  *               note: { type: string }
- *               is_income: { type: boolean }
+ *               isIncome: { type: boolean }
  *     responses:
  *       201:
  *         description: Created transaction.
@@ -66,6 +66,44 @@ router.get('/', controller.getTransactions.bind(controller));
  *         $ref: '#/components/responses/ServerError'
  */
 router.post('/', controller.createTransaction.bind(controller));
+
+/**
+ * @openapi
+ * /transactions/balance:
+ *   get:
+ *     summary: Get totals (credits, debits, balance) for a date range
+ *     description: |
+ *       Returns the sum of credit transactions, sum of debit transactions,
+ *       and the net balance (credits − debits) over the optional date
+ *       range. With no dates supplied, aggregates across all transactions.
+ *     tags: [Transactions]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *         description: Inclusive lower bound (ISO YYYY-MM-DD).
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *         description: Inclusive upper bound (ISO YYYY-MM-DD).
+ *     responses:
+ *       200:
+ *         description: Balance summary.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 credits: { type: number, example: 4250.00 }
+ *                 debits:  { type: number, example: 1875.42 }
+ *                 balance: { type: number, example: 2374.58 }
+ *                 count:   { type: integer, example: 37 }
+ *                 startDate: { type: string, format: date, nullable: true }
+ *                 endDate:   { type: string, format: date, nullable: true }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/balance', controller.getBalance.bind(controller));
 
 /**
  * @openapi
