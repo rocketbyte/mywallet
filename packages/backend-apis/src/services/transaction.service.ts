@@ -40,7 +40,11 @@ export class TransactionService {
     if (startDate || endDate) {
       query.transactionDate = {};
       if (startDate) query.transactionDate.$gte = new Date(startDate);
-      if (endDate) query.transactionDate.$lte = new Date(endDate);
+      if (endDate) {
+        const date = new Date(endDate);
+        date.setHours(23, 59, 59, 999);
+        query.transactionDate.$lte = date;
+      }
     }
 
     if (search) {
