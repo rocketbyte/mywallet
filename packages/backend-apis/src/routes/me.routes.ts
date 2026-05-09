@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { MeController } from '../controllers/me.controller';
+import { AuthController } from '../controllers/auth.controller';
+import { emailProviders } from '../providers';
 
 const router = Router();
-const controller = new MeController();
+const controller = new AuthController(emailProviders);
 
 /**
  * @openapi

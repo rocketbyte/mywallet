@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { TransactionService } from '../services/transaction.service';
-import { getUserId } from '../auth';
+import { getDataOwnerId } from '../auth';
 import { parsePagination } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 
@@ -9,7 +9,7 @@ export class TransactionController {
 
   async getTransactions(req: Request, res: Response) {
     try {
-      const result = await this.service.list(getUserId(req), {
+      const result = await this.service.list(getDataOwnerId(req), {
         ...parsePagination(req.query),
         category: req.query.category as string,
         search: req.query.search as string,
@@ -29,7 +29,7 @@ export class TransactionController {
       return res.status(400).json({ error: 'merchant, amount, category, and date are required' });
     }
     try {
-      const transaction = await this.service.create(getUserId(req), req.body);
+      const transaction = await this.service.create(getDataOwnerId(req), req.body);
       res.status(201).json({ transaction });
     } catch (error) {
       logger.error('Failed to create transaction', { error });
@@ -39,7 +39,7 @@ export class TransactionController {
 
   async getTransactionById(req: Request, res: Response) {
     try {
-      const transaction = await this.service.getById(getUserId(req), req.params.id);
+      const transaction = await this.service.getById(getDataOwnerId(req), req.params.id);
       if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
       res.json({ transaction });
     } catch (error) {
@@ -50,7 +50,7 @@ export class TransactionController {
 
   async updateTransaction(req: Request, res: Response) {
     try {
-      const transaction = await this.service.update(getUserId(req), req.params.id, req.body);
+      const transaction = await this.service.update(getDataOwnerId(req), req.params.id, req.body);
       if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
       res.json({ transaction });
     } catch (error) {
@@ -61,7 +61,7 @@ export class TransactionController {
 
   async deleteTransaction(req: Request, res: Response) {
     try {
-      const deleted = await this.service.delete(getUserId(req), req.params.id);
+      const deleted = await this.service.delete(getDataOwnerId(req), req.params.id);
       if (!deleted) return res.status(404).json({ error: 'Transaction not found' });
       res.json({ message: 'Transaction deleted' });
     } catch (error) {

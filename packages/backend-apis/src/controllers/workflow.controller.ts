@@ -3,13 +3,13 @@ import { getTemporalClient } from '../config/temporal-client';
 import { emailProcessingWorkflow } from '../../../temporal-workflows/src/workflows';
 import { TASK_QUEUES, WORKFLOW_IDS } from '../../../temporal-workflows/src/shared/constants';
 import { EmailProcessingInput } from '../../../temporal-workflows/src/shared/types';
-import { getUserId } from '../auth';
+import { getDataOwnerId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class WorkflowController {
   async startEmailProcessing(req: Request, res: Response) {
     try {
-      const userId = getUserId(req);
+      const userId = getDataOwnerId(req);
 
       const { searchQuery, maxResults, afterDate } = req.body;
 

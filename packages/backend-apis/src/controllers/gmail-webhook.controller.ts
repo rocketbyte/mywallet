@@ -9,7 +9,7 @@ import {
 import { GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX, GMAIL_SIGNALS, GMAIL_SYNC_TASK_QUEUE } from '../../../temporal-workflows/src/shared/constants';
 import { GmailAccount } from '../../../temporal-workflows/src/models/gmail-account.model';
 import { EmailProviderInterface } from '../providers/types';
-import { getUserId } from '../auth';
+import { getDataOwnerId } from '../auth';
 import { logger } from '../utils/logger';
 
 /**
@@ -180,7 +180,7 @@ export class GmailWebhookController {
    */
   async getMyStatus(req: Request, res: Response): Promise<void> {
     try {
-      const status = await this.provider.getAccountStatus(getUserId(req));
+      const status = await this.provider.getAccountStatus(getDataOwnerId(req));
       res.status(200).json(status);
     } catch (error) {
       const code = (error as any).code;

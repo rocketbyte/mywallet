@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AlertService } from '../services/alert.service';
-import { getUserId } from '../auth';
+import { getDataOwnerId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class AlertController {
@@ -8,7 +8,7 @@ export class AlertController {
 
   async getAlerts(req: Request, res: Response) {
     try {
-      const alerts = await this.service.list(getUserId(req));
+      const alerts = await this.service.list(getDataOwnerId(req));
       res.json({ alerts });
     } catch (error) {
       logger.error('Failed to get alerts', { error });
@@ -22,7 +22,7 @@ export class AlertController {
       return res.status(400).json({ error: 'kind, title, and body are required' });
     }
     try {
-      const alert = await this.service.create(getUserId(req), { kind, title, body });
+      const alert = await this.service.create(getDataOwnerId(req), { kind, title, body });
       res.status(201).json({ alert });
     } catch (error) {
       logger.error('Failed to create alert', { error });
@@ -32,7 +32,7 @@ export class AlertController {
 
   async markAlertRead(req: Request, res: Response) {
     try {
-      const alert = await this.service.markRead(getUserId(req), req.params.id);
+      const alert = await this.service.markRead(getDataOwnerId(req), req.params.id);
       if (!alert) return res.status(404).json({ error: 'Alert not found' });
       res.json({ alert });
     } catch (error) {
@@ -43,7 +43,7 @@ export class AlertController {
 
   async deleteAlert(req: Request, res: Response) {
     try {
-      const deleted = await this.service.delete(getUserId(req), req.params.id);
+      const deleted = await this.service.delete(getDataOwnerId(req), req.params.id);
       if (!deleted) return res.status(404).json({ error: 'Alert not found' });
       res.json({ message: 'Alert deleted' });
     } catch (error) {

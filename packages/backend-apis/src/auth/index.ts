@@ -9,6 +9,6 @@ export type {
 export { UnauthorizedError } from './errors';
 export { requireAuth } from './auth.middleware';
 export { createAuthVerifier, getUserResolver } from './auth.factory';
-export { getUserId } from './auth.utils';
+export { getUserId, getDataOwnerId, getTenantId } from './auth.utils';
 export { MongoUserResolver, resolveUserId } from './user.resolver';
 export { MongoTenantProvisioner } from './tenant.provisioner';

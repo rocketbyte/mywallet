@@ -8,13 +8,11 @@ const controller = new TenantController();
  * @openapi
  * /tenants/me:
  *   get:
- *     summary: Get current tenant profile
+ *     summary: Get current tenant (with members)
  *     tags: [Tenants]
- *     parameters:
- *       - $ref: '#/components/parameters/UserId'
  *     responses:
  *       200:
- *         description: Tenant profile.
+ *         description: Tenant profile incl. members.
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  *       500:
@@ -24,9 +22,46 @@ router.get('/me', controller.getTenant.bind(controller));
 
 /**
  * @openapi
- * /tenants:
+ * /tenants/me:
+ *   patch:
+ *     summary: Update current tenant profile
+ *     tags: [Tenants]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               type: { type: string, enum: [individual, business] }
+ *               currency: { type: string, example: USD }
+ *               budgetLimit: { type: number }
+ *               notificationsEnabled: { type: boolean }
+ *               emailSyncEnabled: { type: boolean }
+ *     responses:
+ *       200: { description: Updated tenant. }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
+router.patch('/me', controller.updateTenant.bind(controller));
+
+/**
+ * @openapi
+ * /tenants/me/members:
+ *   get:
+ *     summary: List members of the current tenant
+ *     tags: [Tenants]
+ *     responses:
+ *       200: { description: Members list. }
+ *       500: { $ref: '#/components/responses/ServerError' }
+ */
+router.get('/me/members', controller.listMembers.bind(controller));
+
+/**
+ * @openapi
+ * /tenants/me/members:
  *   post:
- *     summary: Create or replace a tenant profile
+ *     summary: Add an existing user to the tenant (primary only)
  *     tags: [Tenants]
  *     requestBody:
  *       required: true
@@ -36,38 +71,34 @@ router.get('/me', controller.getTenant.bind(controller));
  *             type: object
  *             required: [email]
  *             properties:
- *               email: { type: string }
- *               full_name: { type: string }
- *               currency: { type: string, example: USD }
- *               budget_limit: { type: number }
- *               notifications_enabled: { type: boolean }
- *               email_sync_enabled: { type: boolean }
+ *               email: { type: string, format: email }
  *     responses:
- *       201:
- *         description: Tenant upserted.
- *       400:
- *         $ref: '#/components/responses/ValidationError'
- *       500:
- *         $ref: '#/components/responses/ServerError'
+ *       201: { description: Member added. }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       403: { description: Caller is not the primary user. }
+ *       404: { description: No user with that email. }
+ *       500: { $ref: '#/components/responses/ServerError' }
  */
-router.post('/', controller.upsertTenant.bind(controller));
+router.post('/me/members', controller.addMember.bind(controller));
 
 /**
  * @openapi
- * /tenants/me:
- *   patch:
- *     summary: Update current tenant profile
+ * /tenants/me/members/{userId}:
+ *   delete:
+ *     summary: Remove a member from the tenant (primary only)
  *     tags: [Tenants]
  *     parameters:
- *       - $ref: '#/components/parameters/UserId'
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
  *     responses:
- *       200:
- *         description: Updated tenant profile.
- *       404:
- *         $ref: '#/components/responses/NotFoundError'
- *       500:
- *         $ref: '#/components/responses/ServerError'
+ *       200: { description: Member removed. }
+ *       400: { description: Cannot remove primary user. }
+ *       403: { description: Caller is not the primary user. }
+ *       404: { description: Member not found. }
+ *       500: { $ref: '#/components/responses/ServerError' }
  */
-router.patch('/me', controller.updateTenant.bind(controller));
+router.delete('/me/members/:userId', controller.removeMember.bind(controller));
 
 export default router;

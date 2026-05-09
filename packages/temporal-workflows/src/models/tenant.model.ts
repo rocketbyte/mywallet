@@ -1,9 +1,18 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
+export type TenantType = 'individual' | 'business';
+
+/**
+ * A Tenant is the data-ownership boundary in the system. One Tenant has
+ * exactly one `primaryUserId` (the user whose data the tenant holds);
+ * additional members — Users with `tenantId` pointing at this tenant —
+ * see the primary user's data through the data-owner resolver.
+ */
 export interface TenantInterface extends Document {
-  userId: string;
-  email?: string;
-  fullName?: string;
+  _id: Types.ObjectId;
+  primaryUserId: Types.ObjectId;
+  type: TenantType;
+  name?: string;
   currency?: string;
   budgetLimit?: number;
   notificationsEnabled?: boolean;
@@ -13,9 +22,9 @@ export interface TenantInterface extends Document {
 }
 
 const TenantSchema = new Schema<TenantInterface>({
-  userId: { type: String, required: true, unique: true, index: true },
-  email: { type: String },
-  fullName: { type: String },
+  primaryUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
+  type: { type: String, enum: ['individual', 'business'], default: 'individual', required: true },
+  name: { type: String },
   currency: { type: String, default: 'USD' },
   budgetLimit: { type: Number, default: 0 },
   notificationsEnabled: { type: Boolean, default: true },

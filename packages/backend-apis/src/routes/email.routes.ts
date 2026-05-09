@@ -64,36 +64,6 @@ router.get('/', controller.getAllEmails.bind(controller));
 
 /**
  * @openapi
- * /emails/stats:
- *   get:
- *     summary: Get email statistics
- *     description: Returns processing statistics for all emails belonging to the user.
- *     tags: [Emails]
- *     parameters:
- *       - $ref: '#/components/parameters/UserId'
- *     responses:
- *       200:
- *         description: Email statistics.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 userId: { type: string, example: 'user_123' }
- *                 stats:
- *                   type: object
- *                   properties:
- *                     total: { type: integer, example: 320 }
- *                     processed: { type: integer, example: 310 }
- *                     unprocessed: { type: integer, example: 10 }
- *                     processingRate: { type: string, example: '96.88%' }
- *       500:
- *         $ref: '#/components/responses/ServerError'
- */
-router.get('/stats', controller.getEmailStats.bind(controller));
-
-/**
- * @openapi
  * /emails/search:
  *   get:
  *     summary: Search emails

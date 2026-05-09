@@ -41,6 +41,8 @@ export class MongoUserResolver implements UserResolverInterface {
 
     const doc = await this.upsert(profile);
     const user = this.toAuthUser(doc, profile.provider);
+    // Provisioner mutates `user` to attach tenantId + dataOwnerId so
+    // request handlers can scope queries without an extra DB round-trip.
     if (this.tenantProvisioner) await this.tenantProvisioner.ensureForUser(user);
     this.cache.set(key, { user, expiresAt: Date.now() + this.ttlMs });
     return user;

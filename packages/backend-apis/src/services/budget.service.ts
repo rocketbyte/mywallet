@@ -1,26 +1,6 @@
 import { Budget, Transaction } from '../../../temporal-workflows/src/models';
 import { periodStart, periodEnd } from '../utils/date.utils';
-
-export interface BudgetCategoryDTO {
-  category: string;
-  budget: number;
-  spent: number;
-}
-
-export interface BudgetDTO {
-  id: string;
-  user_id: string;
-  period_start: string;
-  period_end: string;
-  limit_amount: number;
-  categories: BudgetCategoryDTO[];
-}
-
-export interface UpsertBudgetInput {
-  period_start?: string;
-  limit_amount: number;
-  categories?: { category: string; budget: number }[];
-}
+import type { BudgetDTO, UpsertBudgetInput } from '../types/budget.types';
 
 async function getSpentByCategory(userId: string, month: number, year: number): Promise<Record<string, number>> {
   const start = new Date(year, month - 1, 1);

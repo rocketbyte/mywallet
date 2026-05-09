@@ -8,7 +8,6 @@ import pipelineRoutes from './pipeline.routes';
 import transactionRoutes from './transaction.routes';
 import budgetRoutes from './budget.routes';
 import alertRoutes from './alert.routes';
-import pendingRoutes from './pending.routes';
 import tenantRoutes from './tenant.routes';
 import meRoutes from './me.routes';
 import chatRoutes from './chat.routes';
@@ -26,7 +25,6 @@ router.use('/pipeline', pipelineRoutes);
 router.use('/transactions', transactionRoutes);
 router.use('/budgets', budgetRoutes);
 router.use('/alerts', alertRoutes);
-router.use('/pending', pendingRoutes);
 router.use('/tenants', tenantRoutes);
 
 export default router;

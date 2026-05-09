@@ -3,50 +3,17 @@ import { CHAT_BASE_URL, CHAT_MODEL, getAiClient } from './ai-gateway';
 import { TOOL_EXECUTORS } from './chat.tools';
 import { buildSystemPrompt } from './chat.prompts';
 import { logger } from '../../utils/logger';
+import {
+  HISTORY_LIMIT,
+  MAX_TOKENS,
+  MAX_TOOL_RESULT_CHARS,
+  MAX_TOOL_TURNS,
+  MODE_DETECT_CHARS,
+  type ChatStreamRequest,
+  type ChatStreamEvent,
+  type ChatTurn,
+} from '../../types/chat.types';
 
-const MAX_TOOL_TURNS = 5;
-const MAX_TOKENS = 800;
-const HISTORY_LIMIT = 12;
-// Hard cap on the JSON payload of any single tool result. Anything bigger
-// is replaced with a short marker — keeps every follow-up model call's
-// context bounded even if a tool returns more than expected.
-const MAX_TOOL_RESULT_CHARS = 12_000;
-// Number of non-whitespace chars to inspect before deciding whether the
-// model is emitting a tool-call JSON or starting prose.
-const MODE_DETECT_CHARS = 8;
-
-export type ChatStreamEvent =
-  | { type: 'delta'; text: string }
-  | { type: 'tool_call'; id: string; name: string; input: unknown }
-  | { type: 'tool_result'; id: string; output: unknown; isError?: boolean }
-  | { type: 'done'; reason: string }
-  | { type: 'error'; message: string };
-
-export interface ChatTurn {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface ChatStreamRequest {
-  userId: string;
-  message: string;
-  history?: ChatTurn[];
-  signal?: AbortSignal;
-}
-
-/**
- * Streams a chat response from the LiteLLM gateway. The chat model
- * (Llama 3.1 8B) cannot drive OpenAI's native `tool_calls` reliably, so
- * tools are not sent on the API request — instead the system prompt
- * instructs the model to emit a single-line JSON object
- * (`{"name": "...", "arguments": {...}}`) when it needs data, and this
- * loop parses that text, executes the tool, feeds the result back, and
- * iterates until the model returns prose.
- *
- * Tool execution is scoped to the authed `userId` so the model never
- * sees data outside the caller's tenant — the database query *is* the
- * authorization boundary, not a prompt instruction.
- */
 export class ChatService {
   async *stream(req: ChatStreamRequest): AsyncGenerator<ChatStreamEvent> {
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [

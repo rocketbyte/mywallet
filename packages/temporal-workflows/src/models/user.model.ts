@@ -28,6 +28,7 @@ export interface UserInterface extends Document {
   displayName?: string;
   emailVerified?: boolean;
   lastLoginAt?: Date;
+  tenantId?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +46,7 @@ const UserSchema = new Schema<UserInterface>({
   displayName: { type: String },
   emailVerified: { type: Boolean, default: false },
   lastLoginAt: { type: Date },
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', index: true },
 }, {
   timestamps: true,
   collection: 'users',

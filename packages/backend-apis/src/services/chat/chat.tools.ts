@@ -1,68 +1,6 @@
-import type OpenAI from 'openai';
 import { Transaction, Tenant, Budget } from '../../../../temporal-workflows/src/models';
 import { escapeRegex } from '../../utils/request.utils';
-
-const CATEGORY_ENUM = [
-  'food', 'groceries', 'transport', 'services', 'home',
-  'health', 'entertainment', 'shopping', 'income', 'other',
-] as const;
-
-/**
- * Tool catalog exposed to the model. Keeping this list intentionally
- * small — each call to the model carries the full schema, so every tool
- * we add is a permanent context tax. Add a tool only when an existing
- * one cannot answer the question.
- */
-export const CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-  {
-    type: 'function',
-    function: {
-      name: 'query_transactions',
-      description:
-        'Search the user\'s transactions. Use this whenever the user asks about specific spending, merchants, recent activity, or anything that requires looking at concrete records. Resolve relative dates (e.g. "last week", "this month") to ISO YYYY-MM-DD before calling.',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          startDate: { type: 'string', description: 'Inclusive ISO date (YYYY-MM-DD).' },
-          endDate: { type: 'string', description: 'Inclusive ISO date (YYYY-MM-DD).' },
-          category: { type: 'string', enum: [...CATEGORY_ENUM] },
-          merchantContains: { type: 'string', description: 'Case-insensitive substring match.' },
-          type: { type: 'string', enum: ['income', 'expense'] },
-          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10, description: 'Hard-capped at 20 to keep context small. Use get_spending_summary for totals over many transactions.' },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_spending_summary',
-      description:
-        'Aggregate spending over a date range, optionally grouped by category, merchant, or day. Use this for totals, comparisons, or "where did my money go" questions — much cheaper than listing every transaction.',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['startDate', 'endDate'],
-        properties: {
-          startDate: { type: 'string' },
-          endDate: { type: 'string' },
-          groupBy: { type: 'string', enum: ['category', 'merchant', 'day'] },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_budget',
-      description: 'Returns the user\'s current monthly budget limit and the amount spent so far this month.',
-      parameters: { type: 'object', additionalProperties: false, properties: {} },
-    },
-  },
-];
-
-type ToolExecutor = (userId: string, input: Record<string, unknown>) => Promise<unknown>;
+import type { ToolExecutor } from '../../types/chat.types';
 
 export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   async query_transactions(userId, input) {

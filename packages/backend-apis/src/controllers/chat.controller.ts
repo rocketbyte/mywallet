@@ -1,25 +1,13 @@
 import { Request, Response } from 'express';
-import { z } from 'zod';
-import { getUserId } from '../auth';
-import { ChatService, type ChatStreamEvent } from '../services/chat/chat.service';
+import { getDataOwnerId } from '../auth';
+import { ChatService } from '../services/chat/chat.service';
 import { logger } from '../utils/logger';
-
-const SSE_RETRY_MS = 2000;
-const SSE_HEARTBEAT_MS = 15_000;
-
-const MAX_MESSAGE_CHARS = 4_000;
-const MAX_HISTORY_TURNS = 40;
-const MAX_TURN_CHARS = 8_000;
-
-const ChatTurnSchema = z.object({
-  role: z.enum(['user', 'assistant']),
-  content: z.string().trim().min(1).max(MAX_TURN_CHARS),
-});
-
-const ChatRequestSchema = z.object({
-  message: z.string().trim().min(1).max(MAX_MESSAGE_CHARS),
-  history: z.array(ChatTurnSchema).max(MAX_HISTORY_TURNS).optional(),
-});
+import {
+  ChatRequestSchema,
+  SSE_HEARTBEAT_MS,
+  SSE_RETRY_MS,
+  type ChatStreamEvent,
+} from '../types/chat.types';
 
 /**
  * Streams chat replies as Server-Sent Events. Each event is a JSON
@@ -30,7 +18,7 @@ export class ChatController {
   private readonly service = new ChatService();
 
   async stream(req: Request, res: Response): Promise<void> {
-    const userId = getUserId(req);
+    const userId = getDataOwnerId(req);
 
     const parsed = ChatRequestSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -62,7 +50,7 @@ export class ChatController {
     }, SSE_HEARTBEAT_MS);
 
     // Forward client disconnects to the upstream LLM stream so we stop
-    // burning tokens (and dollars) when the user navigates away.
+    // burning tokens when the user navigates away.
     const controller = new AbortController();
     let clientGone = false;
     req.on('close', () => {

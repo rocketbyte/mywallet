@@ -3,7 +3,6 @@ export { Transaction, TransactionInterface } from './transaction.model';
 export { EmailPattern, EmailPatternInterface } from './email-pattern.model';
 export { Budget, BudgetInterface } from './budget.model';
 export { Alert, AlertInterface } from './alert.model';
-export { PendingTransaction, PendingTransactionInterface } from './pending-transaction.model';
 export { Tenant, TenantInterface } from './tenant.model';
 export { Email, EmailInterface } from './email.model';
 export { PipelineStep, PipelineStepInterface } from './pipeline-step.model';

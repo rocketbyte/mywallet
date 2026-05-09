@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
-import { getUserId } from '../auth';
+import { getDataOwnerId, getUserId } from '../auth';
 import {
   AuthState,
   EmailProviderRegistry,
   UnsupportedProviderError,
   type EmailProviderInterface,
 } from '../providers';
+import { User } from '../../../temporal-workflows/src/models';
 import { logger } from '../utils/logger';
 import {
   renderAutoLinkedPage,
@@ -13,25 +14,46 @@ import {
   renderErrorPage,
   renderManualTokenPage,
 } from './auth.views';
+import { EMAIL_REGEX, type ConnectInput, type MeDTO } from '../types/auth.types';
+import { BadRequestError } from '../types/errors';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-class BadRequestError extends Error {
-  readonly code = 'bad_request';
-}
-
-interface ConnectInput {
-  email: string;
-  provider: string;
-}
-
-/**
- * Drives the OAuth-based account linking flow for any registered email
- * provider. Provider-specific behavior lives behind EmailProviderInterface — this
- * controller stays generic.
- */
 export class AuthController {
   constructor(private readonly registry: EmailProviderRegistry) {}
+
+  /**
+   * GET /api/me — protected.
+   * Returns the canonical user record for the bearer token's identity,
+   * including all linked IDP identities.
+   */
+  async getMe(req: Request, res: Response): Promise<void> {
+    try {
+      const id = getUserId(req);
+      const doc = await User.findById(id).lean();
+      if (!doc) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const me: MeDTO = {
+        id: String(doc._id),
+        email: doc.email,
+        display_name: doc.displayName,
+        email_verified: doc.emailVerified ?? false,
+        provider: req.user!.provider,
+        identities: (doc.identities ?? []).map((i) => ({
+          provider: i.provider,
+          subject: i.subject,
+          linked_at: i.linkedAt,
+        })),
+        last_login_at: doc.lastLoginAt,
+        created_at: doc.createdAt,
+      };
+      res.json({ user: me });
+    } catch (error) {
+      logger.error('Failed to get current user', { error });
+      res.status(500).json({ error: 'Failed to fetch current user' });
+    }
+  }
 
   /**
    * POST /api/auth/connect — protected.
@@ -40,7 +62,9 @@ export class AuthController {
    */
   connect(req: Request, res: Response): void {
     try {
-      const userId = getUserId(req);
+      // Tenant members link Gmail to the primary user so the resulting
+      // emails/transactions are visible to everyone in the tenant.
+      const userId = getDataOwnerId(req);
       const { email, provider: providerType } = this.parseConnectInput(req.body);
       const provider = this.registry.get(providerType);
 

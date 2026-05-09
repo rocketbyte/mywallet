@@ -1,4 +1,4 @@
-import { CHAT_TOOLS } from './chat.tools';
+import { CHAT_TOOLS } from '../../types/chat.types';
 
 function describeTools(): string {
   return CHAT_TOOLS

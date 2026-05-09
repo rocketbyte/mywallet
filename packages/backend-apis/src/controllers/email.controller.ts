@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import { Connection } from 'mongoose';
 import { createEmailActivities } from '../../../temporal-workflows/src/activities/database/email.activities';
-import { Email } from '../../../temporal-workflows/src/models';
-import { getUserId } from '../auth';
+import { getDataOwnerId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class EmailController {
@@ -18,7 +17,7 @@ export class EmailController {
    */
   async getAllEmails(req: Request, res: Response) {
     try {
-      const userId = getUserId(req);
+      const userId = getDataOwnerId(req);
 
       const {
         limit = '50',
@@ -67,7 +66,7 @@ export class EmailController {
    */
   async getEmailById(req: Request, res: Response) {
     try {
-      const userId = getUserId(req);
+      const userId = getDataOwnerId(req);
 
       const { id } = req.params;
 
@@ -97,7 +96,7 @@ export class EmailController {
    */
   async searchEmails(req: Request, res: Response) {
     try {
-      const userId = getUserId(req);
+      const userId = getDataOwnerId(req);
 
       const {
         q: searchTerm,
@@ -140,36 +139,4 @@ export class EmailController {
     }
   }
 
-  /**
-   * GET /api/emails/stats
-   * Get email statistics
-   */
-  async getEmailStats(req: Request, res: Response) {
-    try {
-      const userId = getUserId(req);
-
-      const [total, processed, unprocessed] = await Promise.all([
-        Email.countDocuments({ userId }),
-        Email.countDocuments({ userId, isProcessed: true }),
-        Email.countDocuments({ userId, isProcessed: false })
-      ]);
-
-      res.json({
-        userId,
-        stats: {
-          total,
-          processed,
-          unprocessed,
-          processingRate: total > 0 ? (processed / total * 100).toFixed(2) + '%' : '0%'
-        }
-      });
-
-    } catch (error) {
-      logger.error('Failed to get email stats', { error });
-      res.status(500).json({
-        error: 'Failed to fetch statistics',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
 }

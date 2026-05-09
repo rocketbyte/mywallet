@@ -13,6 +13,10 @@ export interface AuthUser {
   email?: string;
   displayName?: string;
   emailVerified?: boolean;
+  /** Tenant the authed user belongs to. */
+  tenantId?: string;
+  /** primaryUserId of the tenant — the id all data is scoped on. */
+  dataOwnerId?: string;
 }
 
 export interface FirebaseCredentials {
