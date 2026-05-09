@@ -113,7 +113,11 @@ export class TransactionService {
     if (filters.startDate || filters.endDate) {
       const range: Record<string, Date> = {};
       if (filters.startDate) range.$gte = new Date(filters.startDate);
-      if (filters.endDate) range.$lte = new Date(filters.endDate);
+      if (filters.endDate) {
+        const date = new Date(filters.endDate);
+        date.setHours(23, 59, 59, 999);
+        range.$lte = date;
+      }
       match.transactionDate = range;
     }
 
