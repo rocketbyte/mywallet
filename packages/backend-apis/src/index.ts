@@ -13,6 +13,7 @@ import { swaggerSpec } from './config/swagger';
 import { redocMiddleware } from './middleware/redoc';
 import { docsAuth } from './middleware/docs-auth';
 import { createAuthVerifier, requireAuth } from './auth';
+import { Budget } from '../../temporal-workflows/src/models';
 
 const app = express();
 
@@ -27,6 +28,7 @@ async function connectMongoDB() {
     }
     await mongoose.connect(process.env.MONGODB_URI);
     logger.info('Connected to MongoDB');
+    await Budget.syncIndexes();
   } catch (error) {
     logger.error('Failed to connect to MongoDB', { error });
     process.exit(1);
