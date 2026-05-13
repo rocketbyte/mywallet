@@ -20,11 +20,6 @@ import { BadRequestError } from '../types/errors';
 export class AuthController {
   constructor(private readonly registry: EmailProviderRegistry) {}
 
-  /**
-   * GET /api/me — protected.
-   * Returns the canonical user record for the bearer token's identity,
-   * including all linked IDP identities.
-   */
   async getMe(req: Request, res: Response): Promise<void> {
     try {
       const id = getUserId(req);
@@ -55,11 +50,6 @@ export class AuthController {
     }
   }
 
-  /**
-   * POST /api/auth/connect — protected.
-   * Returns the OAuth authorization URL for the requested provider with the
-   * caller's userId + email embedded in `state` so the callback auto-links.
-   */
   connect(req: Request, res: Response): void {
     try {
       // Tenant members link Gmail to the primary user so the resulting
@@ -77,11 +67,6 @@ export class AuthController {
     }
   }
 
-  /**
-   * GET /api/auth/:provider/callback — public (called by the provider).
-   * Exchanges the code, verifies the OAuth `state`, and auto-links if the
-   * caller initiated the flow via POST /auth/connect.
-   */
   async handleCallback(req: Request, res: Response): Promise<void> {
     const providerType = req.params.provider;
     let provider: EmailProviderInterface;
@@ -132,8 +117,6 @@ export class AuthController {
       res.status(500).send(renderCallbackErrorPage((err as Error).message));
     }
   }
-
-  // ─── helpers ───────────────────────────────────────────────────────────
 
   private parseConnectInput(body: unknown): ConnectInput {
     const input = (body ?? {}) as Partial<ConnectInput>;

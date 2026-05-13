@@ -3,9 +3,6 @@ import { EmailController } from '../controllers/email.controller';
 import mongoose from 'mongoose';
 
 const router = Router();
-
-// Initialize controller with MongoDB connection
-// Note: This assumes MongoDB is already connected in the worker/app
 const controller = new EmailController(mongoose.connection);
 
 /**

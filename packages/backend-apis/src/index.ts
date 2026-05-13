@@ -53,7 +53,6 @@ app.use(
 );
 app.use(cors());
 
-// Handle gzip-compressed bodies
 app.use((req, res, next) => {
   if (req.headers['content-encoding'] === 'gzip') {
     const gunzip = createGunzip();
@@ -80,7 +79,6 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Request logging
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`, {
     query: req.query,
@@ -106,7 +104,6 @@ app.use(
   routes
 );
 
-// Documentation (protected by Basic Auth)
 app.get('/docs/openapi.json', docsAuth, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
@@ -139,12 +136,10 @@ app.use(
   }
 );
 
-// Error handling
 app.use(errorHandler);
 
 const PORT = config.port;
 
-// Connect to MongoDB and start server
 connectMongoDB().then(() => {
   app.listen(PORT, () => {
     logger.info(`MyWallet API Server listening on port ${PORT}`);
@@ -154,7 +149,6 @@ connectMongoDB().then(() => {
   });
 });
 
-// Handle graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down API server...');
   await mongoose.disconnect();

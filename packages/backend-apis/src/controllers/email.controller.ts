@@ -11,10 +11,6 @@ export class EmailController {
     this.emailActivities = createEmailActivities(mongoConnection);
   }
 
-  /**
-   * GET /api/emails
-   * Get all emails with pagination
-   */
   async getAllEmails(req: Request, res: Response) {
     try {
       const userId = getDataOwnerId(req);
@@ -60,10 +56,6 @@ export class EmailController {
     }
   }
 
-  /**
-   * GET /api/emails/:id
-   * Get a specific email by Gmail ID
-   */
   async getEmailById(req: Request, res: Response) {
     try {
       const userId = getDataOwnerId(req);
@@ -90,10 +82,6 @@ export class EmailController {
     }
   }
 
-  /**
-   * GET /api/emails/search?q=term
-   * Search emails by text
-   */
   async searchEmails(req: Request, res: Response) {
     try {
       const userId = getDataOwnerId(req);

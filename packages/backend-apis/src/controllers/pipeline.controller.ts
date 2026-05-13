@@ -4,22 +4,6 @@ import { PipelineStep } from '../../../temporal-workflows/src/models/pipeline-st
 import { TASK_QUEUES, WORKFLOW_IDS } from '../../../temporal-workflows/src/shared/constants';
 import { logger } from '../utils/logger';
 
-/**
- * Pipeline Controller
- *
- * CRUD for pipeline step configurations (prompt management).
- * Steps are identified by their stepKey (e.g. "classify_email").
- *
- * Routes:
- *   GET    /api/pipeline/steps            — list all steps
- *   GET    /api/pipeline/steps/:stepKey   — get a single step
- *   PUT    /api/pipeline/steps/:stepKey   — create or update a step
- *   POST   /api/pipeline/steps/:stepKey/test — test a prompt against sample email
- *   POST   /api/pipeline/run/:emailId     — manually trigger pipeline for an email
- */
-
-// ─── List all steps ──────────────────────────────────────────────────────────
-
 export async function listPipelineSteps(req: Request, res: Response): Promise<void> {
   try {
     const steps = await PipelineStep.find().sort({ order: 1 }).lean();
@@ -29,8 +13,6 @@ export async function listPipelineSteps(req: Request, res: Response): Promise<vo
     res.status(500).json({ error: 'Failed to list pipeline steps' });
   }
 }
-
-// ─── Get single step ─────────────────────────────────────────────────────────
 
 export async function getPipelineStep(req: Request, res: Response): Promise<void> {
   try {
@@ -48,8 +30,6 @@ export async function getPipelineStep(req: Request, res: Response): Promise<void
     res.status(500).json({ error: 'Failed to get pipeline step' });
   }
 }
-
-// ─── Create or update step ───────────────────────────────────────────────────
 
 export async function upsertPipelineStep(req: Request, res: Response): Promise<void> {
   try {
@@ -97,8 +77,6 @@ export async function upsertPipelineStep(req: Request, res: Response): Promise<v
     res.status(500).json({ error: 'Failed to upsert pipeline step' });
   }
 }
-
-// ─── Manually trigger pipeline for a single email ────────────────────────────
 
 export async function runPipelineForEmail(req: Request, res: Response): Promise<void> {
   try {

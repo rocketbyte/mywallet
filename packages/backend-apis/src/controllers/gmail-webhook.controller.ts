@@ -21,11 +21,6 @@ import { logger } from '../utils/logger';
 export class GmailWebhookController {
   constructor(private readonly provider: EmailProviderInterface) {}
 
-  /**
-   * POST /api/gmail/webhook
-   * Receives Pub/Sub push notifications from Google Cloud.
-   * Signals the running Temporal workflow; starts it if it isn't running yet.
-   */
   async handleWebhook(req: Request, res: Response): Promise<void> {
     try {
       logger.info('Received Gmail webhook', req.body);
@@ -101,10 +96,6 @@ export class GmailWebhookController {
     }
   }
 
-  /**
-   * POST /api/gmail/link
-   * Link a Gmail account and start the Temporal sync workflow.
-   */
   async linkAccount(req: Request, res: Response): Promise<void> {
     try {
       const { userId, email, refreshToken, pubSubTopicName } = req.body;
@@ -128,10 +119,6 @@ export class GmailWebhookController {
     }
   }
 
-  /**
-   * DELETE /api/gmail/unlink/:userId
-   * Stop the sync workflow and mark the account inactive.
-   */
   async unlinkAccount(req: Request, res: Response): Promise<void> {
     try {
       const { userId } = req.params;
@@ -150,10 +137,6 @@ export class GmailWebhookController {
     }
   }
 
-  /**
-   * GET /api/gmail/status/:userId
-   * Returns the current sync status combining MongoDB + Temporal state.
-   */
   async getStatus(req: Request, res: Response): Promise<void> {
     try {
       const { userId } = req.params;
@@ -173,10 +156,8 @@ export class GmailWebhookController {
   }
 
   /**
-   * GET /api/gmail/status/me
    * Authed-user variant — derives userId from the bearer token so callers
-   * never have to pass it (and can't impersonate another user by guessing
-   * an id).
+   * can't impersonate another user by guessing an id.
    */
   async getMyStatus(req: Request, res: Response): Promise<void> {
     try {

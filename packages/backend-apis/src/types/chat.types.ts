@@ -1,8 +1,6 @@
 import type OpenAI from 'openai';
 import { z } from 'zod';
 
-// ─── Controller / SSE ────────────────────────────────────────────────────
-
 export const SSE_RETRY_MS = 2000;
 export const SSE_HEARTBEAT_MS = 15_000;
 
@@ -19,8 +17,6 @@ export const ChatRequestSchema = z.object({
   message: z.string().trim().min(1).max(MAX_MESSAGE_CHARS),
   history: z.array(ChatTurnSchema).max(MAX_HISTORY_TURNS).optional(),
 });
-
-// ─── Service ─────────────────────────────────────────────────────────────
 
 export const MAX_TOOL_TURNS = 5;
 export const MAX_TOKENS = 800;
@@ -51,8 +47,6 @@ export interface ChatStreamRequest {
   history?: ChatTurn[];
   signal?: AbortSignal;
 }
-
-// ─── Tools ───────────────────────────────────────────────────────────────
 
 export const CATEGORY_ENUM = [
   'food', 'groceries', 'transport', 'services', 'home',
