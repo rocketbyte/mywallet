@@ -24,9 +24,9 @@ export class TransactionController {
   }
 
   async createTransaction(req: Request, res: Response) {
-    const { merchant, amount, category, date } = req.body;
-    if (!merchant || amount === undefined || !category || !date) {
-      return res.status(400).json({ error: 'merchant, amount, category, and date are required' });
+    const { merchant, amount, category, transactionDate } = req.body;
+    if (!merchant || amount === undefined || !category || !transactionDate) {
+      return res.status(400).json({ error: 'merchant, amount, category, and transactionDate are required' });
     }
     try {
       const transaction = await this.service.create(getDataOwnerId(req), req.body);

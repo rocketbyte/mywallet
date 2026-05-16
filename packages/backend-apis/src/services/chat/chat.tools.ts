@@ -1,5 +1,6 @@
 import { Transaction, Tenant, Budget } from '../../../../temporal-workflows/src/models';
 import { escapeRegex } from '../../utils/request.utils';
+import { utcDayRange } from '../../utils/date.utils';
 import type { ToolExecutor } from '../../types/chat.types';
 
 export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
@@ -121,21 +122,10 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   },
 };
 
-function buildDateRange(start: unknown, end: unknown): Record<string, Date> | null {
-  const range: Record<string, Date> = {};
-  if (typeof start === 'string' && start) {
-    const d = new Date(start);
-    if (!isNaN(d.getTime())) range.$gte = d;
-  }
-  if (typeof end === 'string' && end) {
-    const d = new Date(end);
-    if (!isNaN(d.getTime())) {
-      // Treat end as inclusive end-of-day so 'YYYY-MM-DD' captures that whole day.
-      d.setHours(23, 59, 59, 999);
-      range.$lte = d;
-    }
-  }
-  return Object.keys(range).length > 0 ? range : null;
+function buildDateRange(start: unknown, end: unknown): { $gte?: Date; $lte?: Date } | null {
+  const s = typeof start === 'string' && start ? start : undefined;
+  const e = typeof end === 'string' && end ? end : undefined;
+  return utcDayRange(s, e);
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {

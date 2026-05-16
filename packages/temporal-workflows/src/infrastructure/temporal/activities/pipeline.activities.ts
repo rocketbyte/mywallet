@@ -127,11 +127,21 @@ export function createPipelineActivities(container: DependencyContainer) {
 
       const data = result.data as Partial<RawTransactionData>;
 
+      // Prefer the bank's transaction date from the body, but fall back to
+      // the email's receivedAt when the AI returns nothing OR a date that's
+      // suspiciously far from when the bank actually notified us. This
+      // catches the small-model hallucination case (e.g. a 4B model
+      // inventing "tomorrow at noon UTC" for an email with no date in the
+      // body). 30 days is generous — a real bank notification is almost
+      // never delayed that long.
+      const emailDate = new Date(input.date);
+      const transactionDate = pickReliableDate(data.transactionDate, emailDate);
+
       return {
         merchant: data.merchant ?? 'Unknown',
         amount: Number(data.amount) || 0,
         currency: data.currency ?? 'USD',
-        transactionDate: data.transactionDate ? new Date(data.transactionDate) : new Date(input.date),
+        transactionDate,
         transactionType: data.transactionType ?? (input.classificationResult.transactionType === 'credit' ? 'credit' : 'debit'),
         bankName: data.bankName ?? '',
         accountLast4: data.accountLast4,
@@ -244,3 +254,19 @@ export function createPipelineActivities(container: DependencyContainer) {
 }
 
 export type PipelineActivities = ReturnType<typeof createPipelineActivities>;
+
+const MAX_AI_DATE_DRIFT_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Returns the AI-extracted date when it parses cleanly and is within
+ * MAX_AI_DATE_DRIFT_MS of the email's receivedAt; otherwise returns
+ * receivedAt. Guards against small models hallucinating a future date
+ * for emails that contain no date in the body.
+ */
+function pickReliableDate(aiValue: unknown, receivedAt: Date): Date {
+  if (typeof aiValue !== 'string' || !aiValue) return receivedAt;
+  const parsed = new Date(aiValue);
+  if (Number.isNaN(parsed.getTime())) return receivedAt;
+  if (Math.abs(parsed.getTime() - receivedAt.getTime()) > MAX_AI_DATE_DRIFT_MS) return receivedAt;
+  return parsed;
+}

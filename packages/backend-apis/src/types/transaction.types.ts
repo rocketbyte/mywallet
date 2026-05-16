@@ -1,8 +1,8 @@
 export interface TransactionDTO {
   id: string;
   userId: string;
-  date: string;
-  time: string;
+  /** UTC ISO 8601 instant. Clients format in their own timezone. */
+  transactionDate: string;
   merchant: string;
   amount: number;
   category: string;
@@ -38,8 +38,8 @@ export interface BalanceDTO {
 }
 
 export interface CreateTransactionInput {
-  date: string;
-  time?: string;
+  /** UTC ISO 8601 instant from the client. */
+  transactionDate: string;
   merchant: string;
   amount: number;
   category: string;

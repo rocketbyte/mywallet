@@ -1,5 +1,5 @@
 import { Transaction } from '../../../temporal-workflows/src/models';
-import { toDateStr, toTimeStr } from '../utils/date.utils';
+import { utcDayRange } from '../utils/date.utils';
 import { escapeRegex } from '../utils/request.utils';
 import type {
   BalanceDTO,
@@ -10,12 +10,10 @@ import type {
 } from '../types/transaction.types';
 
 function toDTO(tx: any): TransactionDTO {
-  const date = new Date(tx.transactionDate);
   return {
     id: tx._id.toString(),
     userId: tx.userId,
-    date: toDateStr(date),
-    time: toTimeStr(date),
+    transactionDate: new Date(tx.transactionDate).toISOString(),
     merchant: tx.merchant,
     amount: tx.transactionType === 'credit' ? Math.abs(tx.amount) : -Math.abs(tx.amount),
     category: tx.category,
@@ -37,15 +35,8 @@ export class TransactionService {
 
     if (category && category !== 'all') query.category = category;
 
-    if (startDate || endDate) {
-      query.transactionDate = {};
-      if (startDate) query.transactionDate.$gte = new Date(startDate);
-      if (endDate) {
-        const date = new Date(endDate);
-        date.setHours(23, 59, 59, 999);
-        query.transactionDate.$lte = date;
-      }
-    }
+    const dateRange = utcDayRange(startDate, endDate);
+    if (dateRange) query.transactionDate = dateRange;
 
     if (search) {
       const safe = escapeRegex(search);
@@ -67,7 +58,7 @@ export class TransactionService {
   }
 
   async create(userId: string, input: CreateTransactionInput): Promise<TransactionDTO> {
-    const transactionDate = new Date(`${input.date}T${input.time ?? '00:00'}:00`);
+    const transactionDate = new Date(input.transactionDate);
     const doc = await Transaction.create({
       userId,
       transactionDate,
@@ -96,7 +87,7 @@ export class TransactionService {
     if (input.source !== undefined) updates.source = input.source;
     if (input.isIncome !== undefined) updates.transactionType = input.isIncome ? 'credit' : 'debit';
     if (input.amount !== undefined) updates.amount = Math.abs(input.amount);
-    if (input.date) updates.transactionDate = new Date(`${input.date}T${input.time ?? '00:00'}:00`);
+    if (input.transactionDate) updates.transactionDate = new Date(input.transactionDate);
 
     const doc = await Transaction.findOneAndUpdate({ _id: id, userId }, { $set: updates }, { new: true }).lean();
     return doc ? toDTO(doc) : null;
@@ -114,16 +105,8 @@ export class TransactionService {
    */
   async getBalance(userId: string, filters: BalanceFilters): Promise<BalanceDTO> {
     const match: Record<string, unknown> = { userId };
-    if (filters.startDate || filters.endDate) {
-      const range: Record<string, Date> = {};
-      if (filters.startDate) range.$gte = new Date(filters.startDate);
-      if (filters.endDate) {
-        const date = new Date(filters.endDate);
-        date.setHours(23, 59, 59, 999);
-        range.$lte = date;
-      }
-      match.transactionDate = range;
-    }
+    const dateRange = utcDayRange(filters.startDate, filters.endDate);
+    if (dateRange) match.transactionDate = dateRange;
 
     const rows = await Transaction.aggregate<{ _id: 'credit' | 'debit'; total: number; count: number }>([
       { $match: match },
