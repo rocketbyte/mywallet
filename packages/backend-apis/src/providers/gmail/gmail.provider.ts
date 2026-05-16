@@ -139,16 +139,13 @@ export class GmailProvider implements EmailProviderInterface {
 
   /**
    * Returns the current sync status by combining the MongoDB account record
-   * with the live Temporal workflow status.
+   * with the live Temporal workflow status. Returns `null` when no account
+   * is linked — callers map this to their preferred response shape.
    */
-  async getAccountStatus(userId: string): Promise<AccountStatus> {
+  async getAccountStatus(userId: string): Promise<AccountStatus | null> {
     const account = await GmailAccount.findOne({ userId });
 
-    if (!account) {
-      const err = new Error(`No Gmail account found for user: ${userId}`) as any;
-      err.code = 'not_found';
-      throw err;
-    }
+    if (!account) return null;
 
     const client = await getTemporalClient();
     let workflowStatus = 'unknown';

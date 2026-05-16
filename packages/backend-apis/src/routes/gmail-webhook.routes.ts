@@ -175,20 +175,40 @@ router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res
  *   get:
  *     summary: Get the authenticated user's Gmail sync status
  *     description: |
- *       Same payload as `GET /gmail/status/{userId}`, but resolves the user
- *       from the bearer token so callers don't need to pass an id.
- *       Returns `404` when the user has not yet linked a Gmail account —
- *       clients can use this to render a "Link Gmail" CTA.
+ *       Resolves the user from the bearer token. Always returns 200 with a
+ *       discriminated payload: `{ linked: false }` when no account is
+ *       linked yet (use this to render a "Link Gmail" CTA), or
+ *       `{ linked: true, ...status }` when an account is linked.
  *     tags: [Gmail]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Account status.
+ *         description: Linkage state of the authenticated user's Gmail account.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - type: object
+ *                   required: [linked]
+ *                   properties:
+ *                     linked: { type: boolean, enum: [false] }
+ *                 - type: object
+ *                   required: [linked, userId, email]
+ *                   properties:
+ *                     linked: { type: boolean, enum: [true] }
+ *                     userId: { type: string }
+ *                     email: { type: string }
+ *                     isActive: { type: boolean }
+ *                     workflowId: { type: string }
+ *                     workflowStatus: { type: string }
+ *                     watchExpiration: { type: string, format: date-time, nullable: true }
+ *                     lastSyncAt: { type: string, format: date-time, nullable: true }
+ *                     totalEmailsSynced: { type: integer }
+ *                     lastError: { type: string, nullable: true }
+ *                     errorCount: { type: integer }
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
- *       404:
- *         description: No Gmail account linked for the authenticated user.
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */

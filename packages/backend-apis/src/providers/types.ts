@@ -62,6 +62,10 @@ export interface EmailProviderInterface {
   /** Stops the sync workflow and marks the account inactive. */
   unlinkAccount(userId: string): Promise<void>;
 
-  /** Returns the current sync status for a linked account. */
-  getAccountStatus(userId: string): Promise<AccountStatus>;
+  /**
+   * Returns the current sync status for a linked account, or `null` when
+   * the user has no account linked. Callers decide how to map the null
+   * case (e.g. `{ linked: false }` for /me, 404 for lookups by id).
+   */
+  getAccountStatus(userId: string): Promise<AccountStatus | null>;
 }

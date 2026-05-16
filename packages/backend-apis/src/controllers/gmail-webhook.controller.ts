@@ -143,13 +143,12 @@ export class GmailWebhookController {
 
       const status = await this.provider.getAccountStatus(userId);
 
-      res.status(200).json(status);
-    } catch (error) {
-      const code = (error as any).code;
-      if (code === 'not_found') {
-        res.status(404).json({ error: 'account_not_found', message: (error as Error).message });
+      if (!status) {
+        res.status(404).json({ error: 'account_not_found', message: `No Gmail account found for user: ${userId}` });
         return;
       }
+      res.status(200).json(status);
+    } catch (error) {
       logger.error('Error getting Gmail sync status', { error });
       res.status(500).json({ error: 'status_check_failed', message: (error as Error).message });
     }
@@ -157,18 +156,19 @@ export class GmailWebhookController {
 
   /**
    * Authed-user variant — derives userId from the bearer token so callers
-   * can't impersonate another user by guessing an id.
+   * can't impersonate another user by guessing an id. Returns 200 with
+   * `linked: false` when no account exists; not-yet-linked is a normal
+   * state for a fresh user, not an error worth a 404.
    */
   async getMyStatus(req: Request, res: Response): Promise<void> {
     try {
       const status = await this.provider.getAccountStatus(getDataOwnerId(req));
-      res.status(200).json(status);
-    } catch (error) {
-      const code = (error as any).code;
-      if (code === 'not_found') {
-        res.status(404).json({ error: 'account_not_found', message: (error as Error).message });
+      if (!status) {
+        res.status(200).json({ linked: false });
         return;
       }
+      res.status(200).json({ linked: true, ...status });
+    } catch (error) {
       logger.error('Error getting Gmail sync status', { error });
       res.status(500).json({ error: 'status_check_failed', message: (error as Error).message });
     }

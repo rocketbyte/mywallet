@@ -69,13 +69,19 @@ export class MongoUserResolver implements UserResolverInterface {
     if (!doc) throw new Error(`User upsert failed for subject=${profile.subject}`);
 
     // Step 2: ensure the (provider, subject) pair is recorded in
-    // identities[]. Idempotent — only pushes when not already present.
-    const hasIdentity = doc.identities?.some(
-      (i) => i.provider === profile.provider && i.subject === profile.subject
+    // identities[]. The filter + $push runs atomically in Mongo, so two
+    // concurrent first-login requests can't both pass the "not present"
+    // check and double-push. modifiedCount tells us whether we actually
+    // appended, so the in-memory copy stays consistent with the DB.
+    const identity = { provider: profile.provider, subject: profile.subject, linkedAt: new Date() };
+    const res = await User.updateOne(
+      {
+        _id: doc._id,
+        identities: { $not: { $elemMatch: { provider: profile.provider, subject: profile.subject } } },
+      },
+      { $push: { identities: identity } },
     );
-    if (!hasIdentity) {
-      const identity = { provider: profile.provider, subject: profile.subject, linkedAt: new Date() };
-      await User.updateOne({ _id: doc._id }, { $push: { identities: identity } });
+    if (res.modifiedCount > 0) {
       doc.identities = [...(doc.identities ?? []), identity];
     }
 
