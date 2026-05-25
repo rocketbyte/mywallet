@@ -5,6 +5,8 @@ export interface ConnectInput {
   provider: string;
 }
 
+export type UserRole = 'admin' | 'guest';
+
 export interface MeDTO {
   id: string;
   email: string;
@@ -14,4 +16,6 @@ export interface MeDTO {
   identities: { provider: string; subject: string; linkedAt?: Date }[];
   lastLoginAt?: Date;
   createdAt: Date;
+  tenantId?: string;
+  role: UserRole;
 }

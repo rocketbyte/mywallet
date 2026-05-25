@@ -6,7 +6,7 @@ import {
   UnsupportedProviderError,
   type EmailProviderInterface,
 } from '../providers';
-import { User } from '../../../temporal-workflows/src/models';
+import { Tenant, User } from '../../../temporal-workflows/src/models';
 import { logger } from '../utils/logger';
 import {
   renderAutoLinkedPage,
@@ -29,6 +29,10 @@ export class AuthController {
         return;
       }
 
+      const tenant = doc.tenantId ? await Tenant.findById(doc.tenantId).lean() : null;
+      const isPrimary = !!tenant && String(tenant.primaryUserId) === String(doc._id);
+      const role: MeDTO['role'] = isPrimary ? 'admin' : 'guest';
+
       const me: MeDTO = {
         id: String(doc._id),
         email: doc.email,
@@ -42,6 +46,8 @@ export class AuthController {
         })),
         lastLoginAt: doc.lastLoginAt,
         createdAt: doc.createdAt,
+        tenantId: tenant ? String(tenant._id) : undefined,
+        role,
       };
       res.json({ user: me });
     } catch (error) {

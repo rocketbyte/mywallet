@@ -47,6 +47,14 @@ const controller = new AuthController(emailProviders);
  *                           linkedAt: { type: string, format: date-time }
  *                     lastLoginAt: { type: string, format: date-time, nullable: true }
  *                     createdAt: { type: string, format: date-time }
+ *                     tenantId:
+ *                       type: string
+ *                       nullable: true
+ *                       description: Tenant the user currently belongs to.
+ *                     role:
+ *                       type: string
+ *                       enum: [admin, guest]
+ *                       description: '`admin` for the tenant primary, `guest` for any other member.'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       404:
