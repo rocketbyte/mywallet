@@ -33,7 +33,8 @@ import {
   defineSignal,
   setHandler,
   condition,
-  continueAsNew
+  continueAsNew,
+  workflowInfo
 } from '@temporalio/workflow';
 import type { SyncActivities } from '../infrastructure/temporal/activities/sync.activities';
 import type { WorkflowStarterActivities } from '../activities/workflow/workflow-starter.activities';
@@ -133,6 +134,10 @@ export async function gmailSubscriptionWorkflow(
 
   /** Epoch when this workflow execution started \u2014 used for continueAsNew scheduling. */
   const workflowStartTime = Date.now();
+
+  /** Epoch of the last successful renewGmailWatch \u2014 used to gate the renewal so it
+   *  doesn't run on every loop wake-up (which would inflate history rapidly). */
+  let lastWatchRenewedAt = 0;
 
   /** FIFO queue of unprocessed webhook signals. */
   const webhookQueue: IncomingWebhookSignal[] = [];
@@ -279,6 +284,7 @@ export async function gmailSubscriptionWorkflow(
       topicName: input.pubSubTopicName
     });
     currentHistoryId = watchResult.historyId;
+    lastWatchRenewedAt = Date.now();
 
     log.info('Gmail watch active', {
       historyId: currentHistoryId,
@@ -375,15 +381,16 @@ export async function gmailSubscriptionWorkflow(
       }
 
       // --------------------------------------------------------------------
-      // Gmail watch renewal
-      //
-      // The condition() above is set to wake after PROACTIVE_REFRESH_INTERVAL_MINUTES
-      // (45 min). The watch runs for RENEWAL_BUFFER_DAYS (5 days). After processing
-      // all webhooks we always attempt to renew the watch so it never expires.
-      // renewGmailWatch is idempotent (it calls gmail.users.watch which returns a
-      // new expiry each time).
+      // Gmail watch renewal — only when the renewal buffer has elapsed.
+      // Without this gate, every webhook wake-up calls renewGmailWatch and
+      // inflates workflow history by ~5 events per iteration, eventually
+      // pushing history past the workflow-task replay budget.
       // --------------------------------------------------------------------
-      if (isActive) {
+      const renewalBufferMs =
+        GMAIL_WATCH_CONFIG.RENEWAL_BUFFER_DAYS * 24 * 60 * 60 * 1_000;
+      const dueForRenewal = Date.now() - lastWatchRenewedAt >= renewalBufferMs;
+
+      if (isActive && dueForRenewal) {
         log.info('Renewing Gmail watch subscription');
 
         const renewalResult = await gmailSyncActivities.renewGmailWatch({
@@ -392,17 +399,28 @@ export async function gmailSubscriptionWorkflow(
           topicName: input.pubSubTopicName
         });
         currentHistoryId = renewalResult.historyId;
+        lastWatchRenewedAt = Date.now();
 
         log.info('Gmail watch renewed', { newExpiration: renewalResult.expiration });
       }
 
       // --------------------------------------------------------------------
-      // continueAsNew \u2014 reset event history every 30 days to keep Temporal
-      // history bounded and queries fast.
+      // continueAsNew \u2014 reset event history when either trigger fires:
+      //  - elapsed days exceeded (time-based safety net)
+      //  - history length exceeded (volume-based \u2014 protects against bursty
+      //    inboxes outrunning the day threshold and stalling workflow tasks)
       // --------------------------------------------------------------------
       const elapsedDays = (Date.now() - workflowStartTime) / (1_000 * 60 * 60 * 24);
-      if (elapsedDays >= GMAIL_WATCH_CONFIG.CONTINUE_AS_NEW_DAYS) {
-        log.info('30-day mark reached \u2014 calling continueAsNew to reset event history');
+      const historyLength = workflowInfo().historyLength;
+
+      if (
+        elapsedDays >= GMAIL_WATCH_CONFIG.CONTINUE_AS_NEW_DAYS ||
+        historyLength >= GMAIL_WATCH_CONFIG.CONTINUE_AS_NEW_HISTORY_LENGTH
+      ) {
+        log.info('Resetting workflow history via continueAsNew', {
+          elapsedDays,
+          historyLength
+        });
         await continueAsNew<typeof gmailSubscriptionWorkflow>(input);
       }
 

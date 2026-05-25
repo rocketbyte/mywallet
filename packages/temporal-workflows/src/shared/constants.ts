@@ -127,10 +127,11 @@ export const GMAIL_SYNC_RETRY_POLICIES = {
 
 // Gmail Watch Configuration
 export const GMAIL_WATCH_CONFIG = {
-  EXPIRATION_DAYS: 7,           // Gmail max is 7 days
-  RENEWAL_BUFFER_DAYS: 5,       // Renew 2 days before expiration
+  EXPIRATION_DAYS: 7,                  // Gmail max is 7 days
+  RENEWAL_BUFFER_DAYS: 5,              // Renew 2 days before expiration
   RENEWAL_CHECK_INTERVAL: '1 day',
-  CONTINUE_AS_NEW_DAYS: 30      // Reset workflow history every 30 days
+  CONTINUE_AS_NEW_DAYS: 7,             // Reset workflow history at least weekly
+  CONTINUE_AS_NEW_HISTORY_LENGTH: 5_000 // Reset whenever history outgrows the 10s WFT replay budget
 } as const;
 
 // ==================== AI Pipeline Constants ====================
