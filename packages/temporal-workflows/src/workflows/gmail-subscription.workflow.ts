@@ -34,7 +34,8 @@ import {
   setHandler,
   condition,
   continueAsNew,
-  workflowInfo
+  workflowInfo,
+  patched
 } from '@temporalio/workflow';
 import type { SyncActivities } from '../infrastructure/temporal/activities/sync.activities';
 import type { WorkflowStarterActivities } from '../activities/workflow/workflow-starter.activities';
@@ -381,17 +382,38 @@ export async function gmailSubscriptionWorkflow(
       }
 
       // --------------------------------------------------------------------
-      // Gmail watch renewal — only when the renewal buffer has elapsed.
-      // Without this gate, every webhook wake-up calls renewGmailWatch and
-      // inflates workflow history by ~5 events per iteration, eventually
-      // pushing history past the workflow-task replay budget.
+      // Gmail watch renewal.
+      //
+      // Originally this ran on every loop iteration. That inflated workflow
+      // history (~5 events per webhook) and eventually exceeded the replay
+      // budget, so it was gated behind a renewal-buffer check.
+      //
+      // The gate is a non-deterministic change for in-flight runs whose
+      // history already shows renewGmailWatch on every iteration, so it is
+      // wrapped in patched() — old runs keep the original always-renew
+      // behavior, new runs use the gate. Remove the unpatched branch only
+      // after all pre-patch runs have completed or been continueAsNew'd.
       // --------------------------------------------------------------------
-      const renewalBufferMs =
-        GMAIL_WATCH_CONFIG.RENEWAL_BUFFER_DAYS * 24 * 60 * 60 * 1_000;
-      const dueForRenewal = Date.now() - lastWatchRenewedAt >= renewalBufferMs;
+      if (patched('gmail-watch-renewal-buffer-gate')) {
+        const renewalBufferMs =
+          GMAIL_WATCH_CONFIG.RENEWAL_BUFFER_DAYS * 24 * 60 * 60 * 1_000;
+        const dueForRenewal = Date.now() - lastWatchRenewedAt >= renewalBufferMs;
 
-      if (isActive && dueForRenewal) {
-        log.info('Renewing Gmail watch subscription');
+        if (isActive && dueForRenewal) {
+          log.info('Renewing Gmail watch subscription');
+
+          const renewalResult = await gmailSyncActivities.renewGmailWatch({
+            userId: input.userId,
+            accessToken: currentAccessToken!,
+            topicName: input.pubSubTopicName
+          });
+          currentHistoryId = renewalResult.historyId;
+          lastWatchRenewedAt = Date.now();
+
+          log.info('Gmail watch renewed', { newExpiration: renewalResult.expiration });
+        }
+      } else if (isActive) {
+        log.info('Renewing Gmail watch subscription (legacy: every-loop)');
 
         const renewalResult = await gmailSyncActivities.renewGmailWatch({
           userId: input.userId,

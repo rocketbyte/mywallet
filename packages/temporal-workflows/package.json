@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "@temporalio/activity": "^1.10.0",
-    "@temporalio/common": "^1.10.0",
-    "@temporalio/workflow": "^1.10.0",
+    "@temporalio/activity": "^1.17.2",
+    "@temporalio/common": "^1.17.2",
+    "@temporalio/workflow": "^1.17.2",
     "google-auth-library": "^9.4.1",
     "googleapis": "^128.0.0",
     "mongoose": "^8.0.3",

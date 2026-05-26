@@ -14,7 +14,9 @@
     "lint": "eslint packages --ext .ts",
     "test": "jest",
     "seed:patterns": "tsx scripts/seed-email-patterns.ts",
-    "seed:pipeline": "tsx scripts/seed-pipeline-steps.ts"
+    "seed:pipeline": "tsx scripts/seed-pipeline-steps.ts",
+    "openspec:sync": "node scripts/openspec-sync.mjs",
+    "openspec:check": "node scripts/openspec-sync.mjs check"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
