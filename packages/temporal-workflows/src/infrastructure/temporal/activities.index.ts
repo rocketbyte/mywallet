@@ -10,6 +10,7 @@ import { createEmailActivities } from './activities/email.activities';
 import { createTransactionActivities } from './activities/transaction.activities';
 import { createSyncActivities } from './activities/sync.activities';
 import { createPipelineActivities } from './activities/pipeline.activities';
+import { createAnalysisActivities } from './activities/analysis.activities';
 
 /**
  * Create all activities using DI Container
@@ -30,7 +31,10 @@ export function createActivities(container: DependencyContainer) {
     ...createSyncActivities(container),
 
     // Pipeline activities (3-step AI extraction pipeline)
-    ...createPipelineActivities(container)
+    ...createPipelineActivities(container),
+
+    // Daily transaction analysis activities (aggregate, analyze, persist)
+    ...createAnalysisActivities(container)
   };
 }
 

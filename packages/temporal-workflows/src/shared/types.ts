@@ -1,3 +1,77 @@
+// Daily Transaction Analysis
+export interface DailyAnalysisWorkflowInput {
+  userId: string;
+  analysisDate: string;   // YYYY-MM-DD in tenant timezone
+}
+
+export interface DailyAnalysisWorkflowResult {
+  status: 'ready' | 'failed';
+  analysisId?: string;
+  reason?: string;
+}
+
+export interface DailyAnalysisContext {
+  userId: string;
+  analysisDate: string;
+  currency: string;
+  transactions: Array<{
+    id: string;
+    merchant: string;
+    amount: number;
+    currency: string;
+    transactionType: 'debit' | 'credit';
+    category: string;
+    transactionDate: string;
+  }>;
+  totals: { income: number; expenses: number; net: number };
+  balance: number;
+  budgetSnapshot: {
+    totalBudget: number;
+    totalSpent: number;
+    percentUsed: number;
+    daysRemainingInPeriod: number;
+  } | null;
+  priorSummaries: string[];
+  promptVersion: number;
+}
+
+export interface DailyAnalysisAIResult {
+  summary: string;
+  fullSummary: string;
+  suggestions: Array<{
+    id: string;
+    title: string;
+    body: string;
+    urgency: 'info' | 'warn' | 'urgent';
+    category?: string;
+  }>;
+  modelMeta: {
+    model: string;
+    promptVersion: number;
+    tokensIn: number;
+    tokensOut: number;
+  };
+}
+
+export interface PersistDailyAnalysisInput {
+  userId: string;
+  analysisDate: string;
+  currency: string;
+  inputs: {
+    transactionCount: number;
+    totals: { income: number; expenses: number; net: number };
+    balance: number;
+    budgetSnapshot: DailyAnalysisContext['budgetSnapshot'];
+  };
+  ai: DailyAnalysisAIResult | null;
+  status: 'ready' | 'failed';
+  failureReason?: string;
+}
+
+export interface PersistDailyAnalysisResult {
+  analysisId: string;
+}
+
 // Workflow Inputs/Outputs
 export interface EmailProcessingInput {
   userId: string;            // NEW: Tenant identifier

@@ -11,6 +11,7 @@ import alertRoutes from './alert.routes';
 import tenantRoutes from './tenant.routes';
 import meRoutes from './me.routes';
 import chatRoutes from './chat.routes';
+import analysisRoutes from './analysis.routes';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/transactions', transactionRoutes);
 router.use('/budgets', budgetRoutes);
 router.use('/alerts', alertRoutes);
 router.use('/tenants', tenantRoutes);
+router.use('/analyses', analysisRoutes);
 
 export default router;

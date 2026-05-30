@@ -6,3 +6,12 @@ export { Alert, AlertInterface } from './alert.model';
 export { Tenant, TenantInterface } from './tenant.model';
 export { Email, EmailInterface } from './email.model';
 export { PipelineStep, PipelineStepInterface } from './pipeline-step.model';
+export {
+  TransactionAnalysis,
+  TransactionAnalysisInterface,
+  AnalysisStatus,
+  AnalysisSuggestion,
+  SuggestionUrgency,
+  AnalysisInputs,
+  AnalysisModelMeta,
+} from './transaction-analysis.model';

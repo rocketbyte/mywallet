@@ -139,8 +139,23 @@ export const GMAIL_WATCH_CONFIG = {
 export const PIPELINE_STEP_KEYS = {
   CLASSIFY_EMAIL: 'classify_email',
   EXTRACT_TRANSACTION: 'extract_transaction',
-  STORE_TRANSACTION: 'store_transaction'
+  STORE_TRANSACTION: 'store_transaction',
+  ANALYZE_DAY: 'analyze_day'
 } as const;
+
+// Number of prior short summaries fed to the analyze_day prompt as compact
+// trend context. Bounded so prompt tokens stay small.
+export const ANALYSIS_PRIOR_SUMMARIES = 7;
+
+// Retry policy for the analysis workflow. Mirrors PIPELINE_RETRY_POLICY but
+// is its own constant so it can diverge later.
+export const ANALYSIS_RETRY_POLICY = {
+  initialInterval: '5s' as any,
+  backoffCoefficient: 2,
+  maximumInterval: '60s' as any,
+  maximumAttempts: 3,
+  nonRetryableErrorTypes: ['PipelineStepNotFoundError', 'PipelineStepInactiveError']
+};
 
 // Deduplication: skip storage when a transaction with the same userId,
 // transactionType, currency, and exact amount was stored within this window.

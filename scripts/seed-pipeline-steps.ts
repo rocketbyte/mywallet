@@ -142,6 +142,70 @@ Return only the JSON object.`
     isActive: true,
     systemPrompt: 'N/A — this step does not call an AI model.',
     userPromptTemplate: 'N/A — this step does not call an AI model.'
+  },
+
+  {
+    stepKey: 'analyze_day',
+    name: 'Analyze Day',
+    description: "Produces a daily financial analysis from yesterday's transactions, current balance, current-month budget snapshot, and the last few short summaries (for trend context).",
+    order: 4,
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    maxTokens: 900,
+    isActive: true,
+    systemPrompt: `You are a careful personal-finance analyst. Given a single day's transactions for one user, plus the user's current balance, current-month budget snapshot, and a list of recent short summaries from prior days, produce a brief, accurate analysis with concrete suggestions.
+
+Tone: factual, supportive, non-judgemental. No moralising. Use the user's currency. Round monetary values to whole units unless cents matter.
+
+Hard constraints:
+- Output STRICT JSON only. No prose, no markdown, no code fences.
+- "summary" MUST be a single sentence at most 200 characters, plain text, no markdown.
+- "fullSummary" MAY use brief markdown (paragraphs, bullets) and SHOULD be 2–6 short paragraphs covering: what happened yesterday, where it stands vs the budget given days remaining in period, and one or two trends inferred from prior summaries (if any).
+- "suggestions" MUST be 0–4 items. Each suggestion's "urgency" is "urgent" only when budget overrun is materially likely given days remaining or when a single charge looks unusual; "warn" when worth flagging; "info" otherwise.
+- Each suggestion has a stable "id" you generate (kebab-case, ≤32 chars), a short "title" (≤48 chars), a "body" (1–3 sentences), an "urgency", and an optional "category" (one of the user's tracked categories).
+- Do NOT invent transactions or numbers; only describe what's in the provided inputs.
+- If yesterday had zero transactions, produce a brief "summary" stating that and one informational suggestion at most.
+
+Schema:
+{
+  "summary": string,
+  "fullSummary": string,
+  "suggestions": Array<{
+    "id": string,
+    "title": string,
+    "body": string,
+    "urgency": "info" | "warn" | "urgent",
+    "category": string | null
+  }>
+}`,
+    userPromptTemplate: `Analyze the day for one user. The current date in their timezone is {{today}} and the analysis covers {{analysis_date}} (yesterday).
+
+Currency: {{currency}}
+
+Yesterday's transactions ({{transaction_count}}):
+"""
+{{transactions_json}}
+"""
+
+Totals yesterday:
+  income:   {{totals_income}}
+  expenses: {{totals_expenses}}
+  net:      {{totals_net}}
+
+Current balance: {{balance}}
+
+Current-month budget snapshot:
+"""
+{{budget_snapshot_json}}
+"""
+Days remaining in the budget period: {{days_remaining}}
+
+Recent prior daily summaries (oldest first, may be empty):
+"""
+{{prior_summaries_json}}
+"""
+
+Return only the JSON object described in the system prompt.`
   }
 ];
 
