@@ -25,6 +25,7 @@ import {
   StoredTransactionResult
 } from '../../../shared/types';
 import { PIPELINE_STEP_KEYS, DUPLICATE_LOOKBACK_HOURS } from '../../../shared/constants';
+import { normalizeMerchant } from '../../../shared/normalize-merchant';
 
 // ---------------------------------------------------------------------------
 // Template interpolation helper
@@ -137,8 +138,10 @@ export function createPipelineActivities(container: DependencyContainer) {
       const emailDate = new Date(input.date);
       const transactionDate = pickReliableDate(data.transactionDate, emailDate);
 
+      const normalizedMerchant = normalizeMerchant(data.merchant) || 'Unknown';
+
       return {
-        merchant: data.merchant ?? 'Unknown',
+        merchant: normalizedMerchant,
         amount: Number(data.amount) || 0,
         currency: data.currency ?? 'USD',
         transactionDate,

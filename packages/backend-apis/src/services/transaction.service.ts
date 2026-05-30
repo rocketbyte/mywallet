@@ -1,4 +1,5 @@
 import { Transaction } from '../../../temporal-workflows/src/models';
+import { normalizeMerchant } from '../../../temporal-workflows/src/shared/normalize-merchant';
 import { utcDayRange } from '../utils/date.utils';
 import { escapeRegex } from '../utils/request.utils';
 import type {
@@ -62,7 +63,7 @@ export class TransactionService {
     const doc = await Transaction.create({
       userId,
       transactionDate,
-      merchant: input.merchant,
+      merchant: normalizeMerchant(input.merchant),
       amount: Math.abs(input.amount),
       currency: 'USD',
       category: input.category,
@@ -81,7 +82,7 @@ export class TransactionService {
 
   async update(userId: string, id: string, input: Partial<CreateTransactionInput>): Promise<TransactionDTO | null> {
     const updates: Record<string, any> = {};
-    if (input.merchant !== undefined) updates.merchant = input.merchant;
+    if (input.merchant !== undefined) updates.merchant = normalizeMerchant(input.merchant);
     if (input.category !== undefined) updates.category = input.category;
     if (input.note !== undefined) updates.note = input.note;
     if (input.source !== undefined) updates.source = input.source;
