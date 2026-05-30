@@ -27,16 +27,6 @@ function workflowIdFor(userId: string): string {
   return `daily-analysis-wf-${userId}`;
 }
 
-function yesterdayISO(tz: string): string {
-  const now = new Date();
-  const nowInTZ = new Date(now.toLocaleString('en-US', { timeZone: tz }));
-  nowInTZ.setDate(nowInTZ.getDate() - 1);
-  const y = nowInTZ.getFullYear();
-  const m = String(nowInTZ.getMonth() + 1).padStart(2, '0');
-  const d = String(nowInTZ.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 export async function ensureDailyAnalysisSchedule(
   userId: string,
   opts: { timezone?: string } = {}
@@ -52,7 +42,11 @@ export async function ensureDailyAnalysisSchedule(
         workflowType: 'dailyTransactionAnalysisWorkflow',
         workflowId: workflowIdFor(userId),
         taskQueue: TASK_QUEUES.PIPELINE,
-        args: [{ userId, analysisDate: yesterdayISO(tz) }],
+        // analysisDate intentionally omitted: the activity computes
+        // "yesterday in UTC" at fire time so each daily cron run targets
+        // the correct calendar day. Baking a static date into the Schedule
+        // would freeze every future run on the same day.
+        args: [{ userId }],
       },
     });
     logger.info('Registered daily analysis schedule', { userId, tz });

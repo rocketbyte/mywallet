@@ -1,7 +1,13 @@
 // Daily Transaction Analysis
 export interface DailyAnalysisWorkflowInput {
   userId: string;
-  analysisDate: string;   // YYYY-MM-DD in tenant timezone
+  /**
+   * YYYY-MM-DD in the tenant's timezone. Optional — when omitted the
+   * activity computes "yesterday in UTC" at run time. Schedules MUST omit
+   * this so each daily fire targets the correct calendar day; only the
+   * manual-rerun API path sets it explicitly.
+   */
+  analysisDate?: string;
 }
 
 export interface DailyAnalysisWorkflowResult {

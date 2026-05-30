@@ -40,29 +40,6 @@ function workflowIdFor(userId: string): string {
   return `daily-analysis-wf-${userId}`;
 }
 
-/**
- * Yesterday in the given IANA timezone, as YYYY-MM-DD.
- * The schedule action is computed at register time; Temporal Schedules
- * pass the same `analysisDate` argument to every fire, so we set it to
- * a sentinel and let the worker resolve "yesterday" at trigger time
- * via the workflow input default — see workflow handling.
- *
- * Simpler alternative: register one schedule that runs daily and pass
- * `analysisDate: 'yesterday'` as a literal token the workflow interprets.
- * For now we hardcode the calendar date and rely on a daily re-seed for
- * date roll-over; the dedicated boot re-seed handles this in practice.
- */
-function yesterdayInTZ(tz: string): string {
-  const now = new Date();
-  // Compute "now" in the target tz, then subtract a day.
-  const nowInTZ = new Date(now.toLocaleString('en-US', { timeZone: tz }));
-  nowInTZ.setDate(nowInTZ.getDate() - 1);
-  const y = nowInTZ.getFullYear();
-  const m = String(nowInTZ.getMonth() + 1).padStart(2, '0');
-  const d = String(nowInTZ.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 interface CliOpts { dryRun: boolean }
 
 function parseArgs(argv: string[]): CliOpts {
@@ -92,7 +69,9 @@ async function main() {
     const userId = String(tenant.primaryUserId);
     const tz = DEFAULT_TZ; // Tenant model has no timezone field yet; use env default.
     const scheduleId = scheduleIdFor(userId);
-    const args = [{ userId, analysisDate: yesterdayInTZ(tz) }];
+    // No analysisDate — workflow's activity resolves "yesterday in UTC" at
+    // fire time so each cron run targets the correct calendar day.
+    const args = [{ userId }];
 
     if (dryRun) {
       console.log(`[dry-run] would upsert schedule ${scheduleId} (tz=${tz})`);

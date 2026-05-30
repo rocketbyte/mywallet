@@ -36,16 +36,21 @@ const { analyzeDailyContext } = proxyActivities<AnalysisActivities>({
 export async function dailyTransactionAnalysisWorkflow(
   input: DailyAnalysisWorkflowInput
 ): Promise<DailyAnalysisWorkflowResult> {
-  log.info('Starting daily transaction analysis', { userId: input.userId, analysisDate: input.analysisDate });
+  log.info('Starting daily transaction analysis', { userId: input.userId, analysisDateInput: input.analysisDate ?? null });
 
   const context = await aggregateDailyContext({
     userId: input.userId,
     analysisDate: input.analysisDate,
   });
 
+  // The activity resolves "yesterday in UTC" when no analysisDate is provided.
+  // Use the resolved value everywhere downstream so the persisted row, logs,
+  // and the (userId, analysisDate) upsert key are all self-consistent.
+  const analysisDate = context.analysisDate;
+
   log.info('Aggregated daily context', {
     userId: input.userId,
-    analysisDate: input.analysisDate,
+    analysisDate,
     transactionCount: context.transactions.length,
     priorSummaries: context.priorSummaries.length,
     hasBudget: context.budgetSnapshot !== null,
@@ -56,7 +61,7 @@ export async function dailyTransactionAnalysisWorkflow(
 
     const { analysisId } = await persistDailyAnalysis({
       userId: input.userId,
-      analysisDate: input.analysisDate,
+      analysisDate,
       currency: context.currency,
       inputs: {
         transactionCount: context.transactions.length,
@@ -68,15 +73,15 @@ export async function dailyTransactionAnalysisWorkflow(
       status: 'ready',
     });
 
-    log.info('Daily analysis ready', { analysisId, userId: input.userId, analysisDate: input.analysisDate });
+    log.info('Daily analysis ready', { analysisId, userId: input.userId, analysisDate });
     return { status: 'ready', analysisId };
   } catch (err: any) {
     const reason = err?.message ?? 'analyze step failed';
-    log.error('Daily analysis failed — persisting failed-status row', { userId: input.userId, analysisDate: input.analysisDate, reason });
+    log.error('Daily analysis failed — persisting failed-status row', { userId: input.userId, analysisDate, reason });
 
     const { analysisId } = await persistDailyAnalysis({
       userId: input.userId,
-      analysisDate: input.analysisDate,
+      analysisDate,
       currency: context.currency,
       inputs: {
         transactionCount: context.transactions.length,

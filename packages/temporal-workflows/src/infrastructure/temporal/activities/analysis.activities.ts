@@ -37,6 +37,33 @@ function renderTemplate(template: string, vars: Record<string, string>): string 
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Returns YYYY-MM-DD for yesterday in UTC. Used as the default when no
+ * explicit analysisDate is supplied (the recurring Schedule case).
+ */
+function yesterdayUTC(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Coerces an incoming analysisDate to a valid YYYY-MM-DD. Falls back to
+ * `yesterdayUTC()` when missing, malformed, or producing an Invalid Date.
+ * Returning a guaranteed-valid string here keeps every downstream date
+ * computation (`startOfUTCDay`, `daysRemainingInMonth`) safe even if a
+ * Schedule was registered with a bad arg or a manual call sent garbage.
+ */
+function resolveAnalysisDate(input: string | undefined): string {
+  if (typeof input === 'string' && ISO_DATE_RE.test(input)) {
+    const probe = new Date(`${input}T00:00:00.000Z`);
+    if (!Number.isNaN(probe.getTime())) return input;
+  }
+  return yesterdayUTC();
+}
+
 function startOfUTCDay(isoDate: string): Date {
   return new Date(`${isoDate}T00:00:00.000Z`);
 }
@@ -75,11 +102,12 @@ export function createAnalysisActivities(container: DependencyContainer) {
      */
     async aggregateDailyContext(input: {
       userId: string;
-      analysisDate: string;
+      analysisDate?: string;
     }): Promise<DailyAnalysisContext> {
       Context.current().heartbeat('aggregate-start');
 
-      const { userId, analysisDate } = input;
+      const { userId } = input;
+      const analysisDate = resolveAnalysisDate(input.analysisDate);
       const dayStart = startOfUTCDay(analysisDate);
       const dayEnd = nextUTCDay(analysisDate);
 
@@ -256,7 +284,7 @@ export function createAnalysisActivities(container: DependencyContainer) {
     ): Promise<PersistDailyAnalysisResult> {
       Context.current().heartbeat('persist-start');
 
-      const analysisDate = startOfUTCDay(input.analysisDate);
+      const analysisDate = startOfUTCDay(resolveAnalysisDate(input.analysisDate));
 
       const doc: Record<string, unknown> = {
         userId: input.userId,
