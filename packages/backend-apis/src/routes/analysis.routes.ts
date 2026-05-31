@@ -67,6 +67,68 @@ router.post('/run', controller.runNow.bind(controller));
 
 /**
  * @openapi
+ * /analyses/monthly/latest:
+ *   get:
+ *     summary: Get the most recent monthly note for the caller
+ *     tags: [Analyses]
+ *     responses:
+ *       200:
+ *         description: Latest monthly note.
+ *       204:
+ *         description: No monthly note yet.
+ */
+router.get('/monthly/latest', controller.getLatestMonthly.bind(controller));
+
+/**
+ * @openapi
+ * /analyses/monthly/run:
+ *   post:
+ *     summary: Trigger a monthly note run for the caller
+ *     description: Owner-only. Defaults to the current month when year/month are omitted.
+ *     tags: [Analyses]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               year: { type: integer }
+ *               month: { type: integer, minimum: 1, maximum: 12 }
+ *     responses:
+ *       202:
+ *         description: Workflow started.
+ *       403:
+ *         description: Caller is not the tenant owner.
+ */
+router.post('/monthly/run', controller.runMonthly.bind(controller));
+
+/**
+ * @openapi
+ * /analyses/monthly:
+ *   get:
+ *     summary: Get the caller's monthly note for a specific month
+ *     tags: [Analyses]
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: month
+ *         required: true
+ *         schema: { type: integer, minimum: 1, maximum: 12 }
+ *     responses:
+ *       200:
+ *         description: Monthly note.
+ *       204:
+ *         description: No note for that month.
+ *       400:
+ *         description: Missing or out-of-range year/month.
+ */
+router.get('/monthly', controller.getMonthly.bind(controller));
+
+/**
+ * @openapi
  * /analyses/{id}:
  *   get:
  *     summary: Get an analysis by id

@@ -11,6 +11,7 @@ import { createTransactionActivities } from './activities/transaction.activities
 import { createSyncActivities } from './activities/sync.activities';
 import { createPipelineActivities } from './activities/pipeline.activities';
 import { createAnalysisActivities } from './activities/analysis.activities';
+import { createMonthlyAnalysisActivities } from './activities/monthly-analysis.activities';
 
 /**
  * Create all activities using DI Container
@@ -34,7 +35,10 @@ export function createActivities(container: DependencyContainer) {
     ...createPipelineActivities(container),
 
     // Daily transaction analysis activities (aggregate, analyze, persist)
-    ...createAnalysisActivities(container)
+    ...createAnalysisActivities(container),
+
+    // Monthly financial note activities (aggregate, analyze, persist)
+    ...createMonthlyAnalysisActivities(container)
   };
 }
 

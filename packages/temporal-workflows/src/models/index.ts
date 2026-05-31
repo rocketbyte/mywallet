@@ -15,3 +15,10 @@ export {
   AnalysisInputs,
   AnalysisModelMeta,
 } from './transaction-analysis.model';
+export {
+  MonthlyAnalysis,
+  MonthlyAnalysisInterface,
+  MonthlyAnalysisBudgetSnapshot,
+  MonthlyAnalysisInputs,
+  MonthlyAnalysisModelMeta,
+} from './monthly-analysis.model';

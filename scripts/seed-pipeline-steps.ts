@@ -206,6 +206,60 @@ Recent prior daily summaries (oldest first, may be empty):
 """
 
 Return only the JSON object described in the system prompt.`
+  },
+
+  {
+    stepKey: 'analyze_month',
+    name: 'Analyze Month',
+    description: "Rolls the month's daily summaries plus a pre-computed numeric block into one short note for the dashboard MONTHLY NOTE card. Token-optimised: the model only sees the daily short summaries, the numeric block, and one prior-month note — never raw transactions.",
+    order: 5,
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    // Low ceiling: the output is a single short paragraph, nothing else.
+    maxTokens: 180,
+    isActive: true,
+    systemPrompt: `You write a single short "monthly note" summarising how a user's current month is tracking financially. You are given the month's pre-computed totals plus a list of short daily summaries the system already produced; you reason ONLY over those.
+
+Tone: factual, supportive, non-judgemental. No moralising. Use the user's currency. Round monetary values to whole units.
+
+Hard constraints:
+- Output STRICT JSON only. No prose, no markdown fences.
+- The object has exactly one key: "note".
+- "note" MUST be ONE short paragraph, at most 320 characters, plain text (light markdown emphasis allowed). No bullet lists, no headings.
+- Cover at most: overall pace vs budget given days remaining, the one or two most notable drivers from the daily summaries, and — only if a prior-month note is provided — a brief month-over-month shift.
+- Do NOT invent transactions or numbers; describe only what's in the inputs.
+- If there are no daily summaries yet, write a brief note saying the month has little activity so far.
+
+Schema:
+{ "note": string }`,
+    userPromptTemplate: `Write the monthly note for one user. The month is {{year}}-{{month}}.
+
+Currency: {{currency}}
+
+Month totals so far:
+  income:   {{totals_income}}
+  expenses: {{totals_expenses}}
+  net:      {{totals_net}}
+
+Current balance: {{balance}}
+
+Current-month budget snapshot:
+"""
+{{budget_snapshot_json}}
+"""
+Days remaining in the month: {{days_remaining}}
+
+Daily summaries for this month ({{daily_count}}, oldest first, may be empty):
+"""
+{{daily_summaries_json}}
+"""
+
+Prior month's note (may be empty):
+"""
+{{prior_month_note}}
+"""
+
+Return only the JSON object described in the system prompt.`
   }
 ];
 

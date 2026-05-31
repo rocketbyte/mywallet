@@ -13,7 +13,9 @@
     "build": "npm run build --workspaces",
     "lint": "eslint packages --ext .ts",
     "test": "jest",
+    "test:unit": "tsx --test $(find packages -path '*/__tests__/*.test.ts')",
     "seed:patterns": "tsx scripts/seed-email-patterns.ts",
+    "seed:schedules": "tsx scripts/seed-daily-analysis-schedules.ts",
     "seed:pipeline": "tsx scripts/seed-pipeline-steps.ts",
     "openspec:sync": "node scripts/openspec-sync.mjs",
     "openspec:check": "node scripts/openspec-sync.mjs check"

@@ -1,6 +1,7 @@
 import { getTemporalClient } from '../config/temporal-client';
 import { TASK_QUEUES } from '../../../temporal-workflows/src/shared/constants';
 import { logger } from '../utils/logger';
+import { ensureMonthlyNoteSchedule } from './monthly-analysis-schedule.service';
 
 /**
  * Lazy per-tenant Temporal Schedule registration.
@@ -10,6 +11,11 @@ import { logger } from '../utils/logger';
  * coupling, no work for tenants who never open the app. Idempotent: a
  * second call is a no-op because Temporal returns `ScheduleAlreadyRunning`
  * which we swallow.
+ *
+ * Registering the daily schedule also registers the monthly note schedule for
+ * the same tenant — the two run as a pair (monthly fires 10 minutes after the
+ * daily analysis and rolls that day's summaries up). So a tenant never has a
+ * daily schedule without the matching monthly one.
  *
  * Failures are logged but never thrown — schedule registration must not
  * affect the caller's HTTP response. A missed registration is recoverable
@@ -57,9 +63,15 @@ export async function ensureDailyAnalysisSchedule(
       message.includes('AlreadyExists') ||
       message.includes('already exists') ||
       message.includes('already running');
-    if (isAlreadyExists) return;
-    logger.warn('Failed to register daily analysis schedule', { userId, error: message });
+    if (!isAlreadyExists) {
+      logger.warn('Failed to register daily analysis schedule', { userId, error: message });
+    }
   }
+
+  // The monthly note schedule is created together with the daily one. Its own
+  // helper is idempotent and swallows "already exists", so this is safe to run
+  // even when the daily schedule already existed.
+  await ensureMonthlyNoteSchedule(userId, opts);
 }
 
 /**
