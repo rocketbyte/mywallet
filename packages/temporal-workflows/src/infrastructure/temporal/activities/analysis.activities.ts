@@ -205,6 +205,20 @@ export function createAnalysisActivities(container: DependencyContainer) {
     async analyzeDailyContext(context: DailyAnalysisContext): Promise<DailyAnalysisAIResult> {
       Context.current().heartbeat('analyze-start');
 
+      // Token discipline: a day with no transactions has nothing for the model
+      // to reason about. Return a deterministic empty-day result and skip the
+      // AI call entirely (the prior behaviour burned ~700 tokens to restate
+      // "no transactions occurred"). The row is still persisted as `ready` so
+      // the dashboard and the monthly rollup see a continuous daily series.
+      if (context.transactions.length === 0) {
+        return {
+          summary: 'No transactions yesterday.',
+          fullSummary: `No transactions were recorded on ${context.analysisDate}. Nothing to act on today.`,
+          suggestions: [],
+          modelMeta: { model: 'none', promptVersion: 0, tokensIn: 0, tokensOut: 0 },
+        };
+      }
+
       const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.ANALYZE_DAY);
 
       const userMessage = renderTemplate(step.userPromptTemplate, {
