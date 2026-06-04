@@ -279,17 +279,51 @@ Follow the accuracy rules in the system prompt. If has_data is false, return the
   }
 ];
 
+/**
+ * CLI flags:
+ *   --force            overwrite existing steps (prompts + params) and bump version
+ *   --only <stepKey>   restrict the run to a single step (repeatable / comma-separated)
+ *
+ * Without --force the original behaviour is preserved: existing steps are skipped.
+ */
+function parseArgs(argv: string[]): { force: boolean; only: Set<string> | null } {
+  const force = argv.includes('--force');
+  const only = new Set<string>();
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--only' && argv[i + 1]) {
+      argv[i + 1].split(',').forEach((k) => only.add(k.trim()));
+    }
+  }
+  return { force, only: only.size ? only : null };
+}
+
 async function seed() {
+  const { force, only } = parseArgs(process.argv.slice(2));
+
   console.log('Connecting to MongoDB...');
   await mongoose.connect(MONGODB_URI);
-  console.log('Connected.\n');
+  console.log(`Connected.${force ? ' (force mode)' : ''}${only ? ` only: ${[...only].join(', ')}` : ''}\n`);
 
   for (const step of DEFAULT_STEPS) {
+    if (only && !only.has(step.stepKey)) continue;
+
     const existing = await PipelineStep.findOne({ stepKey: step.stepKey });
 
-    if (existing) {
+    if (existing && !force) {
       console.log(`⏭  Step "${step.stepKey}" already exists (version ${existing.version}) — skipping.`);
-      console.log('   Use PUT /api/pipeline/steps/:stepKey to update prompts.\n');
+      console.log('   Re-run with --force --only ' + step.stepKey + ' to overwrite, or PUT /api/pipeline/steps/:stepKey.\n');
+      continue;
+    }
+
+    if (existing && force) {
+      // Mirror the app's update path: $set the shipped fields, $inc version.
+      const { stepKey, ...fields } = step;
+      const updated = await PipelineStep.findOneAndUpdate(
+        { stepKey },
+        { $set: { ...fields, updatedBy: 'seed-script:--force' }, $inc: { version: 1 } },
+        { new: true, runValidators: true }
+      );
+      console.log(`♻️  Updated step "${step.stepKey}" (${step.name}) → version ${updated?.version}\n`);
       continue;
     }
 
