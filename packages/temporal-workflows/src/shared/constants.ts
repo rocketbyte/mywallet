@@ -149,8 +149,9 @@ export const PIPELINE_STEP_KEYS = {
 // input stays small regardless of how busy the month was.
 export const MONTHLY_MAX_DAILY_SUMMARIES = 31;
 
-// Max length of the monthly note rendered by the dashboard card.
-export const MONTHLY_NOTE_MAX_CHARS = 320;
+// Max length of the monthly note rendered by the dashboard card. Sized for a
+// 2–4 sentence opinionated advisor note (see the analyze_month prompt).
+export const MONTHLY_NOTE_MAX_CHARS = 480;
 
 // Number of prior short summaries fed to the analyze_day prompt as compact
 // trend context. Bounded so prompt tokens stay small.
