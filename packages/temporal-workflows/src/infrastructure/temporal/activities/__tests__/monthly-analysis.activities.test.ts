@@ -132,11 +132,17 @@ test('aggregateMonthlyContext sums only the target month and collects its daily 
 test('aggregateMonthlyContext builds budget snapshot and loads the prior-month note', async () => {
   const userId = await seedTenant();
 
+  // Stored totalSpent is deliberately stale (0) — the snapshot must reflect the
+  // month's ACTUAL expenses (900) instead, so percentUsed is computed from that.
   await Budget.create({
     userId, year: 2026, month: 5,
-    categories: [{ category: 'Food', budgetAmount: 500, spentAmount: 300, transactionCount: 4 }],
-    totalBudget: 1500, totalSpent: 900,
+    categories: [{ category: 'Food', budgetAmount: 500, spentAmount: 0, transactionCount: 0 }],
+    totalBudget: 1500, totalSpent: 0,
   });
+  await Transaction.create([
+    { userId, emailId: 'e1', transactionDate: dayUTC('2026-05-05'), merchant: 'M1', amount: 600, currency: 'USD', category: 'Food', transactionType: 'debit', processedAt: new Date() },
+    { userId, emailId: 'e2', transactionDate: dayUTC('2026-05-15'), merchant: 'M2', amount: 300, currency: 'USD', category: 'Transport', transactionType: 'debit', processedAt: new Date() },
+  ]);
   await MonthlyAnalysis.create({
     userId, year: 2026, month: 4, currency: 'USD',
     inputs: { dailyCount: 3, totals: { income: 0, expenses: 0, net: 0 }, balance: 0, budgetSnapshot: null, sourceHash: 'x' },
@@ -150,6 +156,8 @@ test('aggregateMonthlyContext builds budget snapshot and loads the prior-month n
 
   assert.ok(ctx.budgetSnapshot);
   assert.equal(ctx.budgetSnapshot!.totalBudget, 1500);
+  // totalSpent mirrors the month's real expenses (600 + 300), not the stored 0.
+  assert.equal(ctx.budgetSnapshot!.totalSpent, 900);
   assert.equal(ctx.budgetSnapshot!.percentUsed, 60);
   assert.equal(ctx.priorMonthNote, 'April was tight on dining.');
 });
@@ -201,6 +209,51 @@ test('analyzeMonthlyContext truncates an oversized note on a word boundary', asy
   const out = await analyzeMonthlyContext(ctx);
   assert.ok(out.note.length <= 320, 'note capped at 320');
   assert.ok(!out.note.endsWith(' '), 'no trailing space after word-boundary cut');
+});
+
+test('analyzeMonthlyContext renders a deterministic budget verdict (under budget is never reported as exceeded)', async () => {
+  // Capture the exact userPrompt sent to the gateway, with a template that
+  // echoes the verdict variables.
+  let captured = '';
+  const c = rootContainer.createChildContainer();
+  c.register('AIGatewayInterface', {
+    useValue: {
+      extractStructuredData: async (args: any) => {
+        captured = args.userPrompt;
+        return { data: { note: 'ok' }, confidence: 1, tokensUsed: 0, rawResponse: {} };
+      },
+      getProviderName: () => 'stub',
+      getModelName: () => 'stub-model',
+      getEndpoint: () => 'http://stub',
+    },
+  });
+  c.register('PipelineStepRepositoryInterface', {
+    useValue: {
+      getActiveStep: async () => ({
+        stepKey: 'analyze_month',
+        systemPrompt: 'sys',
+        userPromptTemplate:
+          'over_budget={{over_budget}} remaining={{budget_remaining}} percent={{budget_percent_used}} status={{budget_status}} has_data={{has_data}}',
+        temperature: 0.2,
+        maxTokens: 180,
+        version: 1,
+      }),
+    },
+  });
+
+  const { analyzeMonthlyContext } = createMonthlyAnalysisActivities(c);
+  const ctx: any = {
+    userId: 'u', year: 2026, month: 6, currency: 'USD', dailyCount: 0,
+    dailySummaries: [], totals: { income: 0, expenses: 83118.63, net: -83118.63 }, balance: 0,
+    budgetSnapshot: { totalBudget: 170000, totalSpent: 83118.63, percentUsed: 48.89, daysRemainingInPeriod: 26 },
+    priorMonthNote: null, sourceHash: 'h', existing: null, promptVersion: 1,
+  };
+  await analyzeMonthlyContext(ctx);
+
+  assert.match(captured, /over_budget=false/);
+  assert.match(captured, /remaining=86881\.37/);
+  assert.match(captured, /status=under_budget/);
+  assert.match(captured, /has_data=true/);
 });
 
 test('analyzeMonthlyContext rejects an empty note', async () => {

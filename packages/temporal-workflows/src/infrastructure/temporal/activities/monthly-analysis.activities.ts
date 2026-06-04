@@ -174,16 +174,19 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
       }
       const balance = round2(credits - debits);
 
-      // Current-month budget snapshot for the target month.
+      // Current-month budget snapshot for the target month. `totalSpent` MUST be
+      // the month's ACTUAL expenses (the same number we show the model in
+      // `totals.expenses`), not the possibly-stale stored `Budget.totalSpent`.
+      // Otherwise the model sees two different "spent" figures and hallucinates
+      // the budget comparison.
       const budget = await Budget.findOne({ userId, year, month }).lean();
+      const totalBudgetAmount = round2(budget?.totalBudget ?? 0);
       const budgetSnapshot: MonthlyAnalysisBudgetSnapshot | null = budget
         ? {
-            totalBudget: round2(budget.totalBudget ?? 0),
-            totalSpent: round2(budget.totalSpent ?? 0),
+            totalBudget: totalBudgetAmount,
+            totalSpent: totals.expenses,
             percentUsed:
-              budget.totalBudget && budget.totalBudget > 0
-                ? round2(((budget.totalSpent ?? 0) / budget.totalBudget) * 100)
-                : 0,
+              totalBudgetAmount > 0 ? round2((totals.expenses / totalBudgetAmount) * 100) : 0,
             daysRemainingInPeriod: daysRemainingInTargetMonth(year, month),
           }
         : null;
@@ -259,6 +262,24 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
 
       const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.ANALYZE_MONTH);
 
+      // Deterministic budget verdict computed in code — the model MUST NOT do
+      // this arithmetic itself. `overBudget`/`status` are the only basis the
+      // prompt is allowed to use for any "exceeded/on-track" statement.
+      const snap = context.budgetSnapshot;
+      const hasBudget = snap !== null && snap.totalBudget > 0;
+      const remainingBudget = hasBudget ? round2(snap!.totalBudget - context.totals.expenses) : 0;
+      const overBudget = hasBudget && context.totals.expenses > snap!.totalBudget;
+      const percentUsed = hasBudget ? round2((context.totals.expenses / snap!.totalBudget) * 100) : 0;
+      const budgetStatus = !hasBudget
+        ? 'no_budget'
+        : overBudget
+          ? 'over_budget'
+          : percentUsed >= 80
+            ? 'near_limit'
+            : 'under_budget';
+      // Whether we have enough to produce an accurate report at all.
+      const hasData = context.dailyCount > 0 || context.totals.expenses > 0 || context.totals.income > 0 || hasBudget;
+
       const userMessage = renderTemplate(step.userPromptTemplate, {
         year: String(context.year),
         month: String(context.month),
@@ -272,6 +293,15 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
         budget_snapshot_json: JSON.stringify(context.budgetSnapshot),
         days_remaining: String(context.budgetSnapshot?.daysRemainingInPeriod ?? ''),
         prior_month_note: context.priorMonthNote ?? '',
+        // Pre-computed verdict — the model only narrates these.
+        has_budget: String(hasBudget),
+        budget_total: hasBudget ? String(snap!.totalBudget) : '',
+        budget_spent: hasBudget ? String(context.totals.expenses) : '',
+        budget_remaining: hasBudget ? String(remainingBudget) : '',
+        budget_percent_used: hasBudget ? String(percentUsed) : '',
+        over_budget: String(overBudget),
+        budget_status: budgetStatus,
+        has_data: String(hasData),
       });
 
       const heartbeat = setInterval(() => {
