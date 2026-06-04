@@ -7,6 +7,11 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Clamp a category limit into `[0, cap]` so it never exceeds the budget cap. */
+function clampToCap(value: number, cap: number): number {
+  return Math.max(0, Math.min(cap, value ?? 0));
+}
+
 interface CategorySpend {
   total: number;
   count: number;
@@ -120,14 +125,21 @@ export class BudgetService {
   /** Creates or replaces the budget row for a month and returns its live DTO. */
   async upsert(userId: string, input: UpsertBudgetInput): Promise<BudgetDTO> {
     const { year, month } = this.resolveMonth(input);
-    const categories = (input.categories ?? []).map((c) => ({
+    const rawCategories = (input.categories ?? []).map((c) => ({
       category: c.category,
       budgetAmount: c.budget,
       spentAmount: 0,
       transactionCount: 0,
     }));
+    // The explicit cap is authoritative; otherwise fall back to the category sum.
     const totalBudget =
-      input.limitAmount ?? categories.reduce((sum, c) => sum + (c.budgetAmount ?? 0), 0);
+      input.limitAmount ?? rawCategories.reduce((sum, c) => sum + (c.budgetAmount ?? 0), 0);
+    // No category limit may exceed the cap (it is the slider max client-side);
+    // clamp to [0, totalBudget] so persisted data always honors the invariant.
+    const categories = rawCategories.map((c) => ({
+      ...c,
+      budgetAmount: clampToCap(c.budgetAmount, totalBudget),
+    }));
 
     const doc = await Budget.findOneAndUpdate(
       { userId, year, month },
@@ -147,9 +159,12 @@ export class BudgetService {
     const updates: Record<string, unknown> = { lastCalculatedAt: new Date() };
     if (input.limitAmount !== undefined) updates.totalBudget = input.limitAmount;
     if (input.categories) {
+      // When the cap is patched in the same call, clamp categories to it so a
+      // category limit can never exceed the cap (the client-side slider max).
+      const cap = input.limitAmount ?? Number.POSITIVE_INFINITY;
       updates.categories = input.categories.map((c) => ({
         category: c.category,
-        budgetAmount: c.budget,
+        budgetAmount: clampToCap(c.budget, cap),
         spentAmount: 0,
         transactionCount: 0,
       }));
