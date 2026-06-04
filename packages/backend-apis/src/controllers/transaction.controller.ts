@@ -3,6 +3,25 @@ import { TransactionService } from '../services/transaction.service';
 import { getDataOwnerId } from '../auth';
 import { parsePagination } from '../utils/request.utils';
 import { logger } from '../utils/logger';
+import {
+  isTransactionCategoryKey,
+  isTransactionType,
+} from '../../../temporal-workflows/src/shared/categories';
+
+/**
+ * Validates the category/transactionType fields of a write payload. Returns an
+ * error message when a supplied value is invalid, or `null` when the payload is
+ * acceptable. Absent fields are allowed (partial updates).
+ */
+function validateClassification(body: any): string | null {
+  if (body.category !== undefined && !isTransactionCategoryKey(body.category)) {
+    return 'category must be one of the supported category keys';
+  }
+  if (body.transactionType !== undefined && !isTransactionType(body.transactionType)) {
+    return "transactionType must be 'debit' or 'credit'";
+  }
+  return null;
+}
 
 export class TransactionController {
   private service = new TransactionService();
@@ -23,10 +42,18 @@ export class TransactionController {
     }
   }
 
+  async getCategories(_req: Request, res: Response) {
+    res.json({ categories: this.service.listCategories() });
+  }
+
   async createTransaction(req: Request, res: Response) {
     const { merchant, amount, category, transactionDate } = req.body;
     if (!merchant || amount === undefined || !category || !transactionDate) {
       return res.status(400).json({ error: 'merchant, amount, category, and transactionDate are required' });
+    }
+    const classificationError = validateClassification(req.body);
+    if (classificationError) {
+      return res.status(400).json({ error: classificationError });
     }
     try {
       const transaction = await this.service.create(getDataOwnerId(req), req.body);
@@ -49,6 +76,10 @@ export class TransactionController {
   }
 
   async updateTransaction(req: Request, res: Response) {
+    const classificationError = validateClassification(req.body);
+    if (classificationError) {
+      return res.status(400).json({ error: classificationError });
+    }
     try {
       const transaction = await this.service.update(getDataOwnerId(req), req.params.id, req.body);
       if (!transaction) return res.status(404).json({ error: 'Transaction not found' });

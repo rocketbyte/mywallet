@@ -1,11 +1,13 @@
 import { Transaction } from '../../../temporal-workflows/src/models';
 import { normalizeMerchant } from '../../../temporal-workflows/src/shared/normalize-merchant';
+import { SUPPORTED_TRANSACTION_CATEGORIES } from '../../../temporal-workflows/src/shared/categories';
 import { utcDayRange } from '../utils/date.utils';
 import { escapeRegex } from '../utils/request.utils';
 import type {
   BalanceDTO,
   BalanceFilters,
   CreateTransactionInput,
+  SupportedCategoryDTO,
   TransactionDTO,
   TransactionFilters,
 } from '../types/transaction.types';
@@ -65,14 +67,20 @@ export class TransactionService {
       transactionDate,
       merchant: normalizeMerchant(input.merchant),
       amount: Math.abs(input.amount),
-      currency: 'USD',
+      currency: input.currency ?? 'USD',
       category: input.category,
-      transactionType: input.isIncome ? 'credit' : 'debit',
+      subcategory: input.subcategory,
+      transactionType: resolveTransactionType(input) ?? 'debit',
       source: input.source ?? 'manual',
       accountNumber: input.account,
       note: input.note,
     });
     return toDTO(doc.toObject());
+  }
+
+  /** The canonical, supported category taxonomy ({ key, label }), display-ordered. */
+  listCategories(): SupportedCategoryDTO[] {
+    return SUPPORTED_TRANSACTION_CATEGORIES.map((c) => ({ key: c.key, label: c.label }));
   }
 
   async getById(userId: string, id: string): Promise<TransactionDTO | null> {
@@ -84,9 +92,12 @@ export class TransactionService {
     const updates: Record<string, any> = {};
     if (input.merchant !== undefined) updates.merchant = normalizeMerchant(input.merchant);
     if (input.category !== undefined) updates.category = input.category;
+    if (input.subcategory !== undefined) updates.subcategory = input.subcategory;
+    if (input.currency !== undefined) updates.currency = input.currency;
     if (input.note !== undefined) updates.note = input.note;
     if (input.source !== undefined) updates.source = input.source;
-    if (input.isIncome !== undefined) updates.transactionType = input.isIncome ? 'credit' : 'debit';
+    const transactionType = resolveTransactionType(input);
+    if (transactionType !== undefined) updates.transactionType = transactionType;
     if (input.amount !== undefined) updates.amount = Math.abs(input.amount);
     if (input.transactionDate) updates.transactionDate = new Date(input.transactionDate);
 
@@ -136,4 +147,18 @@ export class TransactionService {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Resolves the transaction direction from an input payload. `transactionType`
+ * is authoritative; the legacy `isIncome` boolean is honored only as a fallback
+ * for older clients. Returns `undefined` when neither field is present (so a
+ * partial update leaves the stored value untouched).
+ */
+function resolveTransactionType(
+  input: Partial<CreateTransactionInput>,
+): 'debit' | 'credit' | undefined {
+  if (input.transactionType !== undefined) return input.transactionType;
+  if (input.isIncome !== undefined) return input.isIncome ? 'credit' : 'debit';
+  return undefined;
 }

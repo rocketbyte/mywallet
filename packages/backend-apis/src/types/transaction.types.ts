@@ -43,8 +43,21 @@ export interface CreateTransactionInput {
   merchant: string;
   amount: number;
   category: string;
+  currency?: string;
+  subcategory?: string;
+  /**
+   * Transaction direction. Preferred over the legacy `isIncome` boolean; when
+   * both are present, `transactionType` wins.
+   */
+  transactionType?: 'debit' | 'credit';
   source?: string;
   account?: string;
   note?: string;
+  /** @deprecated Use `transactionType`. Retained for backward compatibility. */
   isIncome?: boolean;
+}
+
+export interface SupportedCategoryDTO {
+  key: string;
+  label: string;
 }

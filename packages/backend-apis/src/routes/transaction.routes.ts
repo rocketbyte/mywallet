@@ -107,6 +107,37 @@ router.get('/balance', controller.getBalance.bind(controller));
 
 /**
  * @openapi
+ * /transactions/categories:
+ *   get:
+ *     summary: List supported transaction categories
+ *     description: |
+ *       Returns the canonical, backend-owned category taxonomy. The `key`s are
+ *       the stored contract values and the only category values the create and
+ *       update endpoints accept; `label`s are display-ready names. The list is
+ *       returned in a stable display order.
+ *     tags: [Transactions]
+ *     responses:
+ *       200:
+ *         description: Supported categories.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 categories:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       key:   { type: string, example: food }
+ *                       label: { type: string, example: 'Food & Dining' }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/categories', controller.getCategories.bind(controller));
+
+/**
+ * @openapi
  * /transactions/{id}:
  *   get:
  *     summary: Get transaction by ID
@@ -132,6 +163,11 @@ router.get('/:id', controller.getTransactionById.bind(controller));
  * /transactions/{id}:
  *   patch:
  *     summary: Update a transaction
+ *     description: |
+ *       Partial update. `transactionType` ('credit' = income, 'debit' = expense)
+ *       is honored directly; `category` must be one of the keys from
+ *       `GET /transactions/categories`. An invalid `transactionType` or unknown
+ *       `category` is rejected with 400. AI-only fields are read-only.
  *     tags: [Transactions]
  *     parameters:
  *       - $ref: '#/components/parameters/UserId'
@@ -139,9 +175,25 @@ router.get('/:id', controller.getTransactionById.bind(controller));
  *         name: id
  *         required: true
  *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               merchant: { type: string }
+ *               amount: { type: number }
+ *               currency: { type: string }
+ *               category: { type: string, example: subscriptions }
+ *               subcategory: { type: string }
+ *               transactionType: { type: string, enum: [debit, credit] }
+ *               note: { type: string }
+ *               transactionDate: { type: string, format: date-time }
  *     responses:
  *       200:
  *         description: Updated transaction.
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  *       500:
