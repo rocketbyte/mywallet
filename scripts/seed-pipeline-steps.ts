@@ -92,7 +92,7 @@ Field rules:
 - bankName: the issuing institution detected from the sender domain or signature.
 - accountLast4: last 4 digits of the source card/account if shown, else null.
 - referenceNumber: the transaction's bank-issued reference, authorization, confirmation, or ARN code if present, else null. PREFER bank reference over email/message IDs.
-- category: pick the closest from "Food", "Transport", "Shopping", "Bills", "Entertainment", "Healthcare", "Travel", "Education", "Personal", "Other". When unsure, use "Other".
+- category: pick the closest canonical key (lowercase) from "food", "groceries", "transport", "travel", "shopping", "bills", "housing", "health", "entertainment", "subscriptions", "education", "personal", "income", "transfer", "other". Use "groceries" for supermarkets and "food" for restaurants/dining; "bills" for utilities/telecom; "housing" for rent/mortgage; "subscriptions" for recurring memberships; "income" for money received; "transfer" for account-to-account movements. When unsure, use "other".
 - description: short human-readable summary, else null.
 - confidence: 0..1, calibrated. Penalize when amount, merchant, or currency had to be inferred rather than observed verbatim.
 
@@ -112,7 +112,7 @@ Schema:
   "bankName": string,
   "accountLast4": string | null,
   "referenceNumber": string | null,
-  "category": "Food"|"Transport"|"Shopping"|"Bills"|"Entertainment"|"Healthcare"|"Travel"|"Education"|"Personal"|"Other",
+  "category": "food"|"groceries"|"transport"|"travel"|"shopping"|"bills"|"housing"|"health"|"entertainment"|"subscriptions"|"education"|"personal"|"income"|"transfer"|"other",
   "description": string | null,
   "confidence": number                    // 0..1
 }`,
