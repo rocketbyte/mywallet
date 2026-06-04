@@ -1,14 +1,13 @@
 import { Schema, model, Document } from 'mongoose';
 
-export interface ITransaction extends Document {
-  // Tenant Identifier
-  userId: string;            // Tenant/User identifier for multi-tenancy
+export interface TransactionInterface extends Document {
+  userId: string;
 
-  // Source Information
-  emailId: string;
-  emailSubject: string;
-  emailDate: Date;
-  emailFrom: string;
+  // Source (optional for manual transactions)
+  emailId?: string;
+  emailSubject?: string;
+  emailDate?: Date;
+  emailFrom?: string;
 
   // Transaction Details
   transactionDate: Date;
@@ -21,43 +20,52 @@ export interface ITransaction extends Document {
   subcategory?: string;
   transactionType: 'debit' | 'credit';
 
-  // Banking Details
-  accountNumber: string;
-  bankName: string;
+  // Source channel
+  source?: 'email' | 'sms' | 'manual' | 'chat';
 
-  // Metadata
-  rawEmailText: string;
-  extractedData: Record<string, any>;
-  confidence: number;
+  // Banking Details (optional for manual transactions)
+  accountNumber?: string;
+  bankName?: string;
 
-  // Workflow Tracking
-  workflowId: string;
-  workflowRunId: string;
+  // Additional fields
+  note?: string;
 
-  // Timestamps
+  // Metadata (optional for manual transactions)
+  rawEmailText?: string;
+  extractedData?: Record<string, any>;
+  confidence?: number;
+
+  // Workflow Tracking (optional for manual transactions)
+  workflowId?: string;
+  workflowRunId?: string;
+
   processedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const TransactionSchema = new Schema<ITransaction>({
-  userId: { type: String, index: true },
-  emailId: { type: String, index: true },
+const TransactionSchema = new Schema<TransactionInterface>({
+  userId: { type: String, required: true, index: true },
+  emailId: { type: String },
   emailSubject: { type: String },
   emailDate: { type: Date },
   emailFrom: { type: String },
 
-  transactionDate: { type: Date, index: true },
-  merchant: { type: String },
-  amount: { type: Number },
+  transactionDate: { type: Date, required: true, index: true },
+  merchant: { type: String, required: true },
+  amount: { type: Number, required: true },
   currency: { type: String, default: 'USD' },
 
-  category: { type: String, index: true },
+  category: { type: String, required: true, index: true },
   subcategory: { type: String },
-  transactionType: { type: String, enum: ['debit', 'credit'] },
+  transactionType: { type: String, enum: ['debit', 'credit'], required: true },
+
+  source: { type: String, enum: ['email', 'sms', 'manual', 'chat'], default: 'email' },
 
   accountNumber: { type: String },
   bankName: { type: String },
+
+  note: { type: String },
 
   rawEmailText: { type: String },
   extractedData: { type: Schema.Types.Mixed },
@@ -66,18 +74,23 @@ const TransactionSchema = new Schema<ITransaction>({
   workflowId: { type: String },
   workflowRunId: { type: String },
 
-  processedAt: { type: Date, default: Date.now }
+  processedAt: { type: Date, default: Date.now },
 }, {
   timestamps: true,
-  collection: 'transactions'
+  collection: 'transactions',
 });
 
-// Compound unique index for per-tenant deduplication (one transaction per email per tenant)
-TransactionSchema.index({ userId: 1, emailId: 1 }, { unique: true });
+// Sparse unique index — allows multiple manual transactions (no emailId) per tenant
+TransactionSchema.index({ userId: 1, emailId: 1 }, { unique: true, sparse: true });
 
-// Indexes for common queries (with userId prefix for tenant isolation)
 TransactionSchema.index({ userId: 1, transactionDate: -1, category: 1 });
-TransactionSchema.index({ userId: 1, workflowId: 1 });
-TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 });
+TransactionSchema.index({ userId: 1, workflowId: 1 }, { sparse: true });
+TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 }, { sparse: true });
 
-export const Transaction = model<ITransaction>('Transaction', TransactionSchema);
+// Supports findRecentDuplicate — exact-match dedup query during pipeline storage.
+TransactionSchema.index(
+  { userId: 1, transactionType: 1, currency: 1, amount: 1, transactionDate: -1 },
+  { name: 'dedup_lookup' }
+);
+
+export const Transaction = model<TransactionInterface>('Transaction', TransactionSchema);

@@ -6,14 +6,14 @@
 export class Transaction {
   constructor(
     public readonly id: string,
-    public readonly emailId: string,
+    public readonly emailId: string | undefined,
     public readonly transactionDate: Date,
     public readonly merchant: string,
     public readonly amount: number,
     public readonly currency: string,
     public readonly category: string,
     public readonly transactionType: 'debit' | 'credit',
-    public readonly accountNumber: string,
+    public readonly accountNumber: string | undefined,
     public readonly confidence: number,
     public readonly bankName?: string,
     public readonly subcategory?: string,

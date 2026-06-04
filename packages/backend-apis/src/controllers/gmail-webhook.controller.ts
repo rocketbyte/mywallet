@@ -8,23 +8,19 @@ import {
 } from '../../../temporal-workflows/src/shared/types';
 import { GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX, GMAIL_SIGNALS, GMAIL_SYNC_TASK_QUEUE } from '../../../temporal-workflows/src/shared/constants';
 import { GmailAccount } from '../../../temporal-workflows/src/models/gmail-account.model';
-import { IEmailProvider } from '../providers/types';
+import { EmailProviderInterface } from '../providers/types';
+import { getDataOwnerId } from '../auth';
 import { logger } from '../utils/logger';
 
 /**
  * Handles Gmail-specific operations:
  * - Pub/Sub webhook processing (Gmail-specific format — stays here)
- * - Account link / unlink / status delegated to IEmailProvider
+ * - Account link / unlink / status delegated to EmailProviderInterface
  *   so the same pattern works for Outlook/Yahoo in the future.
  */
 export class GmailWebhookController {
-  constructor(private readonly provider: IEmailProvider) {}
+  constructor(private readonly provider: EmailProviderInterface) {}
 
-  /**
-   * POST /api/gmail/webhook
-   * Receives Pub/Sub push notifications from Google Cloud.
-   * Signals the running Temporal workflow; starts it if it isn't running yet.
-   */
   async handleWebhook(req: Request, res: Response): Promise<void> {
     try {
       logger.info('Received Gmail webhook', req.body);
@@ -100,10 +96,6 @@ export class GmailWebhookController {
     }
   }
 
-  /**
-   * POST /api/gmail/link
-   * Link a Gmail account and start the Temporal sync workflow.
-   */
   async linkAccount(req: Request, res: Response): Promise<void> {
     try {
       const { userId, email, refreshToken, pubSubTopicName } = req.body;
@@ -127,10 +119,6 @@ export class GmailWebhookController {
     }
   }
 
-  /**
-   * DELETE /api/gmail/unlink/:userId
-   * Stop the sync workflow and mark the account inactive.
-   */
   async unlinkAccount(req: Request, res: Response): Promise<void> {
     try {
       const { userId } = req.params;
@@ -149,23 +137,38 @@ export class GmailWebhookController {
     }
   }
 
-  /**
-   * GET /api/gmail/status/:userId
-   * Returns the current sync status combining MongoDB + Temporal state.
-   */
   async getStatus(req: Request, res: Response): Promise<void> {
     try {
       const { userId } = req.params;
 
       const status = await this.provider.getAccountStatus(userId);
 
-      res.status(200).json(status);
-    } catch (error) {
-      const code = (error as any).code;
-      if (code === 'not_found') {
-        res.status(404).json({ error: 'account_not_found', message: (error as Error).message });
+      if (!status) {
+        res.status(404).json({ error: 'account_not_found', message: `No Gmail account found for user: ${userId}` });
         return;
       }
+      res.status(200).json(status);
+    } catch (error) {
+      logger.error('Error getting Gmail sync status', { error });
+      res.status(500).json({ error: 'status_check_failed', message: (error as Error).message });
+    }
+  }
+
+  /**
+   * Authed-user variant — derives userId from the bearer token so callers
+   * can't impersonate another user by guessing an id. Returns 200 with
+   * `linked: false` when no account exists; not-yet-linked is a normal
+   * state for a fresh user, not an error worth a 404.
+   */
+  async getMyStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const status = await this.provider.getAccountStatus(getDataOwnerId(req));
+      if (!status) {
+        res.status(200).json({ linked: false });
+        return;
+      }
+      res.status(200).json({ linked: true, ...status });
+    } catch (error) {
       logger.error('Error getting Gmail sync status', { error });
       res.status(500).json({ error: 'status_check_failed', message: (error as Error).message });
     }

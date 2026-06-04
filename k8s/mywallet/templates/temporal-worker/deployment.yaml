@@ -8,6 +8,8 @@ metadata:
     {{- include "mywallet.worker.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.worker.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "mywallet.worker.selectorLabels" . | nindent 6 }}

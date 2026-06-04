@@ -1,6 +1,24 @@
-export { Transaction, ITransaction } from './transaction.model';
-export { EmailPattern, IEmailPattern } from './email-pattern.model';
-export { Budget, IBudget } from './budget.model';
-export { Email, IEmail } from './email.model';
-export { ScheduleConfig, IScheduleConfig } from './schedule-config.model';
-export { PipelineStep, IPipelineStep } from './pipeline-step.model';
+export { User, UserInterface } from './user.model';
+export { Transaction, TransactionInterface } from './transaction.model';
+export { EmailPattern, EmailPatternInterface } from './email-pattern.model';
+export { Budget, BudgetInterface } from './budget.model';
+export { Alert, AlertInterface } from './alert.model';
+export { Tenant, TenantInterface } from './tenant.model';
+export { Email, EmailInterface } from './email.model';
+export { PipelineStep, PipelineStepInterface } from './pipeline-step.model';
+export {
+  TransactionAnalysis,
+  TransactionAnalysisInterface,
+  AnalysisStatus,
+  AnalysisSuggestion,
+  SuggestionUrgency,
+  AnalysisInputs,
+  AnalysisModelMeta,
+} from './transaction-analysis.model';
+export {
+  MonthlyAnalysis,
+  MonthlyAnalysisInterface,
+  MonthlyAnalysisBudgetSnapshot,
+  MonthlyAnalysisInputs,
+  MonthlyAnalysisModelMeta,
+} from './monthly-analysis.model';

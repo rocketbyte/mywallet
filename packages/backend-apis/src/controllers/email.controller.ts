@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Connection } from 'mongoose';
 import { createEmailActivities } from '../../../temporal-workflows/src/activities/database/email.activities';
-import { Email } from '../../../temporal-workflows/src/models';
+import { getDataOwnerId } from '../auth';
 import { logger } from '../utils/logger';
 
 export class EmailController {
@@ -11,21 +11,9 @@ export class EmailController {
     this.emailActivities = createEmailActivities(mongoConnection);
   }
 
-  /**
-   * GET /api/emails
-   * Get all emails with pagination
-   */
   async getAllEmails(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
+      const userId = getDataOwnerId(req);
 
       const {
         limit = '50',
@@ -68,21 +56,9 @@ export class EmailController {
     }
   }
 
-  /**
-   * GET /api/emails/:id
-   * Get a specific email by Gmail ID
-   */
   async getEmailById(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
+      const userId = getDataOwnerId(req);
 
       const { id } = req.params;
 
@@ -106,21 +82,9 @@ export class EmailController {
     }
   }
 
-  /**
-   * GET /api/emails/search?q=term
-   * Search emails by text
-   */
   async searchEmails(req: Request, res: Response) {
     try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
+      const userId = getDataOwnerId(req);
 
       const {
         q: searchTerm,
@@ -163,44 +127,4 @@ export class EmailController {
     }
   }
 
-  /**
-   * GET /api/emails/stats
-   * Get email statistics
-   */
-  async getEmailStats(req: Request, res: Response) {
-    try {
-      // Extract userId from auth or header
-      const userId = (req as any).user?.id || req.headers['x-user-id'] as string;
-
-      // if (!userId) {
-      //   return res.status(401).json({
-      //     error: 'Unauthorized',
-      //     message: 'userId is required. Provide via authentication or x-user-id header.'
-      //   });
-      // }
-
-      const [total, processed, unprocessed] = await Promise.all([
-        Email.countDocuments({ userId }),
-        Email.countDocuments({ userId, isProcessed: true }),
-        Email.countDocuments({ userId, isProcessed: false })
-      ]);
-
-      res.json({
-        userId,
-        stats: {
-          total,
-          processed,
-          unprocessed,
-          processingRate: total > 0 ? (processed / total * 100).toFixed(2) + '%' : '0%'
-        }
-      });
-
-    } catch (error) {
-      logger.error('Failed to get email stats', { error });
-      res.status(500).json({
-        error: 'Failed to fetch statistics',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
 }

@@ -25,11 +25,12 @@ This API provides powerful tools to interact with your financial data, automate 
       },
     },
     tags: [
+      { name: 'Users', description: 'Authenticated user identity and linked IDPs' },
+      { name: 'Chat', description: 'Streaming chat with the Mintly agent (tool-driven)' },
       { name: 'Gmail', description: 'Gmail OAuth and real-time synchronization' },
       { name: 'Emails', description: 'Financial email storage and searching' },
       { name: 'Pipeline', description: 'AI pipeline — manage prompts and manually trigger transaction extraction' },
       { name: 'Workflows', description: 'Temporal background processing — trigger and monitor runs' },
-      { name: 'Schedules', description: 'Cron-based recurring email processing schedules' },
       { name: 'System', description: 'Platform health and diagnostics' },
     ],
     servers: [
@@ -42,21 +43,23 @@ This API provides powerful tools to interact with your financial data, automate 
         description: 'Local development server',
       },
     ],
+    security: [{ bearerAuth: [] }],
     components: {
       securitySchemes: {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
+          description: 'Firebase ID token. Obtain on the client via the Firebase Auth SDK and send as `Authorization: Bearer <token>`.',
         },
       },
       parameters: {
         UserId: {
           in: 'header',
           name: 'x-user-id',
-          required: true,
+          required: false,
           schema: { type: 'string' },
-          description: 'User identifier. Required on all authenticated endpoints.',
+          description: 'Dev-only override (active when AUTH_BYPASS=true). Ignored when Firebase auth is enforced.',
           example: 'user_123',
         },
         LimitQuery: {
@@ -98,34 +101,6 @@ This API provides powerful tools to interact with your financial data, automate 
             matchedPatternName: { type: 'string', example: 'Chase Credit Card', nullable: true },
             transactionId: { type: 'string', nullable: true },
             confidence: { type: 'number', minimum: 0, maximum: 1, example: 0.97 },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
-          },
-        },
-        ScheduleStats: {
-          type: 'object',
-          properties: {
-            totalRuns: { type: 'integer', example: 48 },
-            totalEmailsFetched: { type: 'integer', example: 320 },
-            totalEmailsProcessed: { type: 'integer', example: 310 },
-            totalErrors: { type: 'integer', example: 2 },
-          },
-        },
-        Schedule: {
-          type: 'object',
-          properties: {
-            scheduleId: { type: 'string', example: 'sched_chase_daily' },
-            name: { type: 'string', example: 'Daily Chase Emails' },
-            description: { type: 'string', example: 'Process Chase credit card alerts', nullable: true },
-            isActive: { type: 'boolean', example: true },
-            searchQuery: { type: 'string', example: 'subject:"Usaste tu tarjeta de credito"' },
-            cronExpression: { type: 'string', example: '0 8 * * *' },
-            maxResults: { type: 'integer', example: 50 },
-            afterDate: { type: 'string', format: 'date-time', nullable: true },
-            nextRunTime: { type: 'string', format: 'date-time', nullable: true },
-            lastRunAt: { type: 'string', format: 'date-time', nullable: true },
-            lastRunStatus: { type: 'string', enum: ['success', 'failure'], nullable: true },
-            stats: { '$ref': '#/components/schemas/ScheduleStats' },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -198,11 +173,11 @@ This API provides powerful tools to interact with your financial data, automate 
       },
       responses: {
         UnauthorizedError: {
-          description: 'userId is missing. Provide via `x-user-id` header.',
+          description: 'Missing or invalid Firebase ID token.',
           content: {
             'application/json': {
               schema: { '$ref': '#/components/schemas/ErrorResponse' },
-              example: { error: 'Unauthorized', message: 'userId is required. Provide via authentication or x-user-id header.' },
+              example: { error: 'Unauthorized', message: 'Invalid or expired token' },
             },
           },
         },

@@ -21,7 +21,6 @@ import {
   createOpenAIActivities,
   createMongoDBActivities,
   createEmailActivities,
-  createScheduleActivities,
   createWorkflowStarterActivities,
   GmailClient,
   OpenAIClient
@@ -122,7 +121,6 @@ async function run() {
       ? {
           ...createMongoDBActivities(mongoose.connection),
           ...createEmailActivities(mongoose.connection),
-          ...createScheduleActivities(mongoose.connection),
         }
       : {};
 

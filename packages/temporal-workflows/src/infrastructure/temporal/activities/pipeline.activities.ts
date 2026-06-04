@@ -12,10 +12,10 @@
 import { Context } from '@temporalio/activity';
 import { DependencyContainer } from 'tsyringe';
 
-import { IAIGateway } from '../../../application/interfaces/gateways/iai-gateway';
-import { IPipelineStepRepository } from '../../../application/interfaces/repositories/ipipeline-step-repository';
-import { ITransactionRepository } from '../../../application/interfaces/repositories/itransaction-repository';
-import { IEmailRepository } from '../../../application/interfaces/repositories/iemail-repository';
+import { AIGatewayInterface } from '../../../application/interfaces/gateways/ai-gateway.interface';
+import { PipelineStepRepositoryInterface } from '../../../application/interfaces/repositories/pipeline-step-repository.interface';
+import { TransactionRepositoryInterface } from '../../../application/interfaces/repositories/transaction-repository.interface';
+import { EmailRepositoryInterface } from '../../../application/interfaces/repositories/email-repository.interface';
 import {
   ClassifyEmailInput,
   ClassificationResult,
@@ -24,7 +24,8 @@ import {
   StoreTransactionInput,
   StoredTransactionResult
 } from '../../../shared/types';
-import { PIPELINE_STEP_KEYS } from '../../../shared/constants';
+import { PIPELINE_STEP_KEYS, DUPLICATE_LOOKBACK_HOURS } from '../../../shared/constants';
+import { normalizeMerchant } from '../../../shared/normalize-merchant';
 
 // ---------------------------------------------------------------------------
 // Template interpolation helper
@@ -35,10 +36,10 @@ function renderTemplate(template: string, vars: Record<string, string>): string 
 }
 
 export function createPipelineActivities(container: DependencyContainer) {
-  const aiGateway = container.resolve<IAIGateway>('IAIGateway');
-  const pipelineStepRepo = container.resolve<IPipelineStepRepository>('IPipelineStepRepository');
-  const transactionRepo = container.resolve<ITransactionRepository>('ITransactionRepository');
-  const emailRepo = container.resolve<IEmailRepository>('IEmailRepository');
+  const aiGateway = container.resolve<AIGatewayInterface>('AIGatewayInterface');
+  const pipelineStepRepo = container.resolve<PipelineStepRepositoryInterface>('PipelineStepRepositoryInterface');
+  const transactionRepo = container.resolve<TransactionRepositoryInterface>('TransactionRepositoryInterface');
+  const emailRepo = container.resolve<EmailRepositoryInterface>('EmailRepositoryInterface');
 
   return {
     /**
@@ -127,11 +128,23 @@ export function createPipelineActivities(container: DependencyContainer) {
 
       const data = result.data as Partial<RawTransactionData>;
 
+      // Prefer the bank's transaction date from the body, but fall back to
+      // the email's receivedAt when the AI returns nothing OR a date that's
+      // suspiciously far from when the bank actually notified us. This
+      // catches the small-model hallucination case (e.g. a 4B model
+      // inventing "tomorrow at noon UTC" for an email with no date in the
+      // body). 30 days is generous — a real bank notification is almost
+      // never delayed that long.
+      const emailDate = new Date(input.date);
+      const transactionDate = pickReliableDate(data.transactionDate, emailDate);
+
+      const normalizedMerchant = normalizeMerchant(data.merchant) || 'Unknown';
+
       return {
-        merchant: data.merchant ?? 'Unknown',
+        merchant: normalizedMerchant,
         amount: Number(data.amount) || 0,
         currency: data.currency ?? 'USD',
-        transactionDate: data.transactionDate ? new Date(data.transactionDate) : new Date(input.date),
+        transactionDate,
         transactionType: data.transactionType ?? (input.classificationResult.transactionType === 'credit' ? 'credit' : 'debit'),
         bankName: data.bankName ?? '',
         accountLast4: data.accountLast4,
@@ -147,19 +160,54 @@ export function createPipelineActivities(container: DependencyContainer) {
      *
      * Persists the extracted transaction data via the injected repositories.
      * Marks the source email as processed.
-     * Idempotent — if the transaction already exists for the email it is skipped.
+     *
+     * Skips persistence when:
+     *   1. The same email was already processed for this tenant (idempotency).
+     *   2. A recent transaction with the same amount, currency and direction
+     *      already exists within DUPLICATE_LOOKBACK_HOURS (deduplication).
      */
     async storeTransaction(input: StoreTransactionInput): Promise<StoredTransactionResult> {
       Context.current().heartbeat();
 
-      // Idempotency check — scoped to tenant
-      const existing = await transactionRepo.findByEmailId(input.userId, input.emailId);
-      if (existing) {
+      // 1. Idempotency check — same email re-processed.
+      const existingByEmail = await transactionRepo.findByEmailId(input.userId, input.emailId);
+      if (existingByEmail) {
         return {
-          transactionId: existing.id,
-          merchant: existing.merchant,
-          amount: existing.amount,
-          currency: existing.currency
+          transactionId: existingByEmail.id,
+          merchant: existingByEmail.merchant,
+          amount: existingByEmail.amount,
+          currency: existingByEmail.currency,
+          isDuplicate: true,
+          duplicateReason: 'same-email'
+        };
+      }
+
+      // 2. Recent duplicate check — same amount/currency/type within the lookback window.
+      const recentDuplicate = await transactionRepo.findRecentDuplicate({
+        userId: input.userId,
+        amount: input.rawData.amount,
+        currency: input.rawData.currency,
+        transactionType: input.rawData.transactionType,
+        near: input.rawData.transactionDate,
+        windowHours: DUPLICATE_LOOKBACK_HOURS
+      });
+      if (recentDuplicate) {
+        await emailRepo.updateProcessingStatus(input.emailId, {
+          isProcessed: true,
+          processedAt: new Date(),
+          workflowId: input.workflowId,
+          transactionId: recentDuplicate.id,
+          confidence: input.rawData.confidence,
+          matchedPatternId: input.patternId,
+          matchedPatternName: input.patternName
+        });
+        return {
+          transactionId: recentDuplicate.id,
+          merchant: recentDuplicate.merchant,
+          amount: recentDuplicate.amount,
+          currency: recentDuplicate.currency,
+          isDuplicate: true,
+          duplicateReason: 'recent-same-amount'
         };
       }
 
@@ -209,3 +257,19 @@ export function createPipelineActivities(container: DependencyContainer) {
 }
 
 export type PipelineActivities = ReturnType<typeof createPipelineActivities>;
+
+const MAX_AI_DATE_DRIFT_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Returns the AI-extracted date when it parses cleanly and is within
+ * MAX_AI_DATE_DRIFT_MS of the email's receivedAt; otherwise returns
+ * receivedAt. Guards against small models hallucinating a future date
+ * for emails that contain no date in the body.
+ */
+function pickReliableDate(aiValue: unknown, receivedAt: Date): Date {
+  if (typeof aiValue !== 'string' || !aiValue) return receivedAt;
+  const parsed = new Date(aiValue);
+  if (Number.isNaN(parsed.getTime())) return receivedAt;
+  if (Math.abs(parsed.getTime() - receivedAt.getTime()) > MAX_AI_DATE_DRIFT_MS) return receivedAt;
+  return parsed;
+}

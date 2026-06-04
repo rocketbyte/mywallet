@@ -1,16 +1,16 @@
 /**
  * MongoDB Transaction Repository (Layer 3 - Interface Adapters)
- * Implements ITransactionRepository interface
+ * Implements TransactionRepositoryInterface interface
  * Maps between Domain entities and Mongoose documents
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { ITransactionRepository, TransactionFilters, StatsParams, TransactionStats } from '../../../../application/interfaces/repositories/itransaction-repository';
+import { TransactionRepositoryInterface, TransactionFilters, StatsParams, TransactionStats, RecentDuplicateCriteria } from '../../../../application/interfaces/repositories/transaction-repository.interface';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
-import { Transaction as TransactionModel, ITransaction } from '../../../../models/transaction.model';
+import { Transaction as TransactionModel, TransactionInterface } from '../../../../models/transaction.model';
 
 @injectable()
-export class MongoDBTransactionRepository implements ITransactionRepository {
+export class MongoDBTransactionRepository implements TransactionRepositoryInterface {
   constructor(
     @inject('MongoConnection') private connection: Connection
   ) {}
@@ -59,6 +59,28 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
    */
   async findByEmailId(userId: string, emailId: string): Promise<Transaction | null> {
     const doc = await TransactionModel.findOne({ userId, emailId });
+    return doc ? this.toDomain(doc) : null;
+  }
+
+  /**
+   * Find a recently-persisted transaction with the same exact amount, currency
+   * and direction within ± windowHours of `near`.
+   */
+  async findRecentDuplicate(c: RecentDuplicateCriteria): Promise<Transaction | null> {
+    // Temporal payload serialization may deliver `near` as an ISO string.
+    const near = c.near instanceof Date ? c.near : new Date(c.near);
+    const windowMs = c.windowHours * 60 * 60 * 1000;
+    const from = new Date(near.getTime() - windowMs);
+    const to = new Date(near.getTime() + windowMs);
+
+    const doc = await TransactionModel.findOne({
+      userId: c.userId,
+      amount: c.amount,
+      currency: c.currency,
+      transactionType: c.transactionType,
+      transactionDate: { $gte: from, $lte: to }
+    }).sort({ transactionDate: -1 });
+
     return doc ? this.toDomain(doc) : null;
   }
 
@@ -156,7 +178,7 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
   /**
    * Map Mongoose document to Domain entity
    */
-  private toDomain(doc: ITransaction): Transaction {
+  private toDomain(doc: TransactionInterface): Transaction {
     return new Transaction(
       doc._id.toString(),
       doc.emailId,
@@ -167,7 +189,7 @@ export class MongoDBTransactionRepository implements ITransactionRepository {
       doc.category,
       doc.transactionType,
       doc.accountNumber,
-      doc.confidence,
+      doc.confidence ?? 0,
       doc.bankName,
       doc.subcategory,
       doc.extractedData

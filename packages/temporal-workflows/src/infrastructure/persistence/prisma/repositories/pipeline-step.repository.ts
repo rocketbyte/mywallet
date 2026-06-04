@@ -1,18 +1,18 @@
 /**
  * Prisma Pipeline Step Repository (Layer 3 - Interface Adapters)
- * Implements IPipelineStepRepository — drop-in replacement for MongoDBPipelineStepRepository.
+ * Implements PipelineStepRepositoryInterface — drop-in replacement for MongoDBPipelineStepRepository.
  */
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient } from '@prisma/client';
 import {
-  IPipelineStepRepository,
+  PipelineStepRepositoryInterface,
   PipelineStepNotFoundError,
   PipelineStepInactiveError,
-} from '../../../../application/interfaces/repositories/ipipeline-step-repository';
+} from '../../../../application/interfaces/repositories/pipeline-step-repository.interface';
 import { PipelineStepConfig } from '../../../../shared/types';
 
 @injectable()
-export class PrismaPipelineStepRepository implements IPipelineStepRepository {
+export class PrismaPipelineStepRepository implements PipelineStepRepositoryInterface {
   constructor(
     @inject('PrismaClient') private prisma: PrismaClient
   ) {}

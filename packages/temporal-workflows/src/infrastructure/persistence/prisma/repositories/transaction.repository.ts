@@ -1,19 +1,20 @@
 /**
  * Prisma Transaction Repository (Layer 3 - Interface Adapters)
- * Implements ITransactionRepository — drop-in replacement for MongoDBTransactionRepository.
+ * Implements TransactionRepositoryInterface — drop-in replacement for MongoDBTransactionRepository.
  */
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient } from '@prisma/client';
 import {
-  ITransactionRepository,
+  TransactionRepositoryInterface,
   TransactionFilters,
   StatsParams,
   TransactionStats,
-} from '../../../../application/interfaces/repositories/itransaction-repository';
+  RecentDuplicateCriteria,
+} from '../../../../application/interfaces/repositories/transaction-repository.interface';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 
 @injectable()
-export class PrismaTransactionRepository implements ITransactionRepository {
+export class PrismaTransactionRepository implements TransactionRepositoryInterface {
   constructor(
     @inject('PrismaClient') private prisma: PrismaClient
   ) {}
@@ -21,7 +22,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
   async save(transaction: Transaction): Promise<Transaction> {
     const record = await this.prisma.transaction.create({
       data: {
-        emailId: transaction.emailId,
+        emailId: transaction.emailId ?? '',
         transactionDate: transaction.transactionDate,
         merchant: transaction.merchant,
         amount: transaction.amount,
@@ -29,7 +30,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
         category: transaction.category,
         subcategory: transaction.subcategory,
         transactionType: transaction.transactionType,
-        accountNumber: transaction.accountNumber,
+        accountNumber: transaction.accountNumber ?? '',
         bankName: transaction.bankName || '',
         extractedData: (transaction.rawData as any) || {},
         confidence: transaction.confidence,
@@ -46,6 +47,27 @@ export class PrismaTransactionRepository implements ITransactionRepository {
 
   async findByEmailId(userId: string, emailId: string): Promise<Transaction | null> {
     const record = await this.prisma.transaction.findFirst({ where: { userId, emailId } });
+    return record ? this.toDomain(record) : null;
+  }
+
+  async findRecentDuplicate(c: RecentDuplicateCriteria): Promise<Transaction | null> {
+    // Temporal payload serialization may deliver `near` as an ISO string.
+    const near = c.near instanceof Date ? c.near : new Date(c.near);
+    const windowMs = c.windowHours * 60 * 60 * 1000;
+    const from = new Date(near.getTime() - windowMs);
+    const to = new Date(near.getTime() + windowMs);
+
+    const record = await this.prisma.transaction.findFirst({
+      where: {
+        userId: c.userId,
+        amount: c.amount,
+        currency: c.currency,
+        transactionType: c.transactionType,
+        transactionDate: { gte: from, lte: to },
+      },
+      orderBy: { transactionDate: 'desc' },
+    });
+
     return record ? this.toDomain(record) : null;
   }
 

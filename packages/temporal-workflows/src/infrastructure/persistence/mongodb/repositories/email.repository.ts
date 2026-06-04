@@ -1,16 +1,16 @@
 /**
  * MongoDB Email Repository (Layer 3 - Interface Adapters)
- * Implements IEmailRepository interface
+ * Implements EmailRepositoryInterface interface
  * Maps between Domain entities and Mongoose documents
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { IEmailRepository, EmailMetadata, SavedEmail, ProcessingStatus } from '../../../../application/interfaces/repositories/iemail-repository';
+import { EmailRepositoryInterface, EmailMetadata, SavedEmail, ProcessingStatus } from '../../../../application/interfaces/repositories/email-repository.interface';
 import { Email } from '../../../../domain/entities/email.entity';
-import { Email as EmailModel, IEmail } from '../../../../models/email.model';
+import { Email as EmailModel, EmailInterface } from '../../../../models/email.model';
 
 @injectable()
-export class MongoDBEmailRepository implements IEmailRepository {
+export class MongoDBEmailRepository implements EmailRepositoryInterface {
   constructor(
     @inject('MongoConnection') private connection: Connection
   ) {}
@@ -123,7 +123,7 @@ export class MongoDBEmailRepository implements IEmailRepository {
   /**
    * Map Mongoose document to SavedEmail
    */
-  private toSavedEmail(doc: IEmail): SavedEmail {
+  private toSavedEmail(doc: EmailInterface): SavedEmail {
     return {
       id: doc._id.toString(),
       emailId: doc.emailId,

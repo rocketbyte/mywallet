@@ -7,7 +7,7 @@ import { DependencyContainer } from 'tsyringe';
 import { Connection } from 'mongoose';
 
 // Application Interfaces
-import { IMailSyncGateway } from '../../../application/interfaces/gateways/imail-sync-gateway';
+import { MailSyncGatewayInterface } from '../../../application/interfaces/gateways/mail-sync-gateway.interface';
 
 // Domain Models (Mongoose)
 import { GmailAccount } from '../../../models/gmail-account.model';
@@ -35,7 +35,7 @@ import { TOKEN_REFRESH_CONFIG } from '../../../shared/constants';
  * @param container - DI Container
  */
 export function createSyncActivities(container: DependencyContainer) {
-  const mailSyncGateway = container.resolve<IMailSyncGateway>('IMailSyncGateway');
+  const mailSyncGateway = container.resolve<MailSyncGatewayInterface>('MailSyncGatewayInterface');
   // Resolve MongoConnection to ensure it's loaded, but don't force a type assignment since Mongoose handles it globally
   container.resolve('MongoConnection');
 

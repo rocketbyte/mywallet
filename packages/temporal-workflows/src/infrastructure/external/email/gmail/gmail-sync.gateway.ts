@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { injectable, inject } from 'tsyringe';
-import { IMailSyncGateway } from '../../../../application/interfaces/gateways/imail-sync-gateway';
+import { MailSyncGatewayInterface } from '../../../../application/interfaces/gateways/mail-sync-gateway.interface';
 import {
   FetchGmailChangesInput,
   FetchGmailChangesOutput,
@@ -14,10 +14,10 @@ import {
 
 /**
  * Gmail Sync Gateway (Layer 3 & 4)
- * Implements IMailSyncGateway for Gmail specifically.
+ * Implements MailSyncGatewayInterface for Gmail specifically.
  */
 @injectable()
-export class GmailSyncGateway implements IMailSyncGateway {
+export class GmailSyncGateway implements MailSyncGatewayInterface {
   constructor(
     @inject('OAuth2Client') private oauth2Client: OAuth2Client
   ) {}

@@ -1,15 +1,15 @@
 /**
  * Prisma Pattern Repository (Layer 3 - Interface Adapters)
- * Implements IPatternRepository — drop-in replacement for MongoDBPatternRepository.
+ * Implements PatternRepositoryInterface — drop-in replacement for MongoDBPatternRepository.
  */
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient } from '@prisma/client';
-import { IPatternRepository } from '../../../../application/interfaces/repositories/ipattern-repository';
+import { PatternRepositoryInterface } from '../../../../application/interfaces/repositories/pattern-repository.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { EmailPattern } from '../../../../domain/entities/email-pattern.entity';
 
 @injectable()
-export class PrismaPatternRepository implements IPatternRepository {
+export class PrismaPatternRepository implements PatternRepositoryInterface {
   constructor(
     @inject('PrismaClient') private prisma: PrismaClient
   ) {}

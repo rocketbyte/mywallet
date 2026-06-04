@@ -10,9 +10,9 @@ import { DependencyContainer } from 'tsyringe';
 import { ProcessEmailUseCase } from '../../../application/use-cases/process-email/process-email.use-case';
 
 // Gateways (Application Layer Interfaces)
-import { IEmailGateway } from '../../../application/interfaces/gateways/iemail-gateway';
-import { IPatternRepository } from '../../../application/interfaces/repositories/ipattern-repository';
-import { IEmailRepository } from '../../../application/interfaces/repositories/iemail-repository';
+import { EmailGatewayInterface } from '../../../application/interfaces/gateways/email-gateway.interface';
+import { PatternRepositoryInterface } from '../../../application/interfaces/repositories/pattern-repository.interface';
+import { EmailRepositoryInterface } from '../../../application/interfaces/repositories/email-repository.interface';
 
 // Domain Entities
 import { Email } from '../../../domain/entities/email.entity';
@@ -34,9 +34,9 @@ import {
  */
 export function createEmailActivities(container: DependencyContainer) {
   // Resolve dependencies from DI Container
-  const emailGateway = container.resolve<IEmailGateway>('IEmailGateway');
-  const patternRepository = container.resolve<IPatternRepository>('IPatternRepository');
-  const emailRepository = container.resolve<IEmailRepository>('IEmailRepository');
+  const emailGateway = container.resolve<EmailGatewayInterface>('EmailGatewayInterface');
+  const patternRepository = container.resolve<PatternRepositoryInterface>('PatternRepositoryInterface');
+  const emailRepository = container.resolve<EmailRepositoryInterface>('EmailRepositoryInterface');
   const processEmailUseCase = container.resolve(ProcessEmailUseCase);
 
   return {

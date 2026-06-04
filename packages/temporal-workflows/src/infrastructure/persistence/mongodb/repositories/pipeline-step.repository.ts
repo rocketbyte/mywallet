@@ -1,14 +1,14 @@
 import { injectable } from 'tsyringe';
 import { PipelineStep } from '../../../../models/pipeline-step.model';
 import {
-  IPipelineStepRepository,
+  PipelineStepRepositoryInterface,
   PipelineStepNotFoundError,
   PipelineStepInactiveError
-} from '../../../../application/interfaces/repositories/ipipeline-step-repository';
+} from '../../../../application/interfaces/repositories/pipeline-step-repository.interface';
 import { PipelineStepConfig } from '../../../../shared/types';
 
 @injectable()
-export class MongoDBPipelineStepRepository implements IPipelineStepRepository {
+export class MongoDBPipelineStepRepository implements PipelineStepRepositoryInterface {
   async getActiveStep(stepKey: string): Promise<PipelineStepConfig> {
     const doc = await PipelineStep.findOne({ stepKey }).lean();
 

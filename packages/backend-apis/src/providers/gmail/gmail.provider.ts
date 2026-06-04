@@ -11,19 +11,21 @@ import {
 import { GmailAccount } from '../../../../temporal-workflows/src/models/gmail-account.model';
 import { logger } from '../../utils/logger';
 import {
-  IEmailProvider,
+  AuthorizationContext,
+  AuthState,
+  EmailProviderInterface,
   LinkAccountInput,
   LinkAccountResult,
   AccountStatus
 } from '../types';
 
 /**
- * Gmail implementation of IEmailProvider.
+ * Gmail implementation of EmailProviderInterface.
  * Handles the full Gmail OAuth flow and Temporal workflow lifecycle.
  * Adding Outlook/Yahoo later means creating a parallel implementation
- * of IEmailProvider — no changes needed here.
+ * of EmailProviderInterface — no changes needed here.
  */
-export class GmailProvider implements IEmailProvider {
+export class GmailProvider implements EmailProviderInterface {
   readonly type = 'gmail';
 
   private readonly oauth2Client = new google.auth.OAuth2(
@@ -33,14 +35,12 @@ export class GmailProvider implements IEmailProvider {
   );
 
   /**
-   * Returns the Google OAuth2 authorization URL.
-   * When userId is supplied it is embedded in the `state` parameter so the
-   * callback can auto-link without an extra round-trip.
+   * Returns the Google OAuth2 authorization URL with the auth context
+   * embedded in `state` so the callback can verify and auto-link.
    */
-  getAuthUrl(userId?: string): string {
-    const state = userId
-      ? Buffer.from(JSON.stringify({ userId, provider: this.type })).toString('base64')
-      : undefined;
+  getAuthUrl(ctx: AuthorizationContext): string {
+    const state: AuthState = { userId: ctx.userId, email: ctx.email, provider: this.type };
+    const encodedState = Buffer.from(JSON.stringify(state)).toString('base64');
 
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
@@ -50,7 +50,8 @@ export class GmailProvider implements IEmailProvider {
         'https://www.googleapis.com/auth/userinfo.email'  // needed to fetch email address after token exchange
       ],
       prompt: 'consent',
-      ...(state && { state })
+      login_hint: ctx.email,
+      state: encodedState
     });
   }
 
@@ -138,16 +139,13 @@ export class GmailProvider implements IEmailProvider {
 
   /**
    * Returns the current sync status by combining the MongoDB account record
-   * with the live Temporal workflow status.
+   * with the live Temporal workflow status. Returns `null` when no account
+   * is linked — callers map this to their preferred response shape.
    */
-  async getAccountStatus(userId: string): Promise<AccountStatus> {
+  async getAccountStatus(userId: string): Promise<AccountStatus | null> {
     const account = await GmailAccount.findOne({ userId });
 
-    if (!account) {
-      const err = new Error(`No Gmail account found for user: ${userId}`) as any;
-      err.code = 'not_found';
-      throw err;
-    }
+    if (!account) return null;
 
     const client = await getTemporalClient();
     let workflowStatus = 'unknown';

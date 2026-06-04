@@ -69,19 +69,6 @@ export const RATE_LIMITS = {
   EMAIL_PROCESSING_DELAY_MS: 100
 } as const;
 
-// Schedule IDs
-export const SCHEDULE_IDS = {
-  EMAIL_PROCESSING_PREFIX: 'email-schedule/'
-} as const;
-
-// Default Schedule Configuration
-export const DEFAULT_SCHEDULE_CONFIG = {
-  SEARCH_QUERY: 'subject:"Usaste tu tarjeta de credito"',
-  CRON_EXPRESSION: '* * * * *',  // Every minute
-  MAX_RESULTS: 50,
-  SKIP_PROCESSED: true
-} as const;
-
 // ==================== Gmail Sync Constants ====================
 
 // Task Queue for Gmail Sync
@@ -140,10 +127,11 @@ export const GMAIL_SYNC_RETRY_POLICIES = {
 
 // Gmail Watch Configuration
 export const GMAIL_WATCH_CONFIG = {
-  EXPIRATION_DAYS: 7,           // Gmail max is 7 days
-  RENEWAL_BUFFER_DAYS: 5,       // Renew 2 days before expiration
+  EXPIRATION_DAYS: 7,                  // Gmail max is 7 days
+  RENEWAL_BUFFER_DAYS: 5,              // Renew 2 days before expiration
   RENEWAL_CHECK_INTERVAL: '1 day',
-  CONTINUE_AS_NEW_DAYS: 30      // Reset workflow history every 30 days
+  CONTINUE_AS_NEW_DAYS: 7,             // Reset workflow history at least weekly
+  CONTINUE_AS_NEW_HISTORY_LENGTH: 5_000 // Reset whenever history outgrows the 10s WFT replay budget
 } as const;
 
 // ==================== AI Pipeline Constants ====================
@@ -151,8 +139,37 @@ export const GMAIL_WATCH_CONFIG = {
 export const PIPELINE_STEP_KEYS = {
   CLASSIFY_EMAIL: 'classify_email',
   EXTRACT_TRANSACTION: 'extract_transaction',
-  STORE_TRANSACTION: 'store_transaction'
+  STORE_TRANSACTION: 'store_transaction',
+  ANALYZE_DAY: 'analyze_day',
+  ANALYZE_MONTH: 'analyze_month'
 } as const;
+
+// Hard ceiling on the daily summaries fed to the analyze_month prompt. A
+// calendar month has at most 31, each ≤200 chars — bounded so the only AI
+// input stays small regardless of how busy the month was.
+export const MONTHLY_MAX_DAILY_SUMMARIES = 31;
+
+// Max length of the monthly note rendered by the dashboard card. Sized for a
+// 2–4 sentence opinionated advisor note (see the analyze_month prompt).
+export const MONTHLY_NOTE_MAX_CHARS = 480;
+
+// Number of prior short summaries fed to the analyze_day prompt as compact
+// trend context. Bounded so prompt tokens stay small.
+export const ANALYSIS_PRIOR_SUMMARIES = 7;
+
+// Retry policy for the analysis workflow. Mirrors PIPELINE_RETRY_POLICY but
+// is its own constant so it can diverge later.
+export const ANALYSIS_RETRY_POLICY = {
+  initialInterval: '5s' as any,
+  backoffCoefficient: 2,
+  maximumInterval: '60s' as any,
+  maximumAttempts: 3,
+  nonRetryableErrorTypes: ['PipelineStepNotFoundError', 'PipelineStepInactiveError']
+};
+
+// Deduplication: skip storage when a transaction with the same userId,
+// transactionType, currency, and exact amount was stored within this window.
+export const DUPLICATE_LOOKBACK_HOURS = 48;
 
 export const PIPELINE_ACTIVITY_TIMEOUTS = {
   // Generous ceiling for slow local LLM inference (Ollama on a Pi can take minutes).

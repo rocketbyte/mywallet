@@ -20,6 +20,6 @@ db.email_patterns.createIndex({ isActive: 1, priority: -1 });
 db.email_patterns.createIndex({ bankName: 1 });
 
 // Create indexes for budgets
-db.budgets.createIndex({ year: 1, month: 1 }, { unique: true });
+db.budgets.createIndex({ userId: 1, year: 1, month: 1 }, { unique: true });
 
 print('MongoDB initialization completed successfully');

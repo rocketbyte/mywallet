@@ -2,19 +2,31 @@ import { Router } from 'express';
 import workflowRoutes from './workflow.routes';
 import healthRoutes from './health.routes';
 import emailRoutes from './email.routes';
-import scheduleRoutes from './schedule.routes';
 import gmailWebhookRoutes from './gmail-webhook.routes';
 import authRoutes from './auth.routes';
 import pipelineRoutes from './pipeline.routes';
+import transactionRoutes from './transaction.routes';
+import budgetRoutes from './budget.routes';
+import alertRoutes from './alert.routes';
+import tenantRoutes from './tenant.routes';
+import meRoutes from './me.routes';
+import chatRoutes from './chat.routes';
+import analysisRoutes from './analysis.routes';
 
 const router = Router();
 
 router.use('/', healthRoutes);
+router.use('/me', meRoutes);
+router.use('/chat', chatRoutes);
 router.use('/workflows', workflowRoutes);
 router.use('/emails', emailRoutes);
-router.use('/schedules', scheduleRoutes);
 router.use('/gmail', gmailWebhookRoutes);
 router.use('/auth', authRoutes);
 router.use('/pipeline', pipelineRoutes);
+router.use('/transactions', transactionRoutes);
+router.use('/budgets', budgetRoutes);
+router.use('/alerts', alertRoutes);
+router.use('/tenants', tenantRoutes);
+router.use('/analyses', analysisRoutes);
 
 export default router;

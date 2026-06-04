@@ -1,17 +1,17 @@
 /**
  * MongoDB Pattern Repository (Layer 3 - Interface Adapters)
- * Implements IPatternRepository interface
+ * Implements PatternRepositoryInterface interface
  * Maps between Domain entities and Mongoose documents
  */
 import { injectable, inject } from 'tsyringe';
 import { Connection } from 'mongoose';
-import { IPatternRepository } from '../../../../application/interfaces/repositories/ipattern-repository';
+import { PatternRepositoryInterface } from '../../../../application/interfaces/repositories/pattern-repository.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { EmailPattern } from '../../../../domain/entities/email-pattern.entity';
-import { EmailPattern as EmailPatternModel, IEmailPattern } from '../../../../models/email-pattern.model';
+import { EmailPattern as EmailPatternModel, EmailPatternInterface } from '../../../../models/email-pattern.model';
 
 @injectable()
-export class MongoDBPatternRepository implements IPatternRepository {
+export class MongoDBPatternRepository implements PatternRepositoryInterface {
   constructor(
     @inject('MongoConnection') private connection: Connection
   ) {}
@@ -114,7 +114,7 @@ export class MongoDBPatternRepository implements IPatternRepository {
   /**
    * Map Mongoose document to Domain entity
    */
-  private toDomain(doc: IEmailPattern): EmailPattern {
+  private toDomain(doc: EmailPatternInterface): EmailPattern {
     return new EmailPattern(
       doc._id.toString(),
       doc.name,

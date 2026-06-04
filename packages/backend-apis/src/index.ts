@@ -11,6 +11,9 @@ import { errorHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { swaggerSpec } from './config/swagger';
 import { redocMiddleware } from './middleware/redoc';
+import { docsAuth } from './middleware/docs-auth';
+import { createAuthVerifier, requireAuth } from './auth';
+import { Budget } from '../../temporal-workflows/src/models';
 
 const app = express();
 
@@ -25,6 +28,7 @@ async function connectMongoDB() {
     }
     await mongoose.connect(process.env.MONGODB_URI);
     logger.info('Connected to MongoDB');
+    await Budget.syncIndexes();
   } catch (error) {
     logger.error('Failed to connect to MongoDB', { error });
     process.exit(1);
@@ -49,7 +53,6 @@ app.use(
 );
 app.use(cors());
 
-// Handle gzip-compressed bodies
 app.use((req, res, next) => {
   if (req.headers['content-encoding'] === 'gzip') {
     const gunzip = createGunzip();
@@ -76,7 +79,6 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Request logging
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`, {
     query: req.query,
@@ -85,17 +87,31 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-app.use('/api', routes);
+// Routes — Firebase ID token auth on /api/*, except endpoints called by external
+// systems that cannot send user tokens (k8s probes, Google Pub/Sub, OAuth redirect).
+const openApiPaths: RegExp[] = [
+  /^\/health(\/.*)?$/,
+  /^\/gmail\/webhook\/?$/,
+  /^\/auth\/[^/]+\/callback\/?$/, // OAuth callback — provider-agnostic, called by Google/etc.
+];
+const authMiddleware = requireAuth(createAuthVerifier());
+app.use(
+  '/api',
+  (req, res, next) => {
+    if (openApiPaths.some((re) => re.test(req.path))) return next();
+    return authMiddleware(req, res, next);
+  },
+  routes
+);
 
-// Documentation
-app.get('/docs/openapi.json', (req, res) => {
+app.get('/docs/openapi.json', docsAuth, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
 
 app.use(
   '/docs/playground',
+  docsAuth,
   async (req, res, next) => {
     try {
       const { apiReference } = await esmImport('@scalar/express-api-reference');
@@ -120,12 +136,10 @@ app.use(
   }
 );
 
-// Error handling
 app.use(errorHandler);
 
 const PORT = config.port;
 
-// Connect to MongoDB and start server
 connectMongoDB().then(() => {
   app.listen(PORT, () => {
     logger.info(`MyWallet API Server listening on port ${PORT}`);
@@ -135,7 +149,6 @@ connectMongoDB().then(() => {
   });
 });
 
-// Handle graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down API server...');
   await mongoose.disconnect();

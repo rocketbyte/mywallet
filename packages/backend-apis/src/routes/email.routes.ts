@@ -3,9 +3,6 @@ import { EmailController } from '../controllers/email.controller';
 import mongoose from 'mongoose';
 
 const router = Router();
-
-// Initialize controller with MongoDB connection
-// Note: This assumes MongoDB is already connected in the worker/app
 const controller = new EmailController(mongoose.connection);
 
 /**
@@ -61,36 +58,6 @@ const controller = new EmailController(mongoose.connection);
  *         $ref: '#/components/responses/ServerError'
  */
 router.get('/', controller.getAllEmails.bind(controller));
-
-/**
- * @openapi
- * /emails/stats:
- *   get:
- *     summary: Get email statistics
- *     description: Returns processing statistics for all emails belonging to the user.
- *     tags: [Emails]
- *     parameters:
- *       - $ref: '#/components/parameters/UserId'
- *     responses:
- *       200:
- *         description: Email statistics.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 userId: { type: string, example: 'user_123' }
- *                 stats:
- *                   type: object
- *                   properties:
- *                     total: { type: integer, example: 320 }
- *                     processed: { type: integer, example: 310 }
- *                     unprocessed: { type: integer, example: 10 }
- *                     processingRate: { type: string, example: '96.88%' }
- *       500:
- *         $ref: '#/components/responses/ServerError'
- */
-router.get('/stats', controller.getEmailStats.bind(controller));
 
 /**
  * @openapi

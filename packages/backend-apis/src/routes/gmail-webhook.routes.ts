@@ -169,6 +169,51 @@ router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
+/**
+ * @openapi
+ * /gmail/status/me:
+ *   get:
+ *     summary: Get the authenticated user's Gmail sync status
+ *     description: |
+ *       Resolves the user from the bearer token. Always returns 200 with a
+ *       discriminated payload: `{ linked: false }` when no account is
+ *       linked yet (use this to render a "Link Gmail" CTA), or
+ *       `{ linked: true, ...status }` when an account is linked.
+ *     tags: [Gmail]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Linkage state of the authenticated user's Gmail account.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - type: object
+ *                   required: [linked]
+ *                   properties:
+ *                     linked: { type: boolean, enum: [false] }
+ *                 - type: object
+ *                   required: [linked, userId, email]
+ *                   properties:
+ *                     linked: { type: boolean, enum: [true] }
+ *                     userId: { type: string }
+ *                     email: { type: string }
+ *                     isActive: { type: boolean }
+ *                     workflowId: { type: string }
+ *                     workflowStatus: { type: string }
+ *                     watchExpiration: { type: string, format: date-time, nullable: true }
+ *                     lastSyncAt: { type: string, format: date-time, nullable: true }
+ *                     totalEmailsSynced: { type: integer }
+ *                     lastError: { type: string, nullable: true }
+ *                     errorCount: { type: integer }
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/status/me', (req, res) => controller.getMyStatus(req, res));
+
 router.get('/status/:userId', (req, res) => controller.getStatus(req, res));
 
 export default router;

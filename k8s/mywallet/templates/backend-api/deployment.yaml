@@ -8,6 +8,10 @@ metadata:
     {{- include "mywallet.backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.backend.replicaCount }}
+  # Single-node cluster: terminate old pod before starting new one so we don't
+  # double-book CPU/memory during rollout.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "mywallet.backend.selectorLabels" . | nindent 6 }}

@@ -1,16 +1,16 @@
 /**
  * Ollama Transaction Extractor Gateway (Layer 4 - Frameworks & Drivers)
- * Implements ITransactionExtractorGateway interface using Ollama
+ * Implements TransactionExtractorGatewayInterface interface using Ollama
  * Handles transaction extraction logic with Ollama models
  */
 import { injectable, inject } from 'tsyringe';
-import { ITransactionExtractorGateway, ExtractionContext } from '../../../../application/interfaces/gateways/iai-gateway';
+import { TransactionExtractorGatewayInterface, ExtractionContext } from '../../../../application/interfaces/gateways/ai-gateway.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 import { OllamaGateway } from './ollama.gateway';
 
 @injectable()
-export class OllamaTransactionExtractorGateway implements ITransactionExtractorGateway {
+export class OllamaTransactionExtractorGateway implements TransactionExtractorGatewayInterface {
   constructor(
     @inject(OllamaGateway) private aiGateway: OllamaGateway
   ) {}

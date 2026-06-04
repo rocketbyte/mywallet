@@ -33,6 +33,8 @@ data:
   # AI configuration — all calls routed through LiteLLM gateway (llm namespace)
   LITELLM_BASE_URL: {{ .Values.app.ai.litellmBaseUrl | quote }}
   OPENAI_MODEL: {{ .Values.app.ai.model | quote }}
+  # Chat-only override; falls back to OPENAI_MODEL when unset.
+  CHAT_MODEL: {{ .Values.app.ai.chatModel | quote }}
 
   # DB provider — 'mongodb' or 'prisma' (Supabase)
   # Credentials (DATABASE_URL, DIRECT_URL) are in the secret

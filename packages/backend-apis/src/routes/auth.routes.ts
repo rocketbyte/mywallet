@@ -1,95 +1,92 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
-import { gmailProvider } from '../providers';
+import { emailProviders } from '../providers';
 
 const router = Router();
-const controller = new AuthController(gmailProvider);
+const controller = new AuthController(emailProviders);
 
 /**
  * @openapi
- * /auth/gmail:
- *   get:
- *     summary: Get Gmail OAuth authorization URL
+ * /auth/connect:
+ *   post:
+ *     summary: Subscribe an email account for incoming-mail listening
  *     description: |
- *       Returns the Google OAuth2 authorization URL to initiate Gmail access.
+ *       Returns the OAuth authorization URL for the requested email provider.
+ *       The caller's authenticated `userId` and the supplied `email` are embedded
+ *       in the OAuth `state`, so once the user grants consent the callback links
+ *       the account automatically and starts the Temporal sync workflow.
  *
- *       **Auto-link flow**: pass `?userId=<id>` to embed the user identifier in the
- *       OAuth `state`. The callback will then automatically link the account and start
- *       the Temporal sync workflow — no extra API call required.
- *
- *       **Manual flow**: omit `userId`. The callback page will display the refresh token
- *       so you can call `POST /gmail/link` yourself.
- *     tags: [Gmail]
- *     parameters:
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *         description: |
- *           When provided, the account is auto-linked after the user grants consent.
- *         example: user_123
+ *       Frontends typically open `authUrl` in a popup; the callback closes the
+ *       popup after auto-linking.
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, provider]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@gmail.com
+ *               provider:
+ *                 type: string
+ *                 enum: [gmail, outlook]
+ *                 example: gmail
  *     responses:
  *       200:
- *         description: OAuth authorization URL (JSON) or authorization HTML page.
+ *         description: Authorization URL returned.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 authUrl:
- *                   type: string
- *                   description: Open this URL in a browser to start the OAuth flow.
- *                   example: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=...'
- *                 provider:
- *                   type: string
- *                   example: gmail
+ *                 authUrl: { type: string }
+ *                 provider: { type: string }
+ *                 email: { type: string }
+ *       400:
+ *         description: Invalid input or unsupported provider.
+ *       401:
+ *         description: Missing or invalid authentication.
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-router.get('/gmail', (req, res) => controller.getAuthUrl(req, res));
+router.post('/connect', (req, res) => controller.connect(req, res));
 
 /**
  * @openapi
- * /auth/gmail/callback:
+ * /auth/{provider}/callback:
  *   get:
- *     summary: Gmail OAuth callback
+ *     summary: OAuth callback (called by the provider — do not call directly)
  *     description: |
- *       Google redirects here after the user grants (or denies) access.
- *
- *       - If `state` contains a `userId` (set by `GET /auth/gmail?userId=<id>`), the
- *         account is auto-linked and the Temporal sync workflow starts immediately.
- *       - Otherwise, the refresh token is displayed so the caller can link manually
- *         via `POST /gmail/link`.
- *
- *       **This endpoint is called by Google — do not call it directly.**
- *     tags: [Gmail]
+ *       Each registered provider has its own redirect URI configured in its OAuth
+ *       app console; that URI must point here. The callback decodes the OAuth
+ *       `state`, exchanges the authorization code, and auto-links the account.
+ *     tags: [Auth]
  *     parameters:
+ *       - in: path
+ *         name: provider
+ *         required: true
+ *         schema: { type: string, enum: [gmail, outlook] }
  *       - in: query
  *         name: code
  *         required: true
- *         schema:
- *           type: string
- *         description: Authorization code provided by Google.
+ *         schema: { type: string }
  *       - in: query
  *         name: state
- *         schema:
- *           type: string
- *         description: Base64-encoded JSON containing `userId` and `provider`.
+ *         schema: { type: string }
  *       - in: query
  *         name: error
- *         schema:
- *           type: string
- *         description: Set by Google when the user denies access.
+ *         schema: { type: string }
  *     responses:
- *       200:
- *         description: |
- *           HTML page — either a success/auto-linked confirmation or a page
- *           displaying the refresh token for manual linking.
- *       400:
- *         description: Missing or invalid authorization code.
- *       500:
- *         $ref: '#/components/responses/ServerError'
+ *       200: { description: HTML success page }
+ *       400: { description: Missing code or unknown provider }
+ *       500: { description: Token exchange failed }
  */
-router.get('/gmail/callback', (req, res) => controller.handleCallback(req, res));
+router.get('/:provider/callback', (req, res) => controller.handleCallback(req, res));
 
 export default router;

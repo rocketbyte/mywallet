@@ -1,16 +1,16 @@
 /**
  * OpenAI Transaction Extractor Gateway (Layer 4 - Frameworks & Drivers)
- * Implements ITransactionExtractorGateway interface using OpenAI
+ * Implements TransactionExtractorGatewayInterface interface using OpenAI
  * Handles transaction extraction logic
  */
 import { injectable, inject } from 'tsyringe';
-import { ITransactionExtractorGateway, ExtractionContext } from '../../../../application/interfaces/gateways/iai-gateway';
+import { TransactionExtractorGatewayInterface, ExtractionContext } from '../../../../application/interfaces/gateways/ai-gateway.interface';
 import { Email } from '../../../../domain/entities/email.entity';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 import { OpenAIGateway } from './openai.gateway';
 
 @injectable()
-export class OpenAITransactionExtractorGateway implements ITransactionExtractorGateway {
+export class OpenAITransactionExtractorGateway implements TransactionExtractorGatewayInterface {
   constructor(
     @inject(OpenAIGateway) private aiGateway: OpenAIGateway
   ) {}

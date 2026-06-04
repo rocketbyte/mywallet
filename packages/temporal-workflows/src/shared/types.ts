@@ -1,3 +1,161 @@
+// Daily Transaction Analysis
+export interface DailyAnalysisWorkflowInput {
+  userId: string;
+  /**
+   * YYYY-MM-DD in the tenant's timezone. Optional — when omitted the
+   * activity computes "yesterday in UTC" at run time. Schedules MUST omit
+   * this so each daily fire targets the correct calendar day; only the
+   * manual-rerun API path sets it explicitly.
+   */
+  analysisDate?: string;
+}
+
+export interface DailyAnalysisWorkflowResult {
+  status: 'ready' | 'failed';
+  analysisId?: string;
+  reason?: string;
+}
+
+export interface DailyAnalysisContext {
+  userId: string;
+  analysisDate: string;
+  currency: string;
+  transactions: Array<{
+    id: string;
+    merchant: string;
+    amount: number;
+    currency: string;
+    transactionType: 'debit' | 'credit';
+    category: string;
+    transactionDate: string;
+  }>;
+  totals: { income: number; expenses: number; net: number };
+  balance: number;
+  budgetSnapshot: {
+    totalBudget: number;
+    totalSpent: number;
+    percentUsed: number;
+    daysRemainingInPeriod: number;
+  } | null;
+  priorSummaries: string[];
+  promptVersion: number;
+}
+
+export interface DailyAnalysisAIResult {
+  summary: string;
+  fullSummary: string;
+  suggestions: Array<{
+    id: string;
+    title: string;
+    body: string;
+    urgency: 'info' | 'warn' | 'urgent';
+    category?: string;
+  }>;
+  modelMeta: {
+    model: string;
+    promptVersion: number;
+    tokensIn: number;
+    tokensOut: number;
+  };
+}
+
+export interface PersistDailyAnalysisInput {
+  userId: string;
+  analysisDate: string;
+  currency: string;
+  inputs: {
+    transactionCount: number;
+    totals: { income: number; expenses: number; net: number };
+    balance: number;
+    budgetSnapshot: DailyAnalysisContext['budgetSnapshot'];
+  };
+  ai: DailyAnalysisAIResult | null;
+  status: 'ready' | 'failed';
+  failureReason?: string;
+}
+
+export interface PersistDailyAnalysisResult {
+  analysisId: string;
+}
+
+// Monthly Financial Note
+export interface MonthlyNoteWorkflowInput {
+  userId: string;
+  /**
+   * Calendar year/month (month is 1-based, 1–12) in the tenant's timezone.
+   * Optional — when omitted the activity resolves the current month in UTC at
+   * run time. Schedules MUST omit these so each daily fire targets the current
+   * month; only the manual-run API path may set them explicitly.
+   */
+  year?: number;
+  month?: number;
+}
+
+export interface MonthlyNoteWorkflowResult {
+  /** `skipped` = inputs unchanged since the last ready run, no AI call made. */
+  status: 'ready' | 'failed' | 'skipped';
+  analysisId?: string;
+  reason?: string;
+}
+
+export interface MonthlyAnalysisBudgetSnapshot {
+  totalBudget: number;
+  totalSpent: number;
+  percentUsed: number;
+  daysRemainingInPeriod: number;
+}
+
+export interface MonthlyAnalysisContext {
+  userId: string;
+  year: number;
+  month: number;
+  currency: string;
+  dailyCount: number;
+  /** Daily short summaries for the month, oldest-first. The only narrative input. */
+  dailySummaries: string[];
+  totals: { income: number; expenses: number; net: number };
+  balance: number;
+  budgetSnapshot: MonthlyAnalysisBudgetSnapshot | null;
+  /** Prior month's note (≤320 chars) for month-over-month context, or null. */
+  priorMonthNote: string | null;
+  /** Hash over dailySummaries + numeric block; drives skip-when-unchanged. */
+  sourceHash: string;
+  /** Existing row for (userId, year, month), if any — lets the workflow skip. */
+  existing: { analysisId: string; sourceHash: string; status: 'ready' | 'failed' } | null;
+  promptVersion: number;
+}
+
+export interface MonthlyAnalysisAIResult {
+  note: string;
+  modelMeta: {
+    model: string;
+    promptVersion: number;
+    tokensIn: number;
+    tokensOut: number;
+  };
+}
+
+export interface PersistMonthlyAnalysisInput {
+  userId: string;
+  year: number;
+  month: number;
+  currency: string;
+  inputs: {
+    dailyCount: number;
+    totals: { income: number; expenses: number; net: number };
+    balance: number;
+    budgetSnapshot: MonthlyAnalysisBudgetSnapshot | null;
+    sourceHash: string;
+  };
+  ai: MonthlyAnalysisAIResult | null;
+  status: 'ready' | 'failed';
+  failureReason?: string;
+}
+
+export interface PersistMonthlyAnalysisResult {
+  analysisId: string;
+}
+
 // Workflow Inputs/Outputs
 export interface EmailProcessingInput {
   userId: string;            // NEW: Tenant identifier
@@ -80,7 +238,7 @@ export interface SaveTransactionInput {
 
 export interface SavedTransaction {
   id: string;
-  emailId: string;
+  emailId?: string;
   transactionDate: Date;
   merchant: string;
   amount: number;
@@ -194,59 +352,6 @@ export interface EmailQueryInput {
   searchTerm?: string;
   startDate?: Date;
   endDate?: Date;
-}
-
-// Scheduled Workflow Types
-export interface ScheduledEmailProcessingInput {
-  userId: string;            // NEW: Tenant identifier
-  scheduleId: string;
-  searchQuery: string;
-  maxResults: number;
-  afterDate?: Date;
-  skipProcessed: boolean;
-}
-
-export interface ScheduledEmailProcessingResult {
-  scheduleId: string;
-  runTimestamp: Date;
-  emailsFetched: number;
-  emailsStored: number;
-  emailsProcessed: number;
-  emailsFailed: number;
-  duplicatesSkipped: number;
-  transactions: SavedTransaction[];
-  errors: Array<{
-    emailId: string;
-    error: string;
-  }>;
-}
-
-// Schedule Management Types
-export interface CreateScheduleInput {
-  name: string;
-  description?: string;
-  searchQuery: string;
-  cronExpression?: string;
-  maxResults?: number;
-  afterDate?: Date;
-}
-
-export interface ScheduleInfo {
-  scheduleId: string;
-  name: string;
-  description?: string;
-  isActive: boolean;
-  searchQuery: string;
-  cronExpression: string;
-  nextRunTime?: Date;
-  lastRunAt?: Date;
-  lastRunStatus?: string;
-  stats: {
-    totalRuns: number;
-    totalEmailsFetched: number;
-    totalEmailsProcessed: number;
-    totalErrors: number;
-  };
 }
 
 // ==================== Gmail Sync Types ====================
@@ -486,6 +591,10 @@ export interface StoredTransactionResult {
   merchant: string;
   amount: number;
   currency: string;
+  /** True when persistence was skipped because a duplicate already existed. */
+  isDuplicate?: boolean;
+  /** Why the activity considered the transaction a duplicate. */
+  duplicateReason?: 'same-email' | 'recent-same-amount';
 }
 
 export interface TransactionPipelineInput {
@@ -502,7 +611,7 @@ export interface TransactionPipelineInput {
 
 export interface TransactionPipelineResult {
   emailId: string;
-  status: 'stored' | 'ignored' | 'failed';
+  status: 'stored' | 'duplicate' | 'ignored' | 'failed';
   reason?: string;
   transactionId?: string;
   merchant?: string;

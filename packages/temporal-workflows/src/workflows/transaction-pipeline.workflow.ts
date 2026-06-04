@@ -118,16 +118,18 @@ export async function transactionPipelineWorkflow(
     patternName: input.patternName
   });
 
-  log.info('Transaction stored', {
+  log.info(stored.isDuplicate ? 'Transaction skipped — duplicate detected' : 'Transaction stored', {
     emailId: input.emailId,
     transactionId: stored.transactionId,
     merchant: stored.merchant,
-    amount: stored.amount
+    amount: stored.amount,
+    duplicateReason: stored.duplicateReason
   });
 
   return {
     emailId: input.emailId,
-    status: 'stored',
+    status: stored.isDuplicate ? 'duplicate' : 'stored',
+    reason: stored.duplicateReason,
     transactionId: stored.transactionId,
     merchant: stored.merchant,
     amount: stored.amount,
