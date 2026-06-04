@@ -1,64 +1,150 @@
 import { Budget, Transaction } from '../../../temporal-workflows/src/models';
+import type { BudgetInterface } from '../../../temporal-workflows/src/models/budget.model';
 import { periodStart, periodEnd } from '../utils/date.utils';
 import type { BudgetDTO, UpsertBudgetInput } from '../types/budget.types';
 
-async function getSpentByCategory(userId: string, month: number, year: number): Promise<Record<string, number>> {
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59, 999);
-  const rows = await Transaction.aggregate([
-    { $match: { userId, transactionType: 'debit', transactionDate: { $gte: start, $lte: end } } },
-    { $group: { _id: '$category', total: { $sum: '$amount' } } },
-  ]);
-  return Object.fromEntries(rows.map((r: any) => [r._id, r.total]));
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
-function toDTO(doc: any, spent: Record<string, number>): BudgetDTO {
-  return {
-    id: doc._id.toString(),
-    userId: doc.userId,
-    periodStart: periodStart(doc.month, doc.year),
-    periodEnd: periodEnd(doc.month, doc.year),
-    limitAmount: doc.totalBudget,
-    categories: (doc.categories ?? []).map((c: any) => ({
-      category: c.category,
-      budget: c.budgetAmount,
-      spent: spent[c.category] ?? 0,
-    })),
-  };
+interface CategorySpend {
+  total: number;
+  count: number;
+}
+
+/**
+ * Per-category debit spending for a `(userId, year, month)`, keyed by category.
+ * Used to backfill `spent`/`transactionCount` on read so the figures stay live
+ * regardless of which month's row supplied the limits (carry-forward).
+ */
+async function getSpentByCategory(
+  userId: string,
+  year: number,
+  month: number,
+): Promise<Record<string, CategorySpend>> {
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0, 23, 59, 59, 999);
+  const rows = await Transaction.aggregate<{ _id: string; total: number; count: number }>([
+    { $match: { userId, transactionType: 'debit', transactionDate: { $gte: start, $lte: end } } },
+    { $group: { _id: '$category', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+  ]);
+  return Object.fromEntries(rows.map((r) => [r._id, { total: r.total, count: r.count }]));
+}
+
+/** Result of resolving the effective budget for a target month. */
+interface EffectiveBudget {
+  doc: BudgetInterface;
+  isCarriedForward: boolean;
+  year: number;
+  month: number;
 }
 
 export class BudgetService {
-  async getCurrent(userId: string): Promise<BudgetDTO | null> {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
-    const doc = await Budget.findOne({ userId, month, year }).lean();
-    if (!doc) return null;
-    const spent = await getSpentByCategory(userId, month, year);
-    return toDTO(doc, spent);
+  /**
+   * Resolves the effective budget for `(year, month)`:
+   * 1. the exact row for that month, else
+   * 2. the most recent row at or before that month (limits carried forward), else
+   * 3. null (the user has never set any budget).
+   */
+  private async resolveEffective(
+    userId: string,
+    year: number,
+    month: number,
+  ): Promise<EffectiveBudget | null> {
+    const exact = await Budget.findOne({ userId, year, month }).lean<BudgetInterface>();
+    if (exact) return { doc: exact, isCarriedForward: false, year, month };
+
+    // Most recent row at or before the target month. Order by year then month desc.
+    const prior = await Budget.findOne({
+      userId,
+      $or: [{ year: { $lt: year } }, { year, month: { $lte: month } }],
+    })
+      .sort({ year: -1, month: -1 })
+      .lean<BudgetInterface>();
+    if (prior) return { doc: prior, isCarriedForward: true, year, month };
+
+    return null;
   }
 
+  /**
+   * Builds the API DTO for a target month from a (possibly carried-forward)
+   * source row. `spent`/`balance` are always computed for the target month.
+   */
+  private async buildDTO(effective: EffectiveBudget): Promise<BudgetDTO> {
+    const { doc, isCarriedForward, year, month } = effective;
+    const spentByCategory = await getSpentByCategory(doc.userId, year, month);
+
+    const categories = (doc.categories ?? []).map((c) => {
+      const spend = spentByCategory[c.category] ?? { total: 0, count: 0 };
+      return {
+        category: c.category,
+        budget: c.budgetAmount ?? 0,
+        spent: round2(spend.total),
+        transactionCount: spend.count,
+      };
+    });
+
+    const totalBudget = round2(
+      doc.totalBudget ?? categories.reduce((sum, c) => sum + c.budget, 0),
+    );
+    // Comprehensive month spend (all debit categories), so "remaining money"
+    // is correct even for categories the user did not explicitly budget.
+    const totalSpent = round2(
+      Object.values(spentByCategory).reduce((sum, s) => sum + s.total, 0),
+    );
+
+    return {
+      id: doc._id.toString(),
+      userId: doc.userId,
+      year,
+      month,
+      periodStart: periodStart(month, year),
+      periodEnd: periodEnd(month, year),
+      isCarriedForward,
+      totalBudget,
+      totalSpent,
+      balance: round2(totalBudget - totalSpent),
+      limitAmount: totalBudget,
+      categories,
+    };
+  }
+
+  /** Effective budget for the current calendar month (carry-forward aware). */
+  async getCurrent(userId: string): Promise<BudgetDTO | null> {
+    const now = new Date();
+    const effective = await this.resolveEffective(userId, now.getFullYear(), now.getMonth() + 1);
+    if (!effective) return null;
+    return this.buildDTO(effective);
+  }
+
+  /** Creates or replaces the budget row for a month and returns its live DTO. */
   async upsert(userId: string, input: UpsertBudgetInput): Promise<BudgetDTO> {
-    const date = input.periodStart ? new Date(input.periodStart) : new Date();
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
+    const { year, month } = this.resolveMonth(input);
     const categories = (input.categories ?? []).map((c) => ({
       category: c.category,
       budgetAmount: c.budget,
       spentAmount: 0,
       transactionCount: 0,
     }));
+    const totalBudget =
+      input.limitAmount ?? categories.reduce((sum, c) => sum + (c.budgetAmount ?? 0), 0);
+
     const doc = await Budget.findOneAndUpdate(
-      { userId, month, year },
-      { $set: { userId, month, year, totalBudget: input.limitAmount, categories, lastCalculatedAt: new Date() } },
-      { upsert: true, new: true }
-    ).lean();
-    const spent = await getSpentByCategory(userId, month, year);
-    return toDTO(doc, spent);
+      { userId, year, month },
+      { $set: { userId, year, month, totalBudget, categories, lastCalculatedAt: new Date() } },
+      { upsert: true, new: true },
+    ).lean<BudgetInterface>();
+
+    return this.buildDTO({ doc, isCarriedForward: false, year, month });
   }
 
-  async update(userId: string, id: string, input: Partial<UpsertBudgetInput>): Promise<BudgetDTO | null> {
-    const updates: Record<string, any> = { lastCalculatedAt: new Date() };
+  /** Patches an existing budget row by id and returns its live DTO. */
+  async update(
+    userId: string,
+    id: string,
+    input: Partial<UpsertBudgetInput>,
+  ): Promise<BudgetDTO | null> {
+    const updates: Record<string, unknown> = { lastCalculatedAt: new Date() };
     if (input.limitAmount !== undefined) updates.totalBudget = input.limitAmount;
     if (input.categories) {
       updates.categories = input.categories.map((c) => ({
@@ -68,9 +154,22 @@ export class BudgetService {
         transactionCount: 0,
       }));
     }
-    const doc = await Budget.findOneAndUpdate({ _id: id, userId }, { $set: updates }, { new: true }).lean();
+    const doc = await Budget.findOneAndUpdate(
+      { _id: id, userId },
+      { $set: updates },
+      { new: true },
+    ).lean<BudgetInterface>();
     if (!doc) return null;
-    const spent = await getSpentByCategory(userId, doc.month ?? 1, doc.year ?? new Date().getFullYear());
-    return toDTO(doc, spent);
+
+    const year = doc.year ?? new Date().getFullYear();
+    const month = doc.month ?? new Date().getMonth() + 1;
+    return this.buildDTO({ doc, isCarriedForward: false, year, month });
+  }
+
+  /** Accepts explicit `year`/`month`, a `periodStart` date, or defaults to now. */
+  private resolveMonth(input: UpsertBudgetInput): { year: number; month: number } {
+    if (input.year && input.month) return { year: input.year, month: input.month };
+    const date = input.periodStart ? new Date(input.periodStart) : new Date();
+    return { year: date.getFullYear(), month: date.getMonth() + 1 };
   }
 }

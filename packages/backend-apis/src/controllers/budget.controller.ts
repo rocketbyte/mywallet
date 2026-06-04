@@ -17,9 +17,14 @@ export class BudgetController {
   }
 
   async upsertBudget(req: Request, res: Response) {
-    const { periodStart, limitAmount } = req.body;
-    if (!periodStart || limitAmount === undefined) {
-      return res.status(400).json({ error: 'periodStart and limitAmount are required' });
+    const { year, month, periodStart, limitAmount, categories } = req.body;
+    const hasMonth = (year && month) || periodStart;
+    const hasAmounts = limitAmount !== undefined || (Array.isArray(categories) && categories.length > 0);
+    if (!hasMonth || !hasAmounts) {
+      return res.status(400).json({
+        error: 'ValidationError',
+        message: 'Provide year+month (or periodStart) and either limitAmount or categories',
+      });
     }
     try {
       const budget = await this.service.upsert(getDataOwnerId(req), req.body);
