@@ -28,11 +28,23 @@ export interface BalanceFilters {
   endDate?: string;
 }
 
+/** Per-category expense (debit) total over the balance's date range. */
+export interface CategorySpendDTO {
+  category: string;
+  spent: number;
+}
+
 export interface BalanceDTO {
   credits: number;
   debits: number;
   balance: number;
   count: number;
+  /**
+   * Debit totals grouped by category over the same range, sorted by spend desc.
+   * Sums to `debits`, so a client can render a category breakdown that matches
+   * the balance total without re-aggregating (or capping) rows itself.
+   */
+  byCategory: CategorySpendDTO[];
   startDate?: string;
   endDate?: string;
 }

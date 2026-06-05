@@ -106,6 +106,14 @@ router.post('/', controller.createTransaction.bind(controller));
  *                 debits:  { type: number, example: 1875.42 }
  *                 balance: { type: number, example: 2374.58 }
  *                 count:   { type: integer, example: 37 }
+ *                 byCategory:
+ *                   type: array
+ *                   description: Debit totals grouped by category (sorted desc); sums to `debits`.
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       category: { type: string, example: food }
+ *                       spent:    { type: number, example: 612.80 }
  *                 startDate: { type: string, format: date, nullable: true }
  *                 endDate:   { type: string, format: date, nullable: true }
  *       500:

@@ -126,25 +126,48 @@ export class TransactionService {
     const dateRange = utcDayRange(filters.startDate, filters.endDate);
     if (dateRange) match.transactionDate = dateRange;
 
-    const rows = await Transaction.aggregate<{ _id: 'credit' | 'debit'; total: number; count: number }>([
+    // One pass: transaction-type totals AND the debit breakdown by category.
+    const [facet] = await Transaction.aggregate<{
+      totals: { _id: 'credit' | 'debit'; total: number; count: number }[];
+      byCategory: { _id: string | null; spent: number }[];
+    }>([
       { $match: match },
-      { $group: { _id: '$transactionType', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      {
+        $facet: {
+          totals: [
+            { $group: { _id: '$transactionType', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+          ],
+          byCategory: [
+            { $match: { transactionType: 'debit' } },
+            { $group: { _id: '$category', spent: { $sum: '$amount' } } },
+            { $sort: { spent: -1 } },
+          ],
+        },
+      },
     ]);
 
     let credits = 0;
     let debits = 0;
     let count = 0;
-    for (const row of rows) {
+    for (const row of facet?.totals ?? []) {
       if (row._id === 'credit') credits = row.total;
       else if (row._id === 'debit') debits = row.total;
       count += row.count;
     }
+
+    // Spent is left unrounded here so the breakdown sums exactly to `debits`;
+    // clients round for display.
+    const byCategory = (facet?.byCategory ?? []).map((row) => ({
+      category: row._id ?? 'other',
+      spent: row.spent,
+    }));
 
     return {
       credits: round2(credits),
       debits: round2(debits),
       balance: round2(credits - debits),
       count,
+      byCategory,
       startDate: filters.startDate,
       endDate: filters.endDate,
     };
