@@ -84,6 +84,9 @@ const TransactionSchema = new Schema<TransactionInterface>({
 TransactionSchema.index({ userId: 1, emailId: 1 }, { unique: true, sparse: true });
 
 TransactionSchema.index({ userId: 1, transactionDate: -1, category: 1 });
+// Supports the list endpoint's category filter: equality on category with the
+// transactionDate-desc sort served straight from the index (no in-memory sort).
+TransactionSchema.index({ userId: 1, category: 1, transactionDate: -1 });
 TransactionSchema.index({ userId: 1, workflowId: 1 }, { sparse: true });
 TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 }, { sparse: true });
 
