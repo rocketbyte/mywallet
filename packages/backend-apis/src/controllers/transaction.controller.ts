@@ -6,19 +6,25 @@ import { logger } from '../utils/logger';
 import {
   isTransactionCategoryKey,
   isTransactionType,
+  isTransactionSource,
+  TRANSACTION_SOURCES,
 } from '../../../temporal-workflows/src/shared/categories';
 
 /**
- * Validates the category/transactionType fields of a write payload. Returns an
- * error message when a supplied value is invalid, or `null` when the payload is
- * acceptable. Absent fields are allowed (partial updates).
+ * Validates the category/transactionType/source fields of a write payload.
+ * Returns an error message when a supplied value is invalid, or `null` when the
+ * payload is acceptable. Absent fields are allowed (partial updates); `source`
+ * defaults to `manual` in the service when omitted on create.
  */
-function validateClassification(body: any): string | null {
+function validateWritePayload(body: any): string | null {
   if (body.category !== undefined && !isTransactionCategoryKey(body.category)) {
     return 'category must be one of the supported category keys';
   }
   if (body.transactionType !== undefined && !isTransactionType(body.transactionType)) {
     return "transactionType must be 'debit' or 'credit'";
+  }
+  if (body.source !== undefined && !isTransactionSource(body.source)) {
+    return `source must be one of: ${TRANSACTION_SOURCES.join(', ')}`;
   }
   return null;
 }
@@ -51,9 +57,9 @@ export class TransactionController {
     if (!merchant || amount === undefined || !category || !transactionDate) {
       return res.status(400).json({ error: 'merchant, amount, category, and transactionDate are required' });
     }
-    const classificationError = validateClassification(req.body);
-    if (classificationError) {
-      return res.status(400).json({ error: classificationError });
+    const validationError = validateWritePayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
     try {
       const transaction = await this.service.create(getDataOwnerId(req), req.body);
@@ -76,9 +82,9 @@ export class TransactionController {
   }
 
   async updateTransaction(req: Request, res: Response) {
-    const classificationError = validateClassification(req.body);
-    if (classificationError) {
-      return res.status(400).json({ error: classificationError });
+    const validationError = validateWritePayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
     try {
       const transaction = await this.service.update(getDataOwnerId(req), req.params.id, req.body);

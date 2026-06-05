@@ -39,6 +39,13 @@ router.get('/', controller.getTransactions.bind(controller));
  * /transactions:
  *   post:
  *     summary: Create a transaction
+ *     description: |
+ *       Manually record a transaction (e.g. cash spending, or any entry not
+ *       ingested from email). `category` must be one of the keys from
+ *       `GET /transactions/categories`; `transactionType` ('credit' = income,
+ *       'debit' = expense) sets the direction. `source` defaults to 'manual'
+ *       when omitted. An unknown `category`, an invalid `transactionType`, or an
+ *       unrecognized `source` is rejected with 400.
  *     tags: [Transactions]
  *     requestBody:
  *       required: true
@@ -46,17 +53,18 @@ router.get('/', controller.getTransactions.bind(controller));
  *         application/json:
  *           schema:
  *             type: object
- *             required: [merchant, amount, category, date]
+ *             required: [merchant, amount, category, transactionDate]
  *             properties:
  *               merchant: { type: string }
- *               amount: { type: number }
- *               category: { type: string }
- *               date: { type: string, format: date }
- *               time: { type: string, example: '14:30' }
- *               source: { type: string, enum: [email, sms, manual, chat] }
+ *               amount: { type: number, description: Non-negative; direction comes from transactionType. }
+ *               category: { type: string, example: food }
+ *               transactionDate: { type: string, format: date-time }
+ *               transactionType: { type: string, enum: [debit, credit] }
+ *               currency: { type: string, example: USD }
+ *               source: { type: string, enum: [email, sms, manual, chat], default: manual }
  *               account: { type: string }
  *               note: { type: string }
- *               isIncome: { type: boolean }
+ *               isIncome: { type: boolean, deprecated: true, description: Legacy; prefer transactionType. }
  *     responses:
  *       201:
  *         description: Created transaction.

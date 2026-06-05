@@ -45,3 +45,19 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export function isTransactionType(value: unknown): value is TransactionType {
   return value === 'debit' || value === 'credit';
 }
+
+/**
+ * How a transaction entered the system. `email`/`sms` are ingested by the
+ * pipeline; `manual` is a user-entered record (e.g. cash spending) and `chat`
+ * is created through the assistant. Manual entry defaults to `manual`.
+ */
+export const TRANSACTION_SOURCES = ['email', 'sms', 'manual', 'chat'] as const;
+export type TransactionSource = (typeof TRANSACTION_SOURCES)[number];
+
+/** True when `value` is a recognized transaction source. */
+export function isTransactionSource(value: unknown): value is TransactionSource {
+  return (
+    typeof value === 'string' &&
+    (TRANSACTION_SOURCES as readonly string[]).includes(value)
+  );
+}

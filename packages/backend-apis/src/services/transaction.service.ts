@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Transaction } from '../../../temporal-workflows/src/models';
 import { normalizeMerchant } from '../../../temporal-workflows/src/shared/normalize-merchant';
 import { SUPPORTED_TRANSACTION_CATEGORIES } from '../../../temporal-workflows/src/shared/categories';
@@ -64,6 +65,11 @@ export class TransactionService {
     const transactionDate = new Date(input.transactionDate);
     const doc = await Transaction.create({
       userId,
+      // Synthetic id so the sparse-unique { userId, emailId } index gets a unique
+      // value per manual row — a compound sparse index still indexes documents
+      // that have `userId`, so omitting emailId would collide on { userId, null }.
+      // Future imports can still dedup against real provider message ids.
+      emailId: `manual-${randomUUID()}`,
       transactionDate,
       merchant: normalizeMerchant(input.merchant),
       amount: Math.abs(input.amount),
