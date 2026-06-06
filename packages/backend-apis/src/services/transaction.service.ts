@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Transaction } from '../../../temporal-workflows/src/models';
 import { normalizeMerchant } from '../../../temporal-workflows/src/shared/normalize-merchant';
 import { SUPPORTED_TRANSACTION_CATEGORIES } from '../../../temporal-workflows/src/shared/categories';
-import { utcDayRange } from '../utils/date.utils';
+import { fixedExpenseWindowStart, utcDayRange } from '../utils/date.utils';
 import { escapeRegex } from '../utils/request.utils';
 import type {
   BalanceDTO,
@@ -27,6 +27,7 @@ function toDTO(tx: any): TransactionDTO {
       : undefined,
     note: tx.note,
     isIncome: tx.transactionType === 'credit',
+    isFixedExpense: tx.isFixedExpense ?? false,
     aiConfidence: tx.confidence,
     createdAt: tx.createdAt,
   };
@@ -80,6 +81,7 @@ export class TransactionService {
       source: input.source ?? 'manual',
       accountNumber: input.account,
       note: input.note,
+      isFixedExpense: input.isFixedExpense ?? false,
     });
     return toDTO(doc.toObject());
   }
@@ -102,13 +104,48 @@ export class TransactionService {
     if (input.currency !== undefined) updates.currency = input.currency;
     if (input.note !== undefined) updates.note = input.note;
     if (input.source !== undefined) updates.source = input.source;
+    if (input.isFixedExpense !== undefined) updates.isFixedExpense = input.isFixedExpense;
     const transactionType = resolveTransactionType(input);
     if (transactionType !== undefined) updates.transactionType = transactionType;
     if (input.amount !== undefined) updates.amount = Math.abs(input.amount);
     if (input.transactionDate) updates.transactionDate = new Date(input.transactionDate);
 
     const doc = await Transaction.findOneAndUpdate({ _id: id, userId }, { $set: updates }, { new: true }).lean();
-    return doc ? toDTO(doc) : null;
+    if (!doc) return null;
+
+    // A fixed expense is recurring, so the flag applies to the whole group: every
+    // transaction of this user sharing the (category, amount, merchant) signature
+    // is marked/unmarked together. Idempotent and tenant-scoped by construction.
+    if (input.isFixedExpense !== undefined) {
+      await this.propagateFixedExpense(userId, doc, input.isFixedExpense);
+    }
+    return toDTO(doc);
+  }
+
+  /**
+   * Applies `value` to transactions owned by `userId` that share the target's
+   * fixed-expense signature (same category, amount, and merchant) AND fall within
+   * the 3-month trailing window anchored on the target's date — from the first of
+   * the month two months before the target's month, through the target's date.
+   * The target itself is already updated by the caller (so it is flagged even if
+   * it sits outside the window). Pure data op — no external I/O, no Temporal.
+   */
+  private async propagateFixedExpense(
+    userId: string,
+    target: { category: string; amount: number; merchant: string; transactionDate: Date },
+    value: boolean,
+  ): Promise<void> {
+    const anchor = new Date(target.transactionDate);
+    await Transaction.updateMany(
+      {
+        userId,
+        category: target.category,
+        amount: target.amount,
+        merchant: target.merchant,
+        transactionDate: { $gte: fixedExpenseWindowStart(anchor), $lte: anchor },
+      },
+      { $set: { isFixedExpense: value } },
+    );
   }
 
   async delete(userId: string, id: string): Promise<boolean> {
@@ -126,10 +163,12 @@ export class TransactionService {
     const dateRange = utcDayRange(filters.startDate, filters.endDate);
     if (dateRange) match.transactionDate = dateRange;
 
-    // One pass: transaction-type totals AND the debit breakdown by category.
+    // One pass: transaction-type totals, the debit breakdown by category, AND
+    // the fixed-expense (recurring/committed) debit subtotal.
     const [facet] = await Transaction.aggregate<{
       totals: { _id: 'credit' | 'debit'; total: number; count: number }[];
       byCategory: { _id: string | null; spent: number }[];
+      fixed: { _id: null; total: number }[];
     }>([
       { $match: match },
       {
@@ -141,6 +180,10 @@ export class TransactionService {
             { $match: { transactionType: 'debit' } },
             { $group: { _id: '$category', spent: { $sum: '$amount' } } },
             { $sort: { spent: -1 } },
+          ],
+          fixed: [
+            { $match: { transactionType: 'debit', isFixedExpense: true } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
           ],
         },
       },
@@ -162,12 +205,15 @@ export class TransactionService {
       spent: row.spent,
     }));
 
+    const fixedExpenses = facet?.fixed?.[0]?.total ?? 0;
+
     return {
       credits: round2(credits),
       debits: round2(debits),
       balance: round2(credits - debits),
       count,
       byCategory,
+      fixedExpenses: round2(fixedExpenses),
       startDate: filters.startDate,
       endDate: filters.endDate,
     };

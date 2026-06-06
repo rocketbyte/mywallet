@@ -10,6 +10,8 @@ export interface TransactionDTO {
   account?: string;
   note?: string;
   isIncome: boolean;
+  /** User-marked recurring fixed expense (e.g. rent, a subscription). */
+  isFixedExpense: boolean;
   aiConfidence?: number;
   createdAt: Date;
 }
@@ -45,6 +47,11 @@ export interface BalanceDTO {
    * the balance total without re-aggregating (or capping) rows itself.
    */
   byCategory: CategorySpendDTO[];
+  /**
+   * Sum of expense (debit) transactions in the range flagged `isFixedExpense`.
+   * Non-negative magnitude, consistent with `debits`. `0` when none.
+   */
+  fixedExpenses: number;
   startDate?: string;
   endDate?: string;
 }
@@ -65,6 +72,11 @@ export interface CreateTransactionInput {
   source?: string;
   account?: string;
   note?: string;
+  /**
+   * Marks the transaction as a recurring fixed expense. On update this is
+   * propagated to every transaction sharing the same category/amount/merchant.
+   */
+  isFixedExpense?: boolean;
   /** @deprecated Use `transactionType`. Retained for backward compatibility. */
   isIncome?: boolean;
 }

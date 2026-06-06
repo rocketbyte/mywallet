@@ -30,6 +30,13 @@ export interface TransactionInterface extends Document {
   // Additional fields
   note?: string;
 
+  /**
+   * User-marked recurring fixed expense (rent, subscriptions, …). Set through
+   * the transactions API; propagated across all transactions sharing the same
+   * category/amount/merchant signature for the user.
+   */
+  isFixedExpense: boolean;
+
   // Metadata (optional for manual transactions)
   rawEmailText?: string;
   extractedData?: Record<string, any>;
@@ -66,6 +73,7 @@ const TransactionSchema = new Schema<TransactionInterface>({
   bankName: { type: String },
 
   note: { type: String },
+  isFixedExpense: { type: Boolean, default: false },
 
   rawEmailText: { type: String },
   extractedData: { type: Schema.Types.Mixed },
@@ -89,6 +97,10 @@ TransactionSchema.index({ userId: 1, transactionDate: -1, category: 1 });
 TransactionSchema.index({ userId: 1, category: 1, transactionDate: -1 });
 TransactionSchema.index({ userId: 1, workflowId: 1 }, { sparse: true });
 TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 }, { sparse: true });
+
+// Supports fixed-expense propagation: marking one transaction updates every
+// other row for the user that shares the same (category, amount, merchant).
+TransactionSchema.index({ userId: 1, category: 1, amount: 1, merchant: 1 });
 
 // Supports findRecentDuplicate — exact-match dedup query during pipeline storage.
 TransactionSchema.index(

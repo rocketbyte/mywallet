@@ -26,6 +26,9 @@ function validateWritePayload(body: any): string | null {
   if (body.source !== undefined && !isTransactionSource(body.source)) {
     return `source must be one of: ${TRANSACTION_SOURCES.join(', ')}`;
   }
+  if (body.isFixedExpense !== undefined && typeof body.isFixedExpense !== 'boolean') {
+    return 'isFixedExpense must be a boolean';
+  }
   return null;
 }
 

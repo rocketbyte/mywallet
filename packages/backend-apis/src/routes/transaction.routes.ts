@@ -114,6 +114,7 @@ router.post('/', controller.createTransaction.bind(controller));
  *                     properties:
  *                       category: { type: string, example: food }
  *                       spent:    { type: number, example: 612.80 }
+ *                 fixedExpenses: { type: number, example: 1200.00, description: Sum of debit transactions in range flagged isFixedExpense; 0 when none. }
  *                 startDate: { type: string, format: date, nullable: true }
  *                 endDate:   { type: string, format: date, nullable: true }
  *       500:
@@ -205,6 +206,7 @@ router.get('/:id', controller.getTransactionById.bind(controller));
  *               transactionType: { type: string, enum: [debit, credit] }
  *               note: { type: string }
  *               transactionDate: { type: string, format: date-time }
+ *               isFixedExpense: { type: boolean, description: Marks the transaction as a recurring fixed expense; the value is propagated to every transaction sharing the same category/amount/merchant. }
  *     responses:
  *       200:
  *         description: Updated transaction.
