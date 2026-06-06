@@ -110,6 +110,7 @@ export class BudgetService {
       totalSpent,
       balance: round2(totalBudget - totalSpent),
       limitAmount: totalBudget,
+      locked: doc.locked ?? false,
       categories,
     };
   }
@@ -141,9 +142,19 @@ export class BudgetService {
       budgetAmount: clampToCap(c.budgetAmount, totalBudget),
     }));
 
+    const set: Record<string, unknown> = {
+      userId,
+      year,
+      month,
+      totalBudget,
+      categories,
+      lastCalculatedAt: new Date(),
+    };
+    if (input.locked !== undefined) set.locked = input.locked;
+
     const doc = await Budget.findOneAndUpdate(
       { userId, year, month },
-      { $set: { userId, year, month, totalBudget, categories, lastCalculatedAt: new Date() } },
+      { $set: set },
       { upsert: true, new: true },
     ).lean<BudgetInterface>();
 
@@ -158,6 +169,7 @@ export class BudgetService {
   ): Promise<BudgetDTO | null> {
     const updates: Record<string, unknown> = { lastCalculatedAt: new Date() };
     if (input.limitAmount !== undefined) updates.totalBudget = input.limitAmount;
+    if (input.locked !== undefined) updates.locked = input.locked;
     if (input.categories) {
       // When the cap is patched in the same call, clamp categories to it so a
       // category limit can never exceed the cap (the client-side slider max).

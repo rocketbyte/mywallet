@@ -12,6 +12,8 @@ export interface BudgetInterface extends Document {
   }[];
   totalBudget?: number;
   totalSpent?: number;
+  /** When true, the budget cap and category limits are locked from edits in the UI. */
+  locked?: boolean;
   lastCalculatedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +31,7 @@ const BudgetSchema = new Schema<BudgetInterface>({
   }],
   totalBudget: { type: Number },
   totalSpent: { type: Number, default: 0 },
+  locked: { type: Boolean, default: false },
   lastCalculatedAt: { type: Date, default: Date.now },
 }, {
   timestamps: true,

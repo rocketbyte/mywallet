@@ -21,6 +21,8 @@ export interface BudgetDTO {
   balance: number;
   /** @deprecated Alias of totalBudget kept for back-compat. */
   limitAmount: number;
+  /** When true, the cap and category limits are locked from edits in the UI. */
+  locked: boolean;
   categories: BudgetCategoryDTO[];
 }
 
@@ -31,5 +33,7 @@ export interface UpsertBudgetInput {
   periodStart?: string;
   /** Optional explicit total cap; defaults to the sum of category budgets. */
   limitAmount?: number;
+  /** Lock state for the budget cap and category limits. */
+  locked?: boolean;
   categories?: { category: string; budget: number }[];
 }
