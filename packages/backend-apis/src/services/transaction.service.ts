@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Transaction } from '../../../temporal-workflows/src/models';
 import { normalizeMerchant } from '../../../temporal-workflows/src/shared/normalize-merchant';
 import { SUPPORTED_TRANSACTION_CATEGORIES } from '../../../temporal-workflows/src/shared/categories';
+import { findInheritedFixedExpense } from '../../../temporal-workflows/src/shared/fixed-expense';
 import { fixedExpenseWindowStart, utcDayRange } from '../utils/date.utils';
 import { escapeRegex } from '../utils/request.utils';
 import type {
@@ -65,6 +66,17 @@ export class TransactionService {
 
   async create(userId: string, input: CreateTransactionInput): Promise<TransactionDTO> {
     const transactionDate = new Date(input.transactionDate);
+    const merchant = normalizeMerchant(input.merchant);
+    const amount = Math.abs(input.amount);
+    const category = input.category;
+
+    // A new transaction inherits the fixed-expense flag from a matching one in the
+    // previous month, so recurring costs stay flagged without re-marking. An
+    // explicit `isFixedExpense: true` from the caller always wins.
+    const isFixedExpense =
+      input.isFixedExpense === true ||
+      (await findInheritedFixedExpense({ userId, category, amount, merchant, transactionDate }));
+
     const doc = await Transaction.create({
       userId,
       // Synthetic id so the sparse-unique { userId, emailId } index gets a unique
@@ -73,16 +85,16 @@ export class TransactionService {
       // Future imports can still dedup against real provider message ids.
       emailId: `manual-${randomUUID()}`,
       transactionDate,
-      merchant: normalizeMerchant(input.merchant),
-      amount: Math.abs(input.amount),
+      merchant,
+      amount,
       currency: input.currency ?? 'USD',
-      category: input.category,
+      category,
       subcategory: input.subcategory,
       transactionType: resolveTransactionType(input) ?? 'debit',
       source: input.source ?? 'manual',
       accountNumber: input.account,
       note: input.note,
-      isFixedExpense: input.isFixedExpense ?? false,
+      isFixedExpense,
     });
     return toDTO(doc.toObject());
   }

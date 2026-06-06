@@ -34,6 +34,7 @@ export class MongoDBTransactionRepository implements TransactionRepositoryInterf
       category: transaction.category,
       subcategory: transaction.subcategory,
       transactionType: transaction.transactionType,
+      isFixedExpense: ext.isFixedExpense ?? false,
       accountNumber: transaction.accountNumber,
       bankName: transaction.bankName || '',
       extractedData: transaction.rawData || {},

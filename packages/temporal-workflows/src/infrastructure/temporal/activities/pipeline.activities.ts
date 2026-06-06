@@ -26,6 +26,7 @@ import {
 } from '../../../shared/types';
 import { PIPELINE_STEP_KEYS, DUPLICATE_LOOKBACK_HOURS } from '../../../shared/constants';
 import { normalizeMerchant } from '../../../shared/normalize-merchant';
+import { findInheritedFixedExpense } from '../../../shared/fixed-expense';
 
 // ---------------------------------------------------------------------------
 // Template interpolation helper
@@ -214,6 +215,17 @@ export function createPipelineActivities(container: DependencyContainer) {
       // Fetch source email to denormalize fields onto the transaction record
       const sourceEmail = await emailRepo.findById(input.userId, input.emailId);
 
+      // Inherit the fixed-expense flag from a matching transaction in the previous
+      // month, so recurring email charges stay flagged consistently with manual
+      // entries. Runs only for genuine inserts (after the dedup checks above).
+      const isFixedExpense = await findInheritedFixedExpense({
+        userId: input.userId,
+        category: input.rawData.category ?? 'Other',
+        amount: input.rawData.amount,
+        merchant: input.rawData.merchant,
+        transactionDate: input.rawData.transactionDate,
+      });
+
       const transaction = await transactionRepo.save({
         id: '',
         emailId: input.emailId,
@@ -231,6 +243,7 @@ export function createPipelineActivities(container: DependencyContainer) {
         accountNumber: input.rawData.accountLast4 ?? '',
         category: input.rawData.category ?? 'Other',
         confidence: input.rawData.confidence,
+        isFixedExpense,
         workflowId: input.workflowId,
         workflowRunId: input.workflowRunId,
         rawData: input.rawData
