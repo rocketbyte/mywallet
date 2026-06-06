@@ -8,6 +8,7 @@ import type {
   BalanceDTO,
   BalanceFilters,
   CreateTransactionInput,
+  FixedExpensesSummaryDTO,
   SupportedCategoryDTO,
   TransactionDTO,
   TransactionFilters,
@@ -163,12 +164,12 @@ export class TransactionService {
     const dateRange = utcDayRange(filters.startDate, filters.endDate);
     if (dateRange) match.transactionDate = dateRange;
 
-    // One pass: transaction-type totals, the debit breakdown by category, AND
-    // the fixed-expense (recurring/committed) debit subtotal.
+    // One pass: transaction-type totals AND the debit breakdown by category.
+    // The fixed-expense total is computed separately (it spans the previous +
+    // current month, not the requested range — see computeFixedExpensesTotal).
     const [facet] = await Transaction.aggregate<{
       totals: { _id: 'credit' | 'debit'; total: number; count: number }[];
       byCategory: { _id: string | null; spent: number }[];
-      fixed: { _id: null; total: number }[];
     }>([
       { $match: match },
       {
@@ -180,10 +181,6 @@ export class TransactionService {
             { $match: { transactionType: 'debit' } },
             { $group: { _id: '$category', spent: { $sum: '$amount' } } },
             { $sort: { spent: -1 } },
-          ],
-          fixed: [
-            { $match: { transactionType: 'debit', isFixedExpense: true } },
-            { $group: { _id: null, total: { $sum: '$amount' } } },
           ],
         },
       },
@@ -205,18 +202,56 @@ export class TransactionService {
       spent: row.spent,
     }));
 
-    const fixedExpenses = facet?.fixed?.[0]?.total ?? 0;
-
     return {
       credits: round2(credits),
       debits: round2(debits),
       balance: round2(credits - debits),
       count,
       byCategory,
-      fixedExpenses: round2(fixedExpenses),
       startDate: filters.startDate,
       endDate: filters.endDate,
     };
+  }
+
+  /**
+   * Recurring fixed-expense summary for the user. A dedicated resource (not a
+   * field on the range-scoped balance) because it answers a different question —
+   * "what are my active committed costs?" — anchored on the server date rather
+   * than a requested range.
+   */
+  async getFixedExpensesSummary(userId: string): Promise<FixedExpensesSummaryDTO> {
+    return { total: round2(await this.computeFixedExpensesTotal(userId)) };
+  }
+
+  /**
+   * The user's currently-active recurring fixed-expense total: the sum over the
+   * DISTINCT fixed-expense signatures (category, amount, merchant) of their fixed
+   * (debit, `isFixedExpense`) transactions dated in the previous OR current
+   * calendar month, anchored on the server's current date. De-duplicating by
+   * signature means an expense recurring in both months is counted once, so the
+   * result is "all of last month's fixed expenses plus this month's new ones".
+   */
+  private async computeFixedExpensesTotal(userId: string): Promise<number> {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const [row] = await Transaction.aggregate<{ total: number }>([
+      {
+        $match: {
+          userId,
+          transactionType: 'debit',
+          isFixedExpense: true,
+          transactionDate: { $gte: start, $lte: end },
+        },
+      },
+      // Collapse to one entry per signature so a charge recurring in both months
+      // counts once; `amount` is part of the key, so it carries through.
+      { $group: { _id: { category: '$category', amount: '$amount', merchant: '$merchant' } } },
+      { $group: { _id: null, total: { $sum: '$_id.amount' } } },
+    ]);
+
+    return row?.total ?? 0;
   }
 }
 

@@ -114,7 +114,6 @@ router.post('/', controller.createTransaction.bind(controller));
  *                     properties:
  *                       category: { type: string, example: food }
  *                       spent:    { type: number, example: 612.80 }
- *                 fixedExpenses: { type: number, example: 1200.00, description: Sum of debit transactions in range flagged isFixedExpense; 0 when none. }
  *                 startDate: { type: string, format: date, nullable: true }
  *                 endDate:   { type: string, format: date, nullable: true }
  *       500:
@@ -152,6 +151,34 @@ router.get('/balance', controller.getBalance.bind(controller));
  *         $ref: '#/components/responses/ServerError'
  */
 router.get('/categories', controller.getCategories.bind(controller));
+
+/**
+ * @openapi
+ * /transactions/fixed-expenses:
+ *   get:
+ *     summary: Recurring fixed-expense summary
+ *     description: |
+ *       Returns the user's currently-active recurring fixed-expense total as
+ *       `{ total }`. The total is the sum over distinct fixed-expense signatures
+ *       (category + amount + merchant) of `isFixedExpense` debit transactions
+ *       across the previous and current calendar month, each counted once
+ *       (an expense recurring in both months is not double-counted). Anchored on
+ *       the server date; this is a rolling view of committed costs, not tied to a
+ *       date range.
+ *     tags: [Transactions]
+ *     responses:
+ *       200:
+ *         description: Fixed-expense summary.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total: { type: number, example: 1260.00 }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/fixed-expenses', controller.getFixedExpensesSummary.bind(controller));
 
 /**
  * @openapi

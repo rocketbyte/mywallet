@@ -110,6 +110,16 @@ export class TransactionController {
     }
   }
 
+  async getFixedExpensesSummary(req: Request, res: Response) {
+    try {
+      const summary = await this.service.getFixedExpensesSummary(getDataOwnerId(req));
+      res.json(summary);
+    } catch (error) {
+      logger.error('Failed to compute fixed-expense summary', { error });
+      res.status(500).json({ error: 'Failed to compute fixed-expense summary' });
+    }
+  }
+
   async getBalance(req: Request, res: Response) {
     try {
       const balance = await this.service.getBalance(getDataOwnerId(req), {

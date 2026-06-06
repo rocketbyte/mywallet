@@ -47,13 +47,21 @@ export interface BalanceDTO {
    * the balance total without re-aggregating (or capping) rows itself.
    */
   byCategory: CategorySpendDTO[];
-  /**
-   * Sum of expense (debit) transactions in the range flagged `isFixedExpense`.
-   * Non-negative magnitude, consistent with `debits`. `0` when none.
-   */
-  fixedExpenses: number;
   startDate?: string;
   endDate?: string;
+}
+
+/**
+ * Recurring fixed-expense summary — a rolling view of the user's committed costs,
+ * deliberately a separate resource from the range-scoped balance.
+ */
+export interface FixedExpensesSummaryDTO {
+  /**
+   * Sum over distinct fixed-expense signatures (category+amount+merchant) of
+   * `isFixedExpense` debits across the previous and current calendar month, each
+   * counted once. Anchored on the server date. Non-negative; `0` when none.
+   */
+  total: number;
 }
 
 export interface CreateTransactionInput {
