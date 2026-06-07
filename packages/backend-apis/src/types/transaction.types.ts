@@ -80,6 +80,12 @@ export interface SpendingPaceDTO {
   projectedExpenses: number;
   /** Budget available for variable spend = max(0, budget − recurring fixed-expense total). */
   variableBudget: number;
+  /**
+   * Signed budget variance: how far the daily average is over (+) or under (−)
+   * the expected daily average, as a whole-number percent. `null` when there is
+   * no target (no budget / zero variable budget).
+   */
+  variancePct: number | null;
   status: SpendingPaceStatus;
   daysElapsed: number;
   daysInMonth: number;

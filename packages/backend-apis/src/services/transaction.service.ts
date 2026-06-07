@@ -48,6 +48,12 @@ export function computeSpendingPace(input: {
   const projectedVariable = dailyAverage * daysInMonth;
   const projectedExpenses = projectedVariable + Math.max(0, fixedExpenses);
 
+  // Signed budget variance vs the expected daily rate (null when no target).
+  const variancePct =
+    expectedDailyAverage > 0
+      ? Math.round(((dailyAverage - expectedDailyAverage) / expectedDailyAverage) * 100)
+      : null;
+
   let status: SpendingPaceDTO['status'];
   if (budgetLimit <= 0) {
     status = 'none';
@@ -64,6 +70,7 @@ export function computeSpendingPace(input: {
     expectedDailyAverage: round2(expectedDailyAverage),
     projectedExpenses: round2(projectedExpenses),
     variableBudget: round2(variableBudget),
+    variancePct,
     status,
     daysElapsed,
     daysInMonth,

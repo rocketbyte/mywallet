@@ -75,6 +75,24 @@ test('no room for variable spend marks any spend over', () => {
   assert.equal(pace.status, 'over');
 });
 
+test('variancePct is the signed % vs the expected daily average', () => {
+  // budget 1500, no fixed -> expected 50/day. variable 600 -> dailyAvg 60 -> +20%.
+  const over = computeSpendingPace({ variableExpenses: 600, budgetLimit: 1500, fixedExpenses: 0, now: NOW });
+  assert.equal(over.variancePct, 20);
+
+  // variable 300 -> dailyAvg 30 vs expected 50 -> -40%.
+  const under = computeSpendingPace({ variableExpenses: 300, budgetLimit: 1500, fixedExpenses: 0, now: NOW });
+  assert.equal(under.variancePct, -40);
+});
+
+test('variancePct is null when there is no target', () => {
+  const noBudget = computeSpendingPace({ variableExpenses: 600, budgetLimit: 0, fixedExpenses: 0, now: NOW });
+  assert.equal(noBudget.variancePct, null);
+  // budget fully consumed by fixed -> expected 0 -> null.
+  const noRoom = computeSpendingPace({ variableExpenses: 100, budgetLimit: 500, fixedExpenses: 500, now: NOW });
+  assert.equal(noRoom.variancePct, null);
+});
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
