@@ -205,6 +205,13 @@ export const RECURRING_CONFIG = {
    * month's recurrent transactions whose day-of-month matches that day.
    */
   CRON: '0 0 * * *',
+  /**
+   * Canonical id of the single global Temporal Schedule and its started workflow.
+   * Both the standalone seed script and the deploy-time auto-seed upsert THIS id —
+   * a fixed id is what guarantees there is ever exactly one schedule (no dupes).
+   */
+  SCHEDULE_ID: 'recurring-transactions-daily',
+  WORKFLOW_TYPE: 'monthlyRecurringTransactionsWorkflow',
   /** Distinct userIds fetched per dispatcher page. */
   USER_PAGE_SIZE: 500,
   /** Recurrent source rows copied per activity call (per user). */

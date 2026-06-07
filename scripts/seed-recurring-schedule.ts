@@ -31,8 +31,8 @@ const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS || 'localhost:7233';
 const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE || 'default';
 const DEFAULT_TZ = process.env.DEFAULT_TENANT_TZ || 'UTC';
 
-const SCHEDULE_ID = 'recurring-transactions-daily';
-const WORKFLOW_ID = 'recurring-transactions-daily';
+const SCHEDULE_ID = RECURRING_CONFIG.SCHEDULE_ID;
+const WORKFLOW_ID = RECURRING_CONFIG.SCHEDULE_ID;
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
@@ -44,7 +44,7 @@ async function main() {
 
   const action = {
     type: 'startWorkflow' as const,
-    workflowType: 'monthlyRecurringTransactionsWorkflow',
+    workflowType: RECURRING_CONFIG.WORKFLOW_TYPE,
     workflowId: WORKFLOW_ID,
     taskQueue: TASK_QUEUES.RECURRING,
     args: [] as unknown[],
