@@ -95,10 +95,10 @@ export interface SpendingPaceDTO {
   safeToSpendPerDay: number | null;
   /**
    * Fixed costs still due this month (recurring commitment minus the fixed
-   * already posted in range) — the amount of the balance reserved before
-   * discretionary spend. `0` when none; `null` when no budget.
+   * already posted in range) — the amount pending to pay. Budget-independent;
+   * `0` when nothing is pending.
    */
-  reservedForFixed: number | null;
+  reservedForFixed: number;
   status: SpendingPaceStatus;
   daysElapsed: number;
   daysInMonth: number;

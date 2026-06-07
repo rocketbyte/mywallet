@@ -59,8 +59,8 @@ export function computeSpendingPace(input: {
   const fixedPosted = Math.max(0, debits - variableExpenses);
   const safeToSpendRemaining = budgetLimit > 0 ? round2(remainingVariable) : null;
   const safeToSpendPerDay = budgetLimit > 0 ? round2(remainingVariable / remainingDays) : null;
-  const reservedForFixed =
-    budgetLimit > 0 ? round2(Math.max(0, Math.max(0, fixedExpenses) - fixedPosted)) : null;
+  // Fixed still pending to pay — budget-independent (it's about fixed commitments).
+  const reservedForFixed = round2(Math.max(0, Math.max(0, fixedExpenses) - fixedPosted));
 
   // Signed budget variance vs the expected daily rate (null when no target).
   const variancePct =

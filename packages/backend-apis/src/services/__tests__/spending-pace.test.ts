@@ -105,11 +105,18 @@ test('safeToSpend is 0/empty when the variable budget is exhausted', () => {
   assert.equal(pace.safeToSpendPerDay, 0);
 });
 
-test('safeToSpend is null with no budget', () => {
+test('safeToSpend is null with no budget; reservedForFixed is still computed', () => {
   const pace = computeSpendingPace({ variableExpenses: 300, debits: 300, budgetLimit: 0, fixedExpenses: 0, now: NOW });
   assert.equal(pace.safeToSpendRemaining, null);
   assert.equal(pace.safeToSpendPerDay, null);
-  assert.equal(pace.reservedForFixed, null);
+  assert.equal(pace.reservedForFixed, 0); // budget-independent
+});
+
+test('reservedForFixed is reported even with no budget', () => {
+  // no budget, fixed commitment 600, posted = 700 - 200 = 500 -> pending 100.
+  const pace = computeSpendingPace({ variableExpenses: 200, debits: 700, budgetLimit: 0, fixedExpenses: 600, now: NOW });
+  assert.equal(pace.safeToSpendRemaining, null);
+  assert.equal(pace.reservedForFixed, 100);
 });
 
 test('reservedForFixed is the fixed commitment not yet posted in range', () => {
