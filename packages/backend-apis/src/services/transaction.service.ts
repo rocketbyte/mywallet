@@ -10,10 +10,64 @@ import type {
   BalanceFilters,
   CreateTransactionInput,
   FixedExpensesSummaryDTO,
+  SpendingPaceDTO,
   SupportedCategoryDTO,
   TransactionDTO,
   TransactionFilters,
 } from '../types/transaction.types';
+
+/** Amber once projected spend passes the variable budget; red past this ratio. */
+const SPENDING_PACE_NEAR_RATIO = 1.15;
+
+/**
+ * Pure spending-pace computation (no IO → unit-testable). Given the period's
+ * variable + total expenses, the budget cap, and the current date, derives the
+ * daily average, the projected month-end spend, and a colour status. See the
+ * change's design.md for the model.
+ */
+export function computeSpendingPace(input: {
+  variableExpenses: number;
+  debits: number;
+  budgetLimit: number;
+  /** Recurring fixed-expense total (reused from computeFixedExpensesTotal). */
+  fixedExpenses: number;
+  now: Date;
+}): SpendingPaceDTO {
+  const { variableExpenses, debits, budgetLimit, fixedExpenses, now } = input;
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysElapsed = Math.max(1, now.getDate());
+
+  const periodFixed = Math.max(0, debits - variableExpenses);
+  const variableBudget = Math.max(0, budgetLimit - periodFixed);
+
+  const dailyAverage = variableExpenses / daysElapsed;
+  const expectedDailyAverage = variableBudget / daysInMonth;
+  // The variable projection drives the colour/status; the displayed projection
+  // also adds committed fixed costs for the realistic month-end total.
+  const projectedVariable = dailyAverage * daysInMonth;
+  const projectedExpenses = projectedVariable + Math.max(0, fixedExpenses);
+
+  let status: SpendingPaceDTO['status'];
+  if (budgetLimit <= 0) {
+    status = 'none';
+  } else if (variableBudget <= 0) {
+    // No room for variable spend — anything but zero is over.
+    status = projectedVariable > 0 ? 'over' : 'under';
+  } else {
+    const ratio = projectedVariable / variableBudget;
+    status = ratio <= 1 ? 'under' : ratio <= SPENDING_PACE_NEAR_RATIO ? 'near' : 'over';
+  }
+
+  return {
+    dailyAverage: round2(dailyAverage),
+    expectedDailyAverage: round2(expectedDailyAverage),
+    projectedExpenses: round2(projectedExpenses),
+    variableBudget: round2(variableBudget),
+    status,
+    daysElapsed,
+    daysInMonth,
+  };
+}
 
 /**
  * Thrown when a write would mark a credit (income) transaction as a fixed
@@ -278,6 +332,29 @@ export class TransactionService {
    */
   async getFixedExpensesSummary(userId: string): Promise<FixedExpensesSummaryDTO> {
     return { total: round2(await this.computeFixedExpensesTotal(userId)) };
+  }
+
+  /**
+   * Spending pace for the period: variable daily average, projected month-end
+   * spend, and a status colour vs the variable budget. `budgetLimit` is the
+   * caller's current monthly budget (0 when none), passed in so this service
+   * does not depend on the budget service.
+   */
+  async getSpendingPace(
+    userId: string,
+    filters: BalanceFilters,
+    budgetLimit: number,
+  ): Promise<SpendingPaceDTO> {
+    const balance = await this.getBalance(userId, filters);
+    // Reuse the existing recurring fixed-expense total — no separate query type.
+    const fixedExpenses = await this.computeFixedExpensesTotal(userId);
+    return computeSpendingPace({
+      variableExpenses: balance.variableExpenses,
+      debits: balance.debits,
+      budgetLimit,
+      fixedExpenses,
+      now: new Date(),
+    });
   }
 
   /**

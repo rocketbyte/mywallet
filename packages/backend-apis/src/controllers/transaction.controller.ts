@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { TransactionService, FixedExpenseOnIncomeError } from '../services/transaction.service';
+import { BudgetService } from '../services/budget.service';
 import { getDataOwnerId } from '../auth';
 import { parsePagination } from '../utils/request.utils';
 import { logger } from '../utils/logger';
@@ -37,6 +38,7 @@ function validateWritePayload(body: any): string | null {
 
 export class TransactionController {
   private service = new TransactionService();
+  private budgetService = new BudgetService();
 
   async getTransactions(req: Request, res: Response) {
     try {
@@ -126,6 +128,25 @@ export class TransactionController {
     } catch (error) {
       logger.error('Failed to compute fixed-expense summary', { error });
       res.status(500).json({ error: 'Failed to compute fixed-expense summary' });
+    }
+  }
+
+  async getSpendingPace(req: Request, res: Response) {
+    try {
+      const userId = getDataOwnerId(req);
+      const budget = await this.budgetService.getCurrent(userId);
+      const pace = await this.service.getSpendingPace(
+        userId,
+        {
+          startDate: req.query.startDate as string | undefined,
+          endDate: req.query.endDate as string | undefined,
+        },
+        budget?.totalBudget ?? 0,
+      );
+      res.json(pace);
+    } catch (error) {
+      logger.error('Failed to compute spending pace', { error });
+      res.status(500).json({ error: 'Failed to compute spending pace' });
     }
   }
 

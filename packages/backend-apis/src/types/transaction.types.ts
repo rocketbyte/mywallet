@@ -59,6 +59,32 @@ export interface BalanceDTO {
   endDate?: string;
 }
 
+/** Whether the projected variable spend is under / slightly over / well over the variable budget. */
+export type SpendingPaceStatus = 'under' | 'near' | 'over' | 'none';
+
+/**
+ * Backend-computed spending pace for a period — powers the dashboard's
+ * "Projected" figure and the colour of the daily-average. See the change's
+ * design.md for the model.
+ */
+export interface SpendingPaceDTO {
+  /** Variable (non-fixed) spend ÷ days elapsed. */
+  dailyAverage: number;
+  /** Sustainable daily rate = variableBudget ÷ daysInMonth. */
+  expectedDailyAverage: number;
+  /**
+   * Projected month-end TOTAL spend = (dailyAverage × daysInMonth) + the
+   * recurring fixed-expense total. The colour `status` still reflects only the
+   * variable projection vs the variable budget.
+   */
+  projectedExpenses: number;
+  /** Budget available for variable spend = max(0, budget − period fixed). */
+  variableBudget: number;
+  status: SpendingPaceStatus;
+  daysElapsed: number;
+  daysInMonth: number;
+}
+
 /**
  * Recurring fixed-expense summary — a rolling view of the user's committed costs,
  * deliberately a separate resource from the range-scoped balance.

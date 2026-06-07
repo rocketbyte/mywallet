@@ -183,6 +183,44 @@ router.get('/fixed-expenses', controller.getFixedExpensesSummary.bind(controller
 
 /**
  * @openapi
+ * /transactions/spending-pace:
+ *   get:
+ *     summary: Spending pace (projected spend + status) for a period
+ *     description: |
+ *       Backend-computed spending pace over an optional date range: the variable
+ *       (non-fixed) daily average, the projected month-end spend, the variable
+ *       budget, and a status (`under` | `near` | `over` | `none`) that drives the
+ *       dashboard's daily-average colour. Honors `startDate`/`endDate`.
+ *     tags: [Transactions]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Spending pace.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 dailyAverage:         { type: number, example: 42.50 }
+ *                 expectedDailyAverage: { type: number, example: 50.00 }
+ *                 projectedExpenses:    { type: number, example: 1275.00 }
+ *                 variableBudget:       { type: number, example: 1500.00 }
+ *                 status:               { type: string, enum: [under, near, over, none] }
+ *                 daysElapsed:          { type: integer, example: 7 }
+ *                 daysInMonth:          { type: integer, example: 30 }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/spending-pace', controller.getSpendingPace.bind(controller));
+
+/**
+ * @openapi
  * /transactions/{id}:
  *   get:
  *     summary: Get transaction by ID
