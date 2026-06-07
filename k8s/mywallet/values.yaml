@@ -138,6 +138,17 @@ pipelineWorker:
       cpu: 500m
       memory: 512Mi
 
+# Recurring-transactions worker (monthly copy job, recurring-queue).
+recurringWorker:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 # MongoDB configuration
 mongodb:
   enabled: true

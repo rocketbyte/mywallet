@@ -234,6 +234,7 @@ router.get('/:id', controller.getTransactionById.bind(controller));
  *               note: { type: string }
  *               transactionDate: { type: string, format: date-time }
  *               isFixedExpense: { type: boolean, description: Marks the transaction as a recurring fixed expense; the value is propagated to every transaction sharing the same category/amount/merchant. }
+ *               isRecurrent: { type: boolean, description: Marks the transaction recurrent; it is re-created each month by the recurring-transactions job. Set on the target row only. }
  *     responses:
  *       200:
  *         description: Updated transaction.

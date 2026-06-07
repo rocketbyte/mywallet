@@ -29,6 +29,9 @@ function validateWritePayload(body: any): string | null {
   if (body.isFixedExpense !== undefined && typeof body.isFixedExpense !== 'boolean') {
     return 'isFixedExpense must be a boolean';
   }
+  if (body.isRecurrent !== undefined && typeof body.isRecurrent !== 'boolean') {
+    return 'isRecurrent must be a boolean';
+  }
   return null;
 }
 

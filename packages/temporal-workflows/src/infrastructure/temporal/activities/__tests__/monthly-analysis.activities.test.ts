@@ -16,6 +16,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { container as rootContainer } from 'tsyringe';
 
 import { createMonthlyAnalysisActivities } from '../monthly-analysis.activities';
+import { MONTHLY_NOTE_MAX_CHARS } from '../../../../shared/constants';
 import { Transaction } from '../../../../models/transaction.model';
 import { Budget } from '../../../../models/budget.model';
 import { Tenant } from '../../../../models/tenant.model';
@@ -207,7 +208,7 @@ test('analyzeMonthlyContext truncates an oversized note on a word boundary', asy
     budgetSnapshot: null, priorMonthNote: null, sourceHash: 'h', existing: null, promptVersion: 1,
   };
   const out = await analyzeMonthlyContext(ctx);
-  assert.ok(out.note.length <= 320, 'note capped at 320');
+  assert.ok(out.note.length <= MONTHLY_NOTE_MAX_CHARS, 'note capped at the configured max');
   assert.ok(!out.note.endsWith(' '), 'no trailing space after word-boundary cut');
 });
 

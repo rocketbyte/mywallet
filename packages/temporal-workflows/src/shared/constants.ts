@@ -4,7 +4,11 @@ export const TASK_QUEUES = {
   TRANSACTION_ANALYSIS: 'transaction-analysis-queue',
   // Dedicated pipeline queue — worker runs with concurrency=1 to avoid
   // hammering the Ollama/LiteLLM instance with parallel AI calls.
-  PIPELINE: 'pipeline-queue'
+  PIPELINE: 'pipeline-queue',
+  // Dedicated queue for the monthly recurring-transactions job. Its activities
+  // are pure DB writes (no AI), so its worker runs high activity concurrency,
+  // isolated from the AI-throttled pipeline queue.
+  RECURRING: 'recurring-queue'
 } as const;
 
 // Workflow ID Prefixes
@@ -192,6 +196,40 @@ export const PIPELINE_RETRY_POLICY = {
 
 // Minimum confidence for the classify step to proceed to extraction
 export const CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.7;
+
+// ==================== Recurring Transactions Job ====================
+
+export const RECURRING_CONFIG = {
+  /**
+   * Cron for the global schedule: 00:00 every day. Each run copies the previous
+   * month's recurrent transactions whose day-of-month matches that day.
+   */
+  CRON: '0 0 * * *',
+  /** Distinct userIds fetched per dispatcher page. */
+  USER_PAGE_SIZE: 500,
+  /** Recurrent source rows copied per activity call (per user). */
+  ROW_PAGE_SIZE: 200,
+  /** Children started per dispatcher iteration before continue-as-new. */
+  USERS_PER_BATCH: 500,
+  /**
+   * Reset the dispatcher's history via continueAsNew once it grows past this,
+   * so the job scales to arbitrarily many tenants (mirrors the Gmail watch
+   * workflow's history-length guard).
+   */
+  CONTINUE_AS_NEW_HISTORY_LENGTH: 4_000,
+} as const;
+
+export const RECURRING_ACTIVITY_TIMEOUTS = {
+  LIST_USERS: '1 minute',
+  COPY_PAGE: '2 minutes',
+} as const;
+
+export const RECURRING_RETRY_POLICY = {
+  initialInterval: '1s' as any,
+  backoffCoefficient: 2,
+  maximumInterval: '30s' as any,
+  maximumAttempts: 10,
+};
 
 // ==================== Signal Names ====================
 

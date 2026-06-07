@@ -21,7 +21,7 @@ export interface TransactionInterface extends Document {
   transactionType: 'debit' | 'credit';
 
   // Source channel
-  source?: 'email' | 'sms' | 'manual' | 'chat';
+  source?: 'email' | 'sms' | 'manual' | 'chat' | 'recurring';
 
   // Banking Details (optional for manual transactions)
   accountNumber?: string;
@@ -36,6 +36,13 @@ export interface TransactionInterface extends Document {
    * category/amount/merchant signature for the user.
    */
   isFixedExpense: boolean;
+
+  /**
+   * User-marked recurrent transaction. When true, the monthly recurring job
+   * clones this row into the next month (preserving the flag, so the series
+   * perpetuates). Independent of `isFixedExpense`.
+   */
+  isRecurrent: boolean;
 
   // Metadata (optional for manual transactions)
   rawEmailText?: string;
@@ -67,13 +74,14 @@ const TransactionSchema = new Schema<TransactionInterface>({
   subcategory: { type: String },
   transactionType: { type: String, enum: ['debit', 'credit'], required: true },
 
-  source: { type: String, enum: ['email', 'sms', 'manual', 'chat'], default: 'email' },
+  source: { type: String, enum: ['email', 'sms', 'manual', 'chat', 'recurring'], default: 'email' },
 
   accountNumber: { type: String },
   bankName: { type: String },
 
   note: { type: String },
   isFixedExpense: { type: Boolean, default: false },
+  isRecurrent: { type: Boolean, default: false },
 
   rawEmailText: { type: String },
   extractedData: { type: Schema.Types.Mixed },
@@ -101,6 +109,10 @@ TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 }, { sparse: 
 // Supports fixed-expense propagation: marking one transaction updates every
 // other row for the user that shares the same (category, amount, merchant).
 TransactionSchema.index({ userId: 1, category: 1, amount: 1, merchant: 1 });
+
+// Supports the monthly recurring job's cross-tenant scan for the previous
+// month's recurrent rows (distinct users, then per-user paging).
+TransactionSchema.index({ isRecurrent: 1, transactionDate: 1, userId: 1 });
 
 // Supports findRecentDuplicate — exact-match dedup query during pipeline storage.
 TransactionSchema.index(

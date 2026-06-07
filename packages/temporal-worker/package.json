@@ -6,8 +6,12 @@
   "main": "dist/worker.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/worker.ts",
+    "dev:pipeline": "ts-node-dev --respawn --transpile-only src/pipeline-worker.ts",
+    "dev:recurring": "ts-node-dev --respawn --transpile-only src/recurring-worker.ts",
     "build": "tsc",
-    "start": "node dist/worker.js"
+    "start": "node dist/worker.js",
+    "start:pipeline": "node dist/pipeline-worker.js",
+    "start:recurring": "node dist/recurring-worker.js"
   },
   "dependencies": {
     "@mywallet/temporal-workflows": "*",

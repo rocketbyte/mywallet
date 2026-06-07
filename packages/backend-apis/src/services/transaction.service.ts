@@ -30,6 +30,7 @@ function toDTO(tx: any): TransactionDTO {
     note: tx.note,
     isIncome: tx.transactionType === 'credit',
     isFixedExpense: tx.isFixedExpense ?? false,
+    isRecurrent: tx.isRecurrent ?? false,
     aiConfidence: tx.confidence,
     createdAt: tx.createdAt,
   };
@@ -95,6 +96,7 @@ export class TransactionService {
       accountNumber: input.account,
       note: input.note,
       isFixedExpense,
+      isRecurrent: input.isRecurrent ?? false,
     });
     return toDTO(doc.toObject());
   }
@@ -118,6 +120,7 @@ export class TransactionService {
     if (input.note !== undefined) updates.note = input.note;
     if (input.source !== undefined) updates.source = input.source;
     if (input.isFixedExpense !== undefined) updates.isFixedExpense = input.isFixedExpense;
+    if (input.isRecurrent !== undefined) updates.isRecurrent = input.isRecurrent;
     const transactionType = resolveTransactionType(input);
     if (transactionType !== undefined) updates.transactionType = transactionType;
     if (input.amount !== undefined) updates.amount = Math.abs(input.amount);

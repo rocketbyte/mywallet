@@ -12,6 +12,8 @@ export interface TransactionDTO {
   isIncome: boolean;
   /** User-marked recurring fixed expense (e.g. rent, a subscription). */
   isFixedExpense: boolean;
+  /** User-marked recurrent transaction, re-created monthly by the recurring job. */
+  isRecurrent: boolean;
   aiConfidence?: number;
   createdAt: Date;
 }
@@ -85,6 +87,8 @@ export interface CreateTransactionInput {
    * propagated to every transaction sharing the same category/amount/merchant.
    */
   isFixedExpense?: boolean;
+  /** Marks the transaction recurrent (re-created monthly by the recurring job). */
+  isRecurrent?: boolean;
   /** @deprecated Use `transactionType`. Retained for backward compatibility. */
   isIncome?: boolean;
 }

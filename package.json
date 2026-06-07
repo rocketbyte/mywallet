@@ -17,6 +17,7 @@
     "seed:patterns": "tsx scripts/seed-email-patterns.ts",
     "seed:schedules": "tsx scripts/seed-daily-analysis-schedules.ts",
     "seed:pipeline": "tsx scripts/seed-pipeline-steps.ts",
+    "seed:recurring": "tsx scripts/seed-recurring-schedule.ts",
     "openspec:sync": "node scripts/openspec-sync.mjs",
     "openspec:check": "node scripts/openspec-sync.mjs check"
   },
