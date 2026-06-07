@@ -133,6 +133,35 @@ test('reservedForFixed is 0 when all fixed has already posted', () => {
   assert.equal(pace.reservedForFixed, 0);
 });
 
+test('FULL CARD scenario — every "Spent this period" figure reconciles', () => {
+  // Mirrors the dashboard card: day 7 of a 30-day month (23d left), big budget,
+  // overspending. variable spend 31,535 -> daily avg exactly 4,505.
+  const now = new Date(2026, 5, 7); // June 7
+  const pace = computeSpendingPace({
+    variableExpenses: 31535,
+    debits: 124447,
+    budgetLimit: 162500,
+    fixedExpenses: 99672,
+    now,
+  });
+
+  assert.equal(pace.daysElapsed, 7);
+  assert.equal(pace.daysInMonth, 30); // -> "23d left"
+  assert.equal(pace.dailyAverage, 4505); // 31535 / 7  (DAILY AVG)
+  assert.equal(pace.variableBudget, 62828); // 162500 - 99672 (fixed total)
+  assert.equal(pace.expectedDailyAverage, round2(62828 / 30)); // 2094.27
+  assert.equal(pace.projectedExpenses, 234822); // 4505*30 + 99672 (PROJECTED)
+  assert.equal(pace.variancePct, 115); // (4505 - 2094.27)/2094.27*100  (+115%)
+  assert.equal(pace.status, 'over'); // 135150/62828 = 2.15  -> red
+  assert.equal(pace.safeToSpendRemaining, 31293); // 62828 - 31535
+  assert.equal(pace.reservedForFixed, 6760); // 99672 - (124447 - 31535)
+  assert.equal(pace.safeToSpendPerDay, round2(31293 / 24)); // remaining / (30-7+1)
+
+  // Cross-checks: the relationships that MUST hold for any inputs.
+  assert.equal(pace.projectedExpenses, round2(pace.dailyAverage * pace.daysInMonth + 99672));
+  assert.equal(pace.variancePct, Math.round(((pace.dailyAverage - pace.expectedDailyAverage) / pace.expectedDailyAverage) * 100));
+});
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
