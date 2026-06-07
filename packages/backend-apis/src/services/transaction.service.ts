@@ -27,18 +27,19 @@ const SPENDING_PACE_NEAR_RATIO = 1.15;
  */
 export function computeSpendingPace(input: {
   variableExpenses: number;
-  debits: number;
   budgetLimit: number;
   /** Recurring fixed-expense total (reused from computeFixedExpensesTotal). */
   fixedExpenses: number;
   now: Date;
 }): SpendingPaceDTO {
-  const { variableExpenses, debits, budgetLimit, fixedExpenses, now } = input;
+  const { variableExpenses, budgetLimit, fixedExpenses, now } = input;
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysElapsed = Math.max(1, now.getDate());
 
-  const periodFixed = Math.max(0, debits - variableExpenses);
-  const variableBudget = Math.max(0, budgetLimit - periodFixed);
+  // Subtract the recurring fixed commitment (deduped previous+current month) —
+  // not just the fixed charges posted so far this range — so the discretionary
+  // budget reflects what is actually fixed, including charges not yet posted.
+  const variableBudget = Math.max(0, budgetLimit - Math.max(0, fixedExpenses));
 
   const dailyAverage = variableExpenses / daysElapsed;
   const expectedDailyAverage = variableBudget / daysInMonth;
@@ -350,7 +351,6 @@ export class TransactionService {
     const fixedExpenses = await this.computeFixedExpensesTotal(userId);
     return computeSpendingPace({
       variableExpenses: balance.variableExpenses,
-      debits: balance.debits,
       budgetLimit,
       fixedExpenses,
       now: new Date(),

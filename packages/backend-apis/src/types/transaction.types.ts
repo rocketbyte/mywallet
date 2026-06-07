@@ -78,7 +78,7 @@ export interface SpendingPaceDTO {
    * variable projection vs the variable budget.
    */
   projectedExpenses: number;
-  /** Budget available for variable spend = max(0, budget − period fixed). */
+  /** Budget available for variable spend = max(0, budget − recurring fixed-expense total). */
   variableBudget: number;
   status: SpendingPaceStatus;
   daysElapsed: number;
