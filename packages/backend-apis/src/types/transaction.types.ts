@@ -49,6 +49,12 @@ export interface BalanceDTO {
    * the balance total without re-aggregating (or capping) rows itself.
    */
   byCategory: CategorySpendDTO[];
+  /**
+   * Sum of debit transactions in the range that are NOT flagged `isFixedExpense`
+   * — the period's variable/discretionary spend. Powers the dashboard's daily
+   * average. Non-negative magnitude; `0` when none.
+   */
+  variableExpenses: number;
   startDate?: string;
   endDate?: string;
 }

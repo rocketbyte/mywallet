@@ -114,6 +114,7 @@ router.post('/', controller.createTransaction.bind(controller));
  *                     properties:
  *                       category: { type: string, example: food }
  *                       spent:    { type: number, example: 612.80 }
+ *                 variableExpenses: { type: number, example: 600.00, description: Sum of in-range debit transactions NOT flagged isFixedExpense (variable/discretionary spend); 0 when none. }
  *                 startDate: { type: string, format: date, nullable: true }
  *                 endDate:   { type: string, format: date, nullable: true }
  *       500:

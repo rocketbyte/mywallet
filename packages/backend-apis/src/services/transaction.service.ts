@@ -15,6 +15,18 @@ import type {
   TransactionFilters,
 } from '../types/transaction.types';
 
+/**
+ * Thrown when a write would mark a credit (income) transaction as a fixed
+ * expense. A fixed expense is by definition an expense (debit). The controller
+ * maps this to HTTP 400.
+ */
+export class FixedExpenseOnIncomeError extends Error {
+  constructor() {
+    super('isFixedExpense can only be set on expense (debit) transactions');
+    this.name = 'FixedExpenseOnIncomeError';
+  }
+}
+
 function toDTO(tx: any): TransactionDTO {
   return {
     id: tx._id.toString(),
@@ -70,13 +82,21 @@ export class TransactionService {
     const merchant = normalizeMerchant(input.merchant);
     const amount = Math.abs(input.amount);
     const category = input.category;
+    const transactionType = resolveTransactionType(input) ?? 'debit';
 
-    // A new transaction inherits the fixed-expense flag from a matching one in the
+    // A fixed expense is by definition an expense — reject marking income.
+    if (input.isFixedExpense === true && transactionType === 'credit') {
+      throw new FixedExpenseOnIncomeError();
+    }
+
+    // A new expense inherits the fixed-expense flag from a matching one in the
     // previous month, so recurring costs stay flagged without re-marking. An
-    // explicit `isFixedExpense: true` from the caller always wins.
+    // explicit `isFixedExpense: true` from the caller always wins. Income never
+    // qualifies, so the flag (and the inheritance lookup) is debit-only.
     const isFixedExpense =
-      input.isFixedExpense === true ||
-      (await findInheritedFixedExpense({ userId, category, amount, merchant, transactionDate }));
+      transactionType === 'debit' &&
+      (input.isFixedExpense === true ||
+        (await findInheritedFixedExpense({ userId, category, amount, merchant, transactionDate })));
 
     const doc = await Transaction.create({
       userId,
@@ -91,7 +111,7 @@ export class TransactionService {
       currency: input.currency ?? 'USD',
       category,
       subcategory: input.subcategory,
-      transactionType: resolveTransactionType(input) ?? 'debit',
+      transactionType,
       source: input.source ?? 'manual',
       accountNumber: input.account,
       note: input.note,
@@ -126,6 +146,16 @@ export class TransactionService {
     if (input.amount !== undefined) updates.amount = Math.abs(input.amount);
     if (input.transactionDate) updates.transactionDate = new Date(input.transactionDate);
 
+    // A fixed expense is by definition an expense: reject marking a row that is
+    // (or stays) income. A request that flips the row to debit in the same call
+    // is allowed. Checked against the resulting type before writing.
+    if (input.isFixedExpense === true) {
+      const existing = await Transaction.findOne({ _id: id, userId }).lean();
+      if (!existing) return null;
+      const resultingType = transactionType ?? existing.transactionType;
+      if (resultingType === 'credit') throw new FixedExpenseOnIncomeError();
+    }
+
     const doc = await Transaction.findOneAndUpdate({ _id: id, userId }, { $set: updates }, { new: true }).lean();
     if (!doc) return null;
 
@@ -155,6 +185,8 @@ export class TransactionService {
     await Transaction.updateMany(
       {
         userId,
+        // Income is never a fixed expense — only propagate to debit siblings.
+        transactionType: 'debit',
         category: target.category,
         amount: target.amount,
         merchant: target.merchant,
@@ -185,6 +217,7 @@ export class TransactionService {
     const [facet] = await Transaction.aggregate<{
       totals: { _id: 'credit' | 'debit'; total: number; count: number }[];
       byCategory: { _id: string | null; spent: number }[];
+      variable: { _id: null; total: number }[];
     }>([
       { $match: match },
       {
@@ -196,6 +229,12 @@ export class TransactionService {
             { $match: { transactionType: 'debit' } },
             { $group: { _id: '$category', spent: { $sum: '$amount' } } },
             { $sort: { spent: -1 } },
+          ],
+          // Variable (non-fixed) expenses in range — powers the dashboard's
+          // discretionary daily-average, so committed fixed costs don't inflate it.
+          variable: [
+            { $match: { transactionType: 'debit', isFixedExpense: { $ne: true } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
           ],
         },
       },
@@ -217,12 +256,15 @@ export class TransactionService {
       spent: row.spent,
     }));
 
+    const variableExpenses = facet?.variable?.[0]?.total ?? 0;
+
     return {
       credits: round2(credits),
       debits: round2(debits),
       balance: round2(credits - debits),
       count,
       byCategory,
+      variableExpenses: round2(variableExpenses),
       startDate: filters.startDate,
       endDate: filters.endDate,
     };

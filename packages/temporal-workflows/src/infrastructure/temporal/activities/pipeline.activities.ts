@@ -217,14 +217,17 @@ export function createPipelineActivities(container: DependencyContainer) {
 
       // Inherit the fixed-expense flag from a matching transaction in the previous
       // month, so recurring email charges stay flagged consistently with manual
-      // entries. Runs only for genuine inserts (after the dedup checks above).
-      const isFixedExpense = await findInheritedFixedExpense({
-        userId: input.userId,
-        category: input.rawData.category ?? 'Other',
-        amount: input.rawData.amount,
-        merchant: input.rawData.merchant,
-        transactionDate: input.rawData.transactionDate,
-      });
+      // entries. Runs only for genuine inserts (after the dedup checks above) and
+      // only for expenses — income (credit) is never a fixed expense.
+      const isFixedExpense =
+        input.rawData.transactionType === 'debit' &&
+        (await findInheritedFixedExpense({
+          userId: input.userId,
+          category: input.rawData.category ?? 'Other',
+          amount: input.rawData.amount,
+          merchant: input.rawData.merchant,
+          transactionDate: input.rawData.transactionDate,
+        }));
 
       const transaction = await transactionRepo.save({
         id: '',

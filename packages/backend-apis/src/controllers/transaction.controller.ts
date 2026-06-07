@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { TransactionService } from '../services/transaction.service';
+import { TransactionService, FixedExpenseOnIncomeError } from '../services/transaction.service';
 import { getDataOwnerId } from '../auth';
 import { parsePagination } from '../utils/request.utils';
 import { logger } from '../utils/logger';
@@ -71,6 +71,9 @@ export class TransactionController {
       const transaction = await this.service.create(getDataOwnerId(req), req.body);
       res.status(201).json({ transaction });
     } catch (error) {
+      if (error instanceof FixedExpenseOnIncomeError) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error('Failed to create transaction', { error });
       res.status(500).json({ error: 'Failed to create transaction' });
     }
@@ -97,6 +100,9 @@ export class TransactionController {
       if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
       res.json({ transaction });
     } catch (error) {
+      if (error instanceof FixedExpenseOnIncomeError) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error('Failed to update transaction', { error });
       res.status(500).json({ error: 'Failed to update transaction' });
     }
