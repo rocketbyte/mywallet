@@ -212,6 +212,9 @@ router.get('/fixed-expenses', controller.getFixedExpensesSummary.bind(controller
  *                 projectedExpenses:    { type: number, example: 1275.00 }
  *                 variableBudget:       { type: number, example: 1500.00 }
  *                 variancePct:          { type: integer, nullable: true, example: 20, description: Signed % the daily average is over (+) / under (-) the expected; null when no budget. }
+ *                 safeToSpendRemaining: { type: number, nullable: true, example: 31293.00, description: Variable budget still available this month; null when no budget. }
+ *                 safeToSpendPerDay:    { type: number, nullable: true, example: 1304.00, description: Variable budget still available ÷ days remaining (today included); 0 when spent, null when no budget. }
+ *                 reservedForFixed:     { type: number, nullable: true, example: 6760.00, description: Fixed costs still due this month, reserved before discretionary; 0 when none, null when no budget. }
  *                 status:               { type: string, enum: [under, near, over, none] }
  *                 daysElapsed:          { type: integer, example: 7 }
  *                 daysInMonth:          { type: integer, example: 30 }

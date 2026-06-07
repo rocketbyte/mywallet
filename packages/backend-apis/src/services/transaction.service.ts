@@ -27,12 +27,14 @@ const SPENDING_PACE_NEAR_RATIO = 1.15;
  */
 export function computeSpendingPace(input: {
   variableExpenses: number;
+  /** All expense (debit) total in range — used to derive fixed already posted. */
+  debits: number;
   budgetLimit: number;
   /** Recurring fixed-expense total (reused from computeFixedExpensesTotal). */
   fixedExpenses: number;
   now: Date;
 }): SpendingPaceDTO {
-  const { variableExpenses, budgetLimit, fixedExpenses, now } = input;
+  const { variableExpenses, debits, budgetLimit, fixedExpenses, now } = input;
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysElapsed = Math.max(1, now.getDate());
 
@@ -47,6 +49,18 @@ export function computeSpendingPace(input: {
   // also adds committed fixed costs for the realistic month-end total.
   const projectedVariable = dailyAverage * daysInMonth;
   const projectedExpenses = projectedVariable + Math.max(0, fixedExpenses);
+
+  // Discretionary money still available this month, and that spread over the
+  // remaining days (today included, so day-1-fresh equals the flat target). The
+  // reserve is the fixed commitment not yet posted — why this is below the raw
+  // budget balance.
+  const remainingDays = Math.max(1, daysInMonth - daysElapsed + 1);
+  const remainingVariable = Math.max(0, variableBudget - variableExpenses);
+  const fixedPosted = Math.max(0, debits - variableExpenses);
+  const safeToSpendRemaining = budgetLimit > 0 ? round2(remainingVariable) : null;
+  const safeToSpendPerDay = budgetLimit > 0 ? round2(remainingVariable / remainingDays) : null;
+  const reservedForFixed =
+    budgetLimit > 0 ? round2(Math.max(0, Math.max(0, fixedExpenses) - fixedPosted)) : null;
 
   // Signed budget variance vs the expected daily rate (null when no target).
   const variancePct =
@@ -71,6 +85,9 @@ export function computeSpendingPace(input: {
     projectedExpenses: round2(projectedExpenses),
     variableBudget: round2(variableBudget),
     variancePct,
+    safeToSpendRemaining,
+    safeToSpendPerDay,
+    reservedForFixed,
     status,
     daysElapsed,
     daysInMonth,
@@ -358,6 +375,7 @@ export class TransactionService {
     const fixedExpenses = await this.computeFixedExpensesTotal(userId);
     return computeSpendingPace({
       variableExpenses: balance.variableExpenses,
+      debits: balance.debits,
       budgetLimit,
       fixedExpenses,
       now: new Date(),

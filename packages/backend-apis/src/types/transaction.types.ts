@@ -86,6 +86,19 @@ export interface SpendingPaceDTO {
    * no target (no budget / zero variable budget).
    */
   variancePct: number | null;
+  /** Variable budget still available this month (`max(0, variableBudget − variableExpenses)`); null when no budget. */
+  safeToSpendRemaining: number | null;
+  /**
+   * Go-forward guidance: variable budget still available ÷ days remaining in the
+   * month. `0` when the variable budget is spent; `null` when no budget.
+   */
+  safeToSpendPerDay: number | null;
+  /**
+   * Fixed costs still due this month (recurring commitment minus the fixed
+   * already posted in range) — the amount of the balance reserved before
+   * discretionary spend. `0` when none; `null` when no budget.
+   */
+  reservedForFixed: number | null;
   status: SpendingPaceStatus;
   daysElapsed: number;
   daysInMonth: number;
