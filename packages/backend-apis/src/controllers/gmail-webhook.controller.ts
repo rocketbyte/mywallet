@@ -10,7 +10,7 @@ import { GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX, GMAIL_SIGNALS, GMAIL_SYNC_TASK_QUEU
 import { GmailAccount } from '../../../temporal-workflows/src/models/gmail-account.model';
 import { EmailProviderInterface } from '../providers/types';
 import { getDataOwnerId } from '../auth';
-import { logger } from '../utils/logger';
+import { logger, redact } from '../utils/logger';
 
 /**
  * Handles Gmail-specific operations:
@@ -23,7 +23,7 @@ export class GmailWebhookController {
 
   async handleWebhook(req: Request, res: Response): Promise<void> {
     try {
-      logger.info('Received Gmail webhook', req.body);
+      logger.info('Received Gmail webhook', { body: redact(req.body) });
 
       const payload: GmailWebhookPayload = req.body;
       const decodedData = Buffer.from(payload.message.data, 'base64').toString('utf-8');

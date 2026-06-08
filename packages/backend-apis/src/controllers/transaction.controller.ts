@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { TransactionService, FixedExpenseOnIncomeError } from '../services/transaction.service';
 import { BudgetService } from '../services/budget.service';
 import { getDataOwnerId } from '../auth';
-import { parsePagination } from '../utils/request.utils';
+import { parsePagination, scalarParam } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 import {
   isTransactionCategoryKey,
@@ -44,10 +44,10 @@ export class TransactionController {
     try {
       const result = await this.service.list(getDataOwnerId(req), {
         ...parsePagination(req.query),
-        category: req.query.category as string,
-        search: req.query.search as string,
-        startDate: req.query.startDate as string,
-        endDate: req.query.endDate as string,
+        category: scalarParam(req.query.category),
+        search: scalarParam(req.query.search),
+        startDate: scalarParam(req.query.startDate),
+        endDate: scalarParam(req.query.endDate),
       });
       res.json(result);
     } catch (error) {
@@ -138,8 +138,8 @@ export class TransactionController {
       const pace = await this.service.getSpendingPace(
         userId,
         {
-          startDate: req.query.startDate as string | undefined,
-          endDate: req.query.endDate as string | undefined,
+          startDate: scalarParam(req.query.startDate),
+          endDate: scalarParam(req.query.endDate),
         },
         budget?.totalBudget ?? 0,
       );
@@ -153,8 +153,8 @@ export class TransactionController {
   async getBalance(req: Request, res: Response) {
     try {
       const balance = await this.service.getBalance(getDataOwnerId(req), {
-        startDate: req.query.startDate as string | undefined,
-        endDate: req.query.endDate as string | undefined,
+        startDate: scalarParam(req.query.startDate),
+        endDate: scalarParam(req.query.endDate),
       });
       res.json(balance);
     } catch (error) {

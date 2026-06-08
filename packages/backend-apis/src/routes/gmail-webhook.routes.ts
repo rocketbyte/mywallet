@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { GmailWebhookController } from '../controllers/gmail-webhook.controller';
 import { gmailProvider } from '../providers';
+import { requirePubSubOIDC } from '../middleware/pubsub-auth';
+import { requireAdminKey } from '../middleware/admin-auth';
+import { publicEndpointLimiter } from '../middleware/rate-limit';
 
 const router = Router();
 const controller = new GmailWebhookController(gmailProvider);
@@ -50,7 +53,7 @@ const controller = new GmailWebhookController(gmailProvider);
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-router.post('/webhook', (req, res) => controller.handleWebhook(req, res));
+router.post('/webhook', publicEndpointLimiter, requirePubSubOIDC, (req, res) => controller.handleWebhook(req, res));
 
 /**
  * @openapi
@@ -98,7 +101,7 @@ router.post('/webhook', (req, res) => controller.handleWebhook(req, res));
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-router.post('/link', (req, res) => controller.linkAccount(req, res));
+router.post('/link', requireAdminKey, (req, res) => controller.linkAccount(req, res));
 
 /**
  * @openapi
@@ -130,7 +133,7 @@ router.post('/link', (req, res) => controller.linkAccount(req, res));
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res));
+router.delete('/unlink/:userId', requireAdminKey, (req, res) => controller.unlinkAccount(req, res));
 
 /**
  * @openapi
@@ -214,6 +217,6 @@ router.delete('/unlink/:userId', (req, res) => controller.unlinkAccount(req, res
  */
 router.get('/status/me', (req, res) => controller.getMyStatus(req, res));
 
-router.get('/status/:userId', (req, res) => controller.getStatus(req, res));
+router.get('/status/:userId', requireAdminKey, (req, res) => controller.getStatus(req, res));
 
 export default router;
