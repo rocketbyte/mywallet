@@ -194,6 +194,12 @@ mongodb:
 
 # Application configuration
 app:
+  # CORS — comma-separated allowlist of frontend origins permitted to make
+  # cross-origin browser requests. Firebase Hosting serves the app from both
+  # the .web.app and .firebaseapp.com origins, so both are listed.
+  cors:
+    allowedOrigins: "https://mintly-3f408.web.app,https://mintly-3f408.firebaseapp.com"
+
   # Gmail configuration
   gmail:
     pubSubTopic: "projects/mywallet-481322/topics/gmail-notifications"

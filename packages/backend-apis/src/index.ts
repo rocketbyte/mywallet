@@ -70,6 +70,19 @@ const corsOptions: CorsOptions = {
 };
 app.use(cors(corsOptions));
 
+// cors() answers (204) preflights from allowed origins, but for a disallowed
+// origin it calls next() instead of terminating — which would let the OPTIONS
+// fall through to the /api auth gate and 401. Answer any remaining preflight
+// here with a clean 204 (no allow-origin header, so the browser still blocks
+// the actual cross-origin request) before auth or rate limiting can see it.
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
 // Baseline rate limit across the whole surface.
 app.use(baselineLimiter);
 
