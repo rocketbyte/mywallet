@@ -172,8 +172,12 @@ export const ANALYSIS_RETRY_POLICY = {
 };
 
 // Deduplication: skip storage when a transaction with the same userId,
-// transactionType, currency, and exact amount was stored within this window.
-export const DUPLICATE_LOOKBACK_HOURS = 48;
+// transactionType, currency, and exact amount was stored within ±this many
+// minutes of the new transaction's date. The window is tight because a
+// same-purchase re-notification (auth then posted, or webhook then poll)
+// arrives within minutes — a wider window would suppress a legitimate repeat
+// charge of the same amount.
+export const DUPLICATE_LOOKBACK_MINUTES = 30;
 
 export const PIPELINE_ACTIVITY_TIMEOUTS = {
   // Generous ceiling for slow local LLM inference (Ollama on a Pi can take minutes).

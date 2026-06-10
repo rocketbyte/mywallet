@@ -24,7 +24,7 @@ import {
   StoreTransactionInput,
   StoredTransactionResult
 } from '../../../shared/types';
-import { PIPELINE_STEP_KEYS, DUPLICATE_LOOKBACK_HOURS } from '../../../shared/constants';
+import { PIPELINE_STEP_KEYS, DUPLICATE_LOOKBACK_MINUTES } from '../../../shared/constants';
 import { normalizeMerchant } from '../../../shared/normalize-merchant';
 import { findInheritedFixedExpense } from '../../../shared/fixed-expense';
 
@@ -165,7 +165,8 @@ export function createPipelineActivities(container: DependencyContainer) {
      * Skips persistence when:
      *   1. The same email was already processed for this tenant (idempotency).
      *   2. A recent transaction with the same amount, currency and direction
-     *      already exists within DUPLICATE_LOOKBACK_HOURS (deduplication).
+     *      already exists within DUPLICATE_LOOKBACK_MINUTES (deduplication of
+     *      the same purchase re-notified).
      */
     async storeTransaction(input: StoreTransactionInput): Promise<StoredTransactionResult> {
       Context.current().heartbeat();
@@ -190,7 +191,7 @@ export function createPipelineActivities(container: DependencyContainer) {
         currency: input.rawData.currency,
         transactionType: input.rawData.transactionType,
         near: input.rawData.transactionDate,
-        windowHours: DUPLICATE_LOOKBACK_HOURS
+        windowMinutes: DUPLICATE_LOOKBACK_MINUTES
       });
       if (recentDuplicate) {
         await emailRepo.updateProcessingStatus(input.emailId, {
