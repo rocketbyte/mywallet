@@ -17,6 +17,8 @@ export interface TenantInterface extends Document {
   budgetLimit?: number;
   notificationsEnabled?: boolean;
   emailSyncEnabled?: boolean;
+  /** When false, members see masked budget values (balances and progress only). */
+  showBudgetToMembers?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +31,7 @@ const TenantSchema = new Schema<TenantInterface>({
   budgetLimit: { type: Number, default: 0 },
   notificationsEnabled: { type: Boolean, default: true },
   emailSyncEnabled: { type: Boolean, default: false },
+  showBudgetToMembers: { type: Boolean, default: true },
 }, {
   timestamps: true,
   collection: 'tenants',

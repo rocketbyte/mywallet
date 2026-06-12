@@ -70,16 +70,16 @@ export type SpendingPaceStatus = 'under' | 'near' | 'over' | 'none';
 export interface SpendingPaceDTO {
   /** Variable (non-fixed) spend ÷ days elapsed. */
   dailyAverage: number;
-  /** Sustainable daily rate = variableBudget ÷ daysInMonth. */
-  expectedDailyAverage: number;
+  /** Sustainable daily rate = variableBudget ÷ daysInMonth. Null when budget values are hidden from the requesting member. */
+  expectedDailyAverage: number | null;
   /**
    * Projected month-end TOTAL spend = (dailyAverage × daysInMonth) + the
    * recurring fixed-expense total. The colour `status` still reflects only the
    * variable projection vs the variable budget.
    */
   projectedExpenses: number;
-  /** Budget available for variable spend = max(0, budget − recurring fixed-expense total). */
-  variableBudget: number;
+  /** Budget available for variable spend = max(0, budget − recurring fixed-expense total). Null when budget values are hidden from the requesting member. */
+  variableBudget: number | null;
   /**
    * Signed budget variance: how far the daily average is over (+) or under (−)
    * the expected daily average, as a whole-number percent. `null` when there is
@@ -102,6 +102,8 @@ export interface SpendingPaceDTO {
   status: SpendingPaceStatus;
   daysElapsed: number;
   daysInMonth: number;
+  /** True when budget-derived fields were masked for a member of this wallet. */
+  budgetHidden?: boolean;
 }
 
 /**

@@ -14,7 +14,7 @@ import { logger, redact } from './utils/logger';
 import { swaggerSpec } from './config/swagger';
 import { redocMiddleware } from './middleware/redoc';
 import { docsAuth } from './middleware/docs-auth';
-import { createAuthVerifier, requireAuth } from './auth';
+import { createAuthVerifier, requireAuth, walletContext } from './auth';
 import { Budget } from '../../temporal-workflows/src/models';
 
 const app = express();
@@ -150,6 +150,7 @@ app.use(
     if (openApiPaths.some((re) => re.test(req.path))) return next();
     return authMiddleware(req, res, next);
   },
+  walletContext,
   routes
 );
 

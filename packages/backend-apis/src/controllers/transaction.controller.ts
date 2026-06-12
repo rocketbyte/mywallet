@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { TransactionService, FixedExpenseOnIncomeError } from '../services/transaction.service';
 import { BudgetService } from '../services/budget.service';
-import { getDataOwnerId } from '../auth';
+import { getDataOwnerId, isBudgetHidden } from '../auth';
 import { parsePagination, scalarParam } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 import {
@@ -143,6 +143,20 @@ export class TransactionController {
         },
         budget?.totalBudget ?? 0,
       );
+      // Members of a wallet that hides budget values get the pace status
+      // and spend-derived figures, but every budget-derived number is
+      // nulled — any of them would let the budget be back-derived.
+      if (isBudgetHidden(req)) {
+        return res.json({
+          ...pace,
+          variableBudget: null,
+          expectedDailyAverage: null,
+          variancePct: null,
+          safeToSpendRemaining: null,
+          safeToSpendPerDay: null,
+          budgetHidden: true,
+        });
+      }
       res.json(pace);
     } catch (error) {
       logger.error('Failed to compute spending pace', { error });
