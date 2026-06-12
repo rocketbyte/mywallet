@@ -8,9 +8,9 @@ model_list:
   # ── Cloudflare Workers AI ─────────────────────────────────────────────────
   # api_base = https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1
   # Set CLOUDFLARE_API_BASE and CLOUDFLARE_API_TOKEN in your .env
-  - model_name: cf/llama-3.1-8b-instruct
+  - model_name: cf/llama-3.3-70b-instruct-fp8-fast
     litellm_params:
-      model: openai/@cf/meta/llama-3.1-8b-instruct
+      model: openai/@cf/meta/llama-3.3-70b-instruct-fp8-fast
       api_key: os.environ/CLOUDFLARE_API_TOKEN
       api_base: os.environ/CLOUDFLARE_API_BASE
 
