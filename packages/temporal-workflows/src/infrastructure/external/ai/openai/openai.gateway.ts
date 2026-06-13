@@ -6,6 +6,7 @@
 import { injectable, inject } from 'tsyringe';
 import OpenAI from 'openai';
 import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/ai-gateway.interface';
+import { parseJsonContent } from './parse-json-content';
 
 @injectable()
 export class OpenAIGateway implements AIGatewayInterface {
@@ -42,7 +43,7 @@ export class OpenAIGateway implements AIGatewayInterface {
     });
 
     const content = completion.choices[0].message.content;
-    const data = content ? JSON.parse(content) : {};
+    const data = content ? parseJsonContent(content) : {};
 
     return {
       data,

@@ -5,6 +5,13 @@
 # To switch the default model: update OPENAI_MODEL env var on the worker.
 
 model_list:
+  # ── Groq (gpt-oss-120b) — pipeline primary ────────────────────────────────
+  # Set GROQ_API_KEY in your .env
+  - model_name: groq/gpt-oss-120b
+    litellm_params:
+      model: groq/openai/gpt-oss-120b
+      api_key: os.environ/GROQ_API_KEY
+
   # ── Cloudflare Workers AI ─────────────────────────────────────────────────
   # api_base = https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1
   # Set CLOUDFLARE_API_BASE and CLOUDFLARE_API_TOKEN in your .env
@@ -54,7 +61,7 @@ router_settings:
   # When the Cloudflare model errors (notably 429 — free tier is 10k neurons/day,
   # and the 70b model burns them fast), fall back to Gemini, then local Ollama.
   fallbacks:
-    - cf/llama-3.1-8b-instruct-fp8: ["gemini-2.5-flash-lite", "qwen3:8b"]
+    - groq/gpt-oss-120b: ["gemini-2.5-flash-lite", "qwen3:8b"]
   num_retries: 2
 
 # General settings
