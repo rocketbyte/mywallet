@@ -70,6 +70,44 @@ router.get('/', controller.getMe.bind(controller));
 
 /**
  * @openapi
+ * /me:
+ *   patch:
+ *     summary: Update the authenticated user's preferences
+ *     description: |
+ *       Updates mutable fields on the caller's account. Currently only the UI
+ *       `language` preference is editable. The value MUST be one of the
+ *       supported languages (`en`, `es`); anything else is rejected with 400.
+ *       Returns the full, updated user record (same shape as `GET /me`).
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               language:
+ *                 type: string
+ *                 enum: [en, es]
+ *                 description: Preferred UI language.
+ *     responses:
+ *       200:
+ *         description: The updated user.
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.patch('/', controller.updateMe.bind(controller));
+
+/**
+ * @openapi
  * /me/wallets:
  *   get:
  *     summary: List wallets the caller can act in
