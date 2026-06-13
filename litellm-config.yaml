@@ -8,9 +8,9 @@ model_list:
   # ── Cloudflare Workers AI ─────────────────────────────────────────────────
   # api_base = https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1
   # Set CLOUDFLARE_API_BASE and CLOUDFLARE_API_TOKEN in your .env
-  - model_name: cf/llama-3.3-70b-instruct-fp8-fast
+  - model_name: cf/llama-3.1-8b-instruct-fp8
     litellm_params:
-      model: openai/@cf/meta/llama-3.3-70b-instruct-fp8-fast
+      model: openai/@cf/meta/llama-3.1-8b-instruct-fp8
       api_key: os.environ/CLOUDFLARE_API_TOKEN
       api_base: os.environ/CLOUDFLARE_API_BASE
 
@@ -51,6 +51,11 @@ model_list:
 # Router settings
 router_settings:
   routing_strategy: simple-shuffle  # or: least-busy, latency-based-routing
+  # When the Cloudflare model errors (notably 429 — free tier is 10k neurons/day,
+  # and the 70b model burns them fast), fall back to Gemini, then local Ollama.
+  fallbacks:
+    - cf/llama-3.1-8b-instruct-fp8: ["gemini-2.5-flash-lite", "qwen3:8b"]
+  num_retries: 2
 
 # General settings
 general_settings:

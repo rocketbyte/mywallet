@@ -91,7 +91,7 @@ export class DIContainer {
     container.register('OpenAIConfig', {
       useValue: {
         apiKey: config.litellmApiKey!,
-        model: config.litellmModel || 'cf/llama-3.3-70b-instruct-fp8-fast',
+        model: config.litellmModel || 'cf/llama-3.1-8b-instruct-fp8',
         endpoint: config.litellmEndpoint,
       },
     });

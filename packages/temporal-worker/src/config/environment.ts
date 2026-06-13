@@ -41,7 +41,7 @@ export const config = {
   // OPENAI_MODEL must match a model_name in the LiteLLM configmap.
   litellm: {
     apiKey: process.env.LITELLM_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'cf/llama-3.3-70b-instruct-fp8-fast',
+    model: process.env.OPENAI_MODEL || 'cf/llama-3.1-8b-instruct-fp8',
     endpoint: process.env.LITELLM_BASE_URL || ''
   },
 
