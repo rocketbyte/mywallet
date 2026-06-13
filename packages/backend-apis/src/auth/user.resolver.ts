@@ -53,20 +53,46 @@ export class MongoUserResolver implements UserResolverInterface {
   }
 
   private async upsert(profile: UserProfile): Promise<UserInterface> {
+    const normalizedEmail = profile.email ? normalizeEmail(profile.email) : undefined;
+
     const set: Partial<UserInterface> = { lastLoginAt: new Date() };
-    if (profile.email) set.email = profile.email;
+    if (normalizedEmail) set.email = normalizedEmail;
     if (profile.displayName) set.displayName = profile.displayName;
     if (profile.emailVerified !== undefined) set.emailVerified = profile.emailVerified;
 
-    // Step 1: atomic upsert keyed on the legacy unique index. For the
-    // primary IDP, `authUid` mirrors the OIDC subject — this single op
-    // covers both new-user provisioning and returning-user updates.
-    const doc = await User.findOneAndUpdate(
-      { authUid: profile.subject },
-      { $set: set, $setOnInsert: { authUid: profile.subject } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    if (!doc) throw new Error(`User upsert failed for subject=${profile.subject}`);
+    // Step 1: resolve an EXISTING user for this login, in priority order:
+    //   (a) this exact IDP identity (an identities[] entry, or the legacy
+    //       `authUid` mirror) — a returning user, possibly via a linked UID;
+    //   (b) only if none, AND the IDP asserts a VERIFIED email, by that
+    //       email — so a second IDP identity for the same person links to
+    //       their existing account instead of forking a duplicate user +
+    //       tenant. An unverified email is never allowed to attach to an
+    //       existing account (account-takeover guard).
+    let doc = await User.findOne({
+      $or: [
+        { identities: { $elemMatch: { provider: profile.provider, subject: profile.subject } } },
+        { authUid: profile.subject },
+      ],
+    });
+
+    if (!doc && normalizedEmail && profile.emailVerified) {
+      doc = await User.findOne({ email: normalizedEmail });
+    }
+
+    if (doc) {
+      // Returning or newly-linked user — refresh best-effort profile fields.
+      await User.updateOne({ _id: doc._id }, { $set: set });
+      Object.assign(doc, set);
+    } else {
+      // Brand-new person: create keyed on the legacy `authUid` unique index.
+      const created = await User.findOneAndUpdate(
+        { authUid: profile.subject },
+        { $set: set, $setOnInsert: { authUid: profile.subject } },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+      if (!created) throw new Error(`User upsert failed for subject=${profile.subject}`);
+      doc = created;
+    }
 
     // Step 2: ensure the (provider, subject) pair is recorded in
     // identities[]. The filter + $push runs atomically in Mongo, so two
@@ -98,6 +124,15 @@ export class MongoUserResolver implements UserResolverInterface {
       emailVerified: doc.emailVerified,
     };
   }
+}
+
+/**
+ * Canonical form for email matching: trimmed and lower-cased. Used both when
+ * storing `User.email` and when looking a user up by email so identity linking
+ * and membership invites compare on the same key.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
 /**
