@@ -215,8 +215,12 @@ Return only the JSON object described in the system prompt.`
     order: 5,
     model: 'gpt-4o-mini',
     temperature: 0.3,
-    // Room for a 2–4 sentence advisor note, nothing more.
-    maxTokens: 260,
+    // The note itself is short (2–4 sentences, ~150 tokens), but reasoning
+    // models (e.g. gpt-oss) spend tokens on hidden reasoning BEFORE the final
+    // JSON. Too small a cap leaves the validated output channel empty and Groq
+    // returns json_validate_failed. Give reasoning headroom; truncateNote()
+    // still clamps the visible note to MONTHLY_NOTE_MAX_CHARS.
+    maxTokens: 900,
     isActive: true,
     systemPrompt: `You are a professional financial analyst preparing an accurate monthly financial report for one client. You are given the month's pre-computed figures and a pre-computed budget verdict, plus the short daily summaries the system already produced. Your job is to NARRATE these inputs faithfully — never to calculate.
 

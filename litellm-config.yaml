@@ -21,6 +21,13 @@ model_list:
       api_key: os.environ/CLOUDFLARE_API_TOKEN
       api_base: os.environ/CLOUDFLARE_API_BASE
 
+  # ── Google AI Studio (Gemini) — first fallback ───────────────────────────
+  # Set GEMINI_API_KEY in your .env (aistudio.google.com → API keys)
+  - model_name: gemini-2.5-flash-lite
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+
   # ── Ollama (k8s: ollama.llm.svc.cluster.local:11434) ─────────────────────
   - model_name: qwen3:4b
     litellm_params:
@@ -58,10 +65,12 @@ model_list:
 # Router settings
 router_settings:
   routing_strategy: simple-shuffle  # or: least-busy, latency-based-routing
-  # When the Cloudflare model errors (notably 429 — free tier is 10k neurons/day,
-  # and the 70b model burns them fast), fall back to Gemini, then local Ollama.
+  # When the Groq primary errors (rate limits, or json_validate_failed on the
+  # reasoning model), fall back to Gemini, then local Ollama. Use qwen3:4b — the
+  # 8b variant needs ~5.5 GiB and won't load on the Pi (5.2 GiB free), so it can
+  # never serve as a real last resort.
   fallbacks:
-    - groq/gpt-oss-120b: ["gemini-2.5-flash-lite", "qwen3:8b"]
+    - groq/gpt-oss-120b: ["gemini-2.5-flash-lite", "qwen3:4b"]
   num_retries: 2
 
 # General settings

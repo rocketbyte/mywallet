@@ -8,6 +8,22 @@ import OpenAI from 'openai';
 import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/ai-gateway.interface';
 import { parseJsonContent } from './parse-json-content';
 
+/**
+ * Models that must NOT be sent OpenAI-style strict `response_format:
+ * json_object`. Reasoning models (e.g. gpt-oss on Groq) emit hidden reasoning
+ * before the final answer; under strict server-side JSON validation the
+ * validated channel can come back empty, yielding Groq's
+ * `json_validate_failed` with an empty `failed_generation`. For these we skip
+ * the constraint and rely on `parseJsonContent` to recover the JSON instead.
+ * `cf/` (Cloudflare Workers AI) also doesn't support the param.
+ */
+function supportsStrictJsonObject(modelName: string): boolean {
+  const m = modelName.toLowerCase();
+  if (m.startsWith('cf/')) return false;
+  if (m.includes('gpt-oss')) return false;
+  return true;
+}
+
 @injectable()
 export class OpenAIGateway implements AIGatewayInterface {
   private client: OpenAI;
@@ -35,7 +51,7 @@ export class OpenAIGateway implements AIGatewayInterface {
         { role: 'system', content: request.systemPrompt },
         { role: 'user', content: request.userPrompt }
       ],
-      ...(request.responseFormat === 'json' && !this.modelName.startsWith('cf/')
+      ...(request.responseFormat === 'json' && supportsStrictJsonObject(this.modelName)
         ? { response_format: { type: 'json_object' as const } }
         : {}),
       temperature: request.temperature ?? 0.1,
