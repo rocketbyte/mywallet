@@ -20,6 +20,18 @@ import {
 } from '../types';
 
 /**
+ * True when a workflow signal failed because the target run no longer exists —
+ * i.e. it already completed or was never found. For unlink this is benign: the
+ * sync is already stopped. Matches the Temporal SDK's `WorkflowNotFoundError`
+ * and the gRPC "workflow execution already completed" / NOT_FOUND messages.
+ */
+function isWorkflowGoneError(err: unknown): boolean {
+  const name = (err as { name?: string })?.name ?? '';
+  const message = (err as Error)?.message ?? '';
+  return name === 'WorkflowNotFoundError' || /already completed|not found|NOT_FOUND/i.test(message);
+}
+
+/**
  * Gmail implementation of EmailProviderInterface.
  * Handles the full Gmail OAuth flow and Temporal workflow lifecycle.
  * Adding Outlook/Yahoo later means creating a parallel implementation
@@ -115,8 +127,17 @@ export class GmailProvider implements EmailProviderInterface {
   }
 
   /**
-   * Sends a stopSync signal to the running workflow, which will deactivate
-   * the account and exit gracefully.
+   * Disconnects a Gmail account: stops the sync workflow and marks the account
+   * inactive.
+   *
+   * The account's `isActive` flag is the authoritative gate — the webhook
+   * handler only signals accounts that are `isActive: true` — so we set it false
+   * here regardless of the workflow's state. The stopSync signal is best-effort:
+   * if the workflow has already finished, signaling throws "workflow execution
+   * already completed" / NotFound, which simply means the sync is already
+   * stopped, so we swallow that and proceed. Any other signal failure (e.g.
+   * Temporal unreachable) may leave a *live* workflow still reading, so it is
+   * re-thrown for the caller to retry rather than falsely reporting success.
    */
   async unlinkAccount(userId: string): Promise<void> {
     const account = await GmailAccount.findOne({ userId });
@@ -128,13 +149,27 @@ export class GmailProvider implements EmailProviderInterface {
     }
 
     const client = await getTemporalClient();
-    const handle = client.workflow.getHandle(account.workflowId);
-    await handle.signal(GMAIL_SIGNALS.STOP_SYNC);
+    try {
+      const handle = client.workflow.getHandle(account.workflowId);
+      await handle.signal(GMAIL_SIGNALS.STOP_SYNC);
+      logger.info('GmailProvider: sent stopSync signal', {
+        userId,
+        workflowId: account.workflowId
+      });
+    } catch (err) {
+      if (!isWorkflowGoneError(err)) throw err;
+      logger.warn('GmailProvider: stopSync target already finished — deactivating account', {
+        userId,
+        workflowId: account.workflowId,
+        message: (err as Error).message
+      });
+    }
 
-    logger.info('GmailProvider: sent stopSync signal', {
-      userId,
-      workflowId: account.workflowId
-    });
+    if (account.isActive) {
+      account.isActive = false;
+      await account.save();
+      logger.info('GmailProvider: marked account inactive', { userId });
+    }
   }
 
   /**

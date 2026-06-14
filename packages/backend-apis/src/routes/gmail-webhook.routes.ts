@@ -105,6 +105,35 @@ router.post('/link', requireAdminKey, (req, res) => controller.linkAccount(req, 
 
 /**
  * @openapi
+ * /gmail/unlink/me:
+ *   delete:
+ *     summary: Disconnect the authenticated user's own Gmail account
+ *     description: |
+ *       Self-service. Derives the user from the bearer token (never a path id or
+ *       the shared-wallet data owner), sends `stopSync` to that user's Temporal
+ *       workflow, and marks the account inactive so email reading stops.
+ *     tags: [Gmail]
+ *     responses:
+ *       200:
+ *         description: Account disconnected successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: unlinked }
+ *                 message: { type: string }
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+// Registered before `/unlink/:userId` so the literal "me" is not captured by the
+// admin-gated param route.
+router.delete('/unlink/me', (req, res) => controller.unlinkMe(req, res));
+
+/**
+ * @openapi
  * /gmail/unlink/{userId}:
  *   delete:
  *     summary: Unlink a Gmail account
