@@ -28,7 +28,10 @@ const DEFAULT_STEPS = [
     order: 1,
     model: 'gpt-4o-mini',
     temperature: 0.1,
-    maxTokens: 300,
+    // Headroom for a reasoning model: gpt-oss emits hidden reasoning plus the
+    // `reasoning` field before closing the JSON; too small a cap truncates the
+    // output mid-string and it can't be parsed (json_object is off for gpt-oss).
+    maxTokens: 800,
     isActive: true,
     systemPrompt: `You are a strict financial-email classifier. Decide whether ONE email reports a single executed bank or payment transaction.
 
@@ -75,7 +78,9 @@ Return only the JSON object.`
     order: 2,
     model: 'gpt-4o-mini',
     temperature: 0.1,
-    maxTokens: 600,
+    // Headroom for a reasoning model emitting a richer transaction JSON — see
+    // the classify_email note. Too small a cap truncates the JSON mid-output.
+    maxTokens: 900,
     isActive: true,
     systemPrompt: `You are a precise financial-transaction extractor for multi-bank, multi-currency, multi-language emails. Extract the SINGLE primary transaction reported in this email into one structured JSON object.
 
