@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { emailProviders } from '../providers';
+import { publicEndpointLimiter } from '../middleware/rate-limit';
 
 const router = Router();
 const controller = new AuthController(emailProviders);
@@ -87,6 +88,6 @@ router.post('/connect', (req, res) => controller.connect(req, res));
  *       400: { description: Missing code or unknown provider }
  *       500: { description: Token exchange failed }
  */
-router.get('/:provider/callback', (req, res) => controller.handleCallback(req, res));
+router.get('/:provider/callback', publicEndpointLimiter, (req, res) => controller.handleCallback(req, res));
 
 export default router;

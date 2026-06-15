@@ -4,6 +4,12 @@ export { EmailPattern, EmailPatternInterface } from './email-pattern.model';
 export { Budget, BudgetInterface } from './budget.model';
 export { Alert, AlertInterface } from './alert.model';
 export { Tenant, TenantInterface } from './tenant.model';
+export {
+  TenantMembership,
+  TenantMembershipInterface,
+  TenantMembershipRole,
+  TenantMembershipStatus,
+} from './tenant-membership.model';
 export { Email, EmailInterface } from './email.model';
 export { PipelineStep, PipelineStepInterface } from './pipeline-step.model';
 export {

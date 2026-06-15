@@ -5,14 +5,16 @@ import helmet from 'helmet';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import { createGunzip } from 'zlib';
+import type { CorsOptions } from 'cors';
 import { config } from './config/environment';
 import routes from './routes';
 import { errorHandler } from './middleware/error-handler';
-import { logger } from './utils/logger';
+import { baselineLimiter } from './middleware/rate-limit';
+import { logger, redact } from './utils/logger';
 import { swaggerSpec } from './config/swagger';
 import { redocMiddleware } from './middleware/redoc';
 import { docsAuth } from './middleware/docs-auth';
-import { createAuthVerifier, requireAuth } from './auth';
+import { createAuthVerifier, requireAuth, walletContext } from './auth';
 import { Budget } from '../../temporal-workflows/src/models';
 
 const app = express();
@@ -51,15 +53,61 @@ app.use(
     },
   })
 );
-app.use(cors());
+// CORS is restricted to an explicit allowlist. Requests with no Origin
+// (server-to-server, curl, Pub/Sub) always pass; browser requests from
+// unlisted origins receive no allow-origin header. An empty allowlist denies
+// cross-origin in production but allows all in development for convenience.
+const corsOptions: CorsOptions = {
+  credentials: true,
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (config.cors.allowedOrigins.includes(origin)) return callback(null, true);
+    if (config.cors.allowedOrigins.length === 0 && !config.isProduction) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+};
+app.use(cors(corsOptions));
+
+// cors() answers (204) preflights from allowed origins, but for a disallowed
+// origin it calls next() instead of terminating — which would let the OPTIONS
+// fall through to the /api auth gate and 401. Answer any remaining preflight
+// here with a clean 204 (no allow-origin header, so the browser still blocks
+// the actual cross-origin request) before auth or rate limiting can see it.
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
+// Baseline rate limit across the whole surface.
+app.use(baselineLimiter);
 
 app.use((req, res, next) => {
   if (req.headers['content-encoding'] === 'gzip') {
     const gunzip = createGunzip();
     req.pipe(gunzip);
     const chunks: Buffer[] = [];
-    gunzip.on('data', (chunk) => chunks.push(chunk));
+    let total = 0;
+    let aborted = false;
+    gunzip.on('data', (chunk: Buffer) => {
+      if (aborted) return;
+      total += chunk.length;
+      // Cap the *decompressed* size to defeat gzip-bomb DoS.
+      if (total > config.bodyLimits.maxDecompressedBytes) {
+        aborted = true;
+        gunzip.destroy();
+        logger.warn('Rejected oversized gzip body', { decompressedBytes: total });
+        res.status(413).json({ error: 'PayloadTooLarge', message: 'Request body too large' });
+        return;
+      }
+      chunks.push(chunk);
+    });
     gunzip.on('end', () => {
+      if (aborted) return;
       const body = Buffer.concat(chunks).toString('utf-8');
       try {
         req.body = JSON.parse(body);
@@ -69,6 +117,7 @@ app.use((req, res, next) => {
       next();
     });
     gunzip.on('error', (err) => {
+      if (aborted) return;
       logger.error('Failed to decompress gzip body', { err });
       next(err);
     });
@@ -77,12 +126,12 @@ app.use((req, res, next) => {
   }
 });
 
-app.use(express.json());
+app.use(express.json({ limit: config.bodyLimits.json }));
 
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`, {
-    query: req.query,
-    body: req.body
+    query: redact(req.query),
+    body: redact(req.body)
   });
   next();
 });
@@ -101,6 +150,7 @@ app.use(
     if (openApiPaths.some((re) => re.test(req.path))) return next();
     return authMiddleware(req, res, next);
   },
+  walletContext,
   routes
 );
 

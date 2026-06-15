@@ -4,7 +4,7 @@ export type TenantType = 'individual' | 'business';
 
 export type TenantShape = Pick<
   TenantInterface,
-  '_id' | 'primaryUserId' | 'type' | 'name' | 'currency' | 'budgetLimit' | 'notificationsEnabled' | 'emailSyncEnabled'
+  '_id' | 'primaryUserId' | 'type' | 'name' | 'currency' | 'budgetLimit' | 'notificationsEnabled' | 'emailSyncEnabled' | 'showBudgetToMembers'
 >;
 
 export type UserShape = Pick<UserInterface, '_id' | 'email' | 'displayName'>;
@@ -13,6 +13,9 @@ export interface TenantMemberDTO {
   id: string;
   email: string;
   displayName?: string;
+  role: 'owner' | 'member';
+  joinedAt?: string;
+  /** @deprecated use role === 'owner' */
   isPrimary: boolean;
 }
 
@@ -22,9 +25,11 @@ export interface TenantDTO {
   name?: string;
   primaryUserId: string;
   currency: string;
-  budgetLimit: number;
+  /** Null when budget values are hidden from the requesting member. */
+  budgetLimit: number | null;
   notificationsEnabled: boolean;
   emailSyncEnabled: boolean;
+  showBudgetToMembers: boolean;
   members: TenantMemberDTO[];
 }
 
@@ -35,8 +40,18 @@ export interface UpdateTenantInput {
   budgetLimit?: number;
   notificationsEnabled?: boolean;
   emailSyncEnabled?: boolean;
+  showBudgetToMembers?: boolean;
 }
 
 export interface AddMemberInput {
   email: string;
+}
+
+/** One wallet the caller can act in — own wallet or an active membership. */
+export interface WalletDTO {
+  id: string;
+  name?: string;
+  ownerName?: string;
+  role: 'owner' | 'member';
+  budgetHidden: boolean;
 }

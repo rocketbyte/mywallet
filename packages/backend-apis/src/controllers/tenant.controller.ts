@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { TenantService } from '../services/tenant.service';
-import { getUserId } from '../auth';
+import { getUserId, isMemberContext, isBudgetHidden, getTenantId } from '../auth';
 import { logger } from '../utils/logger';
 import {
   CannotRemovePrimaryError,
@@ -13,8 +13,13 @@ export class TenantController {
 
   async getTenant(req: Request, res: Response) {
     try {
-      const tenant = await this.service.getForUser(getUserId(req));
+      // In member context the acting wallet's tenant is on the request;
+      // for owners fall back to their own tenant via the user record.
+      const tenant = isMemberContext(req)
+        ? await this.service.getByTenantId(getTenantId(req))
+        : await this.service.getForUser(getUserId(req));
       if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+      if (isBudgetHidden(req)) tenant.budgetLimit = null;
       res.json({ tenant });
     } catch (error) {
       logger.error('Failed to get tenant', { error });

@@ -15,6 +15,9 @@ data:
   # Backend API port
   PORT: {{ .Values.backend.env.PORT | quote }}
 
+  # CORS allowlist (comma-separated frontend origins)
+  CORS_ALLOWED_ORIGINS: {{ .Values.app.cors.allowedOrigins | quote }}
+
   # MongoDB configuration
   MONGODB_HOST: {{ include "mywallet.mongodb.fullname" . | quote }}
   MONGODB_PORT: {{ .Values.mongodb.service.port | quote }}

@@ -11,6 +11,16 @@ export function formatWhen(date: Date): string {
   return `${Math.floor(hours / 24)} days ago`;
 }
 
+/**
+ * Start of the 3-month trailing window used for fixed-expense propagation:
+ * the first day (00:00:00.000 local) of the month two calendar months before
+ * the given transaction date's month. E.g. a date in June ⇒ April 1. The window
+ * the caller forms is `[windowStart, transactionDate]` inclusive.
+ */
+export function fixedExpenseWindowStart(transactionDate: Date): Date {
+  return new Date(transactionDate.getFullYear(), transactionDate.getMonth() - 2, 1, 0, 0, 0, 0);
+}
+
 export function periodStart(month: number, year: number): string {
   return `${year}-${padTwo(month)}-01`;
 }

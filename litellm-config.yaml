@@ -5,14 +5,28 @@
 # To switch the default model: update OPENAI_MODEL env var on the worker.
 
 model_list:
+  # ── Groq (gpt-oss-120b) — pipeline primary ────────────────────────────────
+  # Set GROQ_API_KEY in your .env
+  - model_name: groq/gpt-oss-120b
+    litellm_params:
+      model: groq/openai/gpt-oss-120b
+      api_key: os.environ/GROQ_API_KEY
+
   # ── Cloudflare Workers AI ─────────────────────────────────────────────────
   # api_base = https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1
   # Set CLOUDFLARE_API_BASE and CLOUDFLARE_API_TOKEN in your .env
-  - model_name: cf/llama-3.1-8b-instruct
+  - model_name: cf/llama-3.1-8b-instruct-fp8
     litellm_params:
-      model: openai/@cf/meta/llama-3.1-8b-instruct
+      model: openai/@cf/meta/llama-3.1-8b-instruct-fp8
       api_key: os.environ/CLOUDFLARE_API_TOKEN
       api_base: os.environ/CLOUDFLARE_API_BASE
+
+  # ── Google AI Studio (Gemini) — first fallback ───────────────────────────
+  # Set GEMINI_API_KEY in your .env (aistudio.google.com → API keys)
+  - model_name: gemini-2.5-flash-lite
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
 
   # ── Ollama (k8s: ollama.llm.svc.cluster.local:11434) ─────────────────────
   - model_name: qwen3:4b
@@ -51,6 +65,13 @@ model_list:
 # Router settings
 router_settings:
   routing_strategy: simple-shuffle  # or: least-busy, latency-based-routing
+  # When the Groq primary errors (rate limits, or json_validate_failed on the
+  # reasoning model), fall back to Gemini, then local Ollama. Use qwen3:4b — the
+  # 8b variant needs ~5.5 GiB and won't load on the Pi (5.2 GiB free), so it can
+  # never serve as a real last resort.
+  fallbacks:
+    - groq/gpt-oss-120b: ["gemini-2.5-flash-lite", "qwen3:4b"]
+  num_retries: 2
 
 # General settings
 general_settings:

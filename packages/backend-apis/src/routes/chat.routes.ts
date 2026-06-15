@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ChatController } from '../controllers/chat.controller';
+import { chatLimiter } from '../middleware/rate-limit';
 
 const router = Router();
 const controller = new ChatController();
@@ -56,6 +57,6 @@ const controller = new ChatController();
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-router.post('/', (req, res) => controller.stream(req, res));
+router.post('/', chatLimiter, (req, res) => controller.stream(req, res));
 
 export default router;

@@ -8,6 +8,7 @@ import { Connection } from 'mongoose';
 import { TransactionRepositoryInterface, TransactionFilters, StatsParams, TransactionStats, RecentDuplicateCriteria } from '../../../../application/interfaces/repositories/transaction-repository.interface';
 import { Transaction } from '../../../../domain/entities/transaction.entity';
 import { Transaction as TransactionModel, TransactionInterface } from '../../../../models/transaction.model';
+import { buildRecentDuplicateMongoFilter } from '../../../../shared/recent-duplicate';
 
 @injectable()
 export class MongoDBTransactionRepository implements TransactionRepositoryInterface {
@@ -34,6 +35,7 @@ export class MongoDBTransactionRepository implements TransactionRepositoryInterf
       category: transaction.category,
       subcategory: transaction.subcategory,
       transactionType: transaction.transactionType,
+      isFixedExpense: ext.isFixedExpense ?? false,
       accountNumber: transaction.accountNumber,
       bankName: transaction.bankName || '',
       extractedData: transaction.rawData || {},
@@ -64,22 +66,14 @@ export class MongoDBTransactionRepository implements TransactionRepositoryInterf
 
   /**
    * Find a recently-persisted transaction with the same exact amount, currency
-   * and direction within ± windowHours of `near`.
+   * and direction within ± windowMinutes of `near`. The filter is built by the
+   * shared `buildRecentDuplicateMongoFilter` so the match semantics stay testable
+   * and aligned with the Prisma repository.
    */
   async findRecentDuplicate(c: RecentDuplicateCriteria): Promise<Transaction | null> {
-    // Temporal payload serialization may deliver `near` as an ISO string.
-    const near = c.near instanceof Date ? c.near : new Date(c.near);
-    const windowMs = c.windowHours * 60 * 60 * 1000;
-    const from = new Date(near.getTime() - windowMs);
-    const to = new Date(near.getTime() + windowMs);
-
-    const doc = await TransactionModel.findOne({
-      userId: c.userId,
-      amount: c.amount,
-      currency: c.currency,
-      transactionType: c.transactionType,
-      transactionDate: { $gte: from, $lte: to }
-    }).sort({ transactionDate: -1 });
+    const doc = await TransactionModel
+      .findOne(buildRecentDuplicateMongoFilter(c))
+      .sort({ transactionDate: -1 });
 
     return doc ? this.toDomain(doc) : null;
   }

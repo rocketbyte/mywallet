@@ -49,6 +49,7 @@ router.get('/current', controller.getCurrentBudget.bind(controller));
  *               month: { type: integer, example: 6 }
  *               periodStart: { type: string, format: date, example: '2026-06-01' }
  *               limitAmount: { type: number, example: 3800 }
+ *               locked: { type: boolean, example: false, description: Lock the cap and category limits from edits. }
  *               categories:
  *                 type: array
  *                 items:

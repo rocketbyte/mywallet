@@ -3,6 +3,7 @@ import { AnalysisService } from '../services/analysis.service';
 import { MonthlyAnalysisService } from '../services/monthly-analysis.service';
 import { ensureDailyAnalysisScheduleDetached } from '../services/analysis-schedule.service';
 import { getDataOwnerId, getUserId } from '../auth';
+import { scalarParam } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 
 function parseAnalysisPagination(query: Record<string, any>): { limit: number; offset: number } {
@@ -29,8 +30,8 @@ export class AnalysisController {
       const result = await service.list(getDataOwnerId(req), {
         limit,
         offset,
-        from: req.query.from as string | undefined,
-        to: req.query.to as string | undefined,
+        from: scalarParam(req.query.from),
+        to: scalarParam(req.query.to),
       });
       res.json(result);
     } catch (err) {

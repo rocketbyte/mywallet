@@ -9,8 +9,8 @@ import {
 import { GMAIL_SUBSCRIPTION_WORKFLOW_PREFIX, GMAIL_SIGNALS, GMAIL_SYNC_TASK_QUEUE } from '../../../temporal-workflows/src/shared/constants';
 import { GmailAccount } from '../../../temporal-workflows/src/models/gmail-account.model';
 import { EmailProviderInterface } from '../providers/types';
-import { getDataOwnerId } from '../auth';
-import { logger } from '../utils/logger';
+import { getDataOwnerId, getUserId } from '../auth';
+import { logger, redact } from '../utils/logger';
 
 /**
  * Handles Gmail-specific operations:
@@ -23,7 +23,7 @@ export class GmailWebhookController {
 
   async handleWebhook(req: Request, res: Response): Promise<void> {
     try {
-      logger.info('Received Gmail webhook', req.body);
+      logger.info('Received Gmail webhook', { body: redact(req.body) });
 
       const payload: GmailWebhookPayload = req.body;
       const decodedData = Buffer.from(payload.message.data, 'base64').toString('utf-8');
@@ -133,6 +133,32 @@ export class GmailWebhookController {
         return;
       }
       logger.error('Error unlinking Gmail account', { error });
+      res.status(500).json({ error: 'unlink_failed', message: (error as Error).message });
+    }
+  }
+
+  /**
+   * Self-service disconnect — the authenticated user severs *their own* Gmail
+   * link, stopping the sync workflow. The target id comes from `getUserId`
+   * (the real caller), NOT `getDataOwnerId`: a read-only member acting inside a
+   * shared wallet must never be able to unlink the wallet owner's account.
+   * Idempotent-ish: a missing account is reported as 404, which the client
+   * treats as already-disconnected.
+   */
+  async unlinkMe(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = getUserId(req);
+
+      await this.provider.unlinkAccount(userId);
+
+      res.status(200).json({ status: 'unlinked', message: 'Gmail account disconnected successfully' });
+    } catch (error) {
+      const code = (error as any).code;
+      if (code === 'not_found') {
+        res.status(404).json({ error: 'account_not_found', message: (error as Error).message });
+        return;
+      }
+      logger.error('Error disconnecting own Gmail account', { error });
       res.status(500).json({ error: 'unlink_failed', message: (error as Error).message });
     }
   }

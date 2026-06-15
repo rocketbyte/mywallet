@@ -21,7 +21,7 @@ export interface TransactionInterface extends Document {
   transactionType: 'debit' | 'credit';
 
   // Source channel
-  source?: 'email' | 'sms' | 'manual' | 'chat';
+  source?: 'email' | 'sms' | 'manual' | 'chat' | 'recurring';
 
   // Banking Details (optional for manual transactions)
   accountNumber?: string;
@@ -29,6 +29,20 @@ export interface TransactionInterface extends Document {
 
   // Additional fields
   note?: string;
+
+  /**
+   * User-marked recurring fixed expense (rent, subscriptions, …). Set through
+   * the transactions API; propagated across all transactions sharing the same
+   * category/amount/merchant signature for the user.
+   */
+  isFixedExpense: boolean;
+
+  /**
+   * User-marked recurrent transaction. When true, the monthly recurring job
+   * clones this row into the next month (preserving the flag, so the series
+   * perpetuates). Independent of `isFixedExpense`.
+   */
+  isRecurrent: boolean;
 
   // Metadata (optional for manual transactions)
   rawEmailText?: string;
@@ -60,12 +74,14 @@ const TransactionSchema = new Schema<TransactionInterface>({
   subcategory: { type: String },
   transactionType: { type: String, enum: ['debit', 'credit'], required: true },
 
-  source: { type: String, enum: ['email', 'sms', 'manual', 'chat'], default: 'email' },
+  source: { type: String, enum: ['email', 'sms', 'manual', 'chat', 'recurring'], default: 'email' },
 
   accountNumber: { type: String },
   bankName: { type: String },
 
   note: { type: String },
+  isFixedExpense: { type: Boolean, default: false },
+  isRecurrent: { type: Boolean, default: false },
 
   rawEmailText: { type: String },
   extractedData: { type: Schema.Types.Mixed },
@@ -84,8 +100,19 @@ const TransactionSchema = new Schema<TransactionInterface>({
 TransactionSchema.index({ userId: 1, emailId: 1 }, { unique: true, sparse: true });
 
 TransactionSchema.index({ userId: 1, transactionDate: -1, category: 1 });
+// Supports the list endpoint's category filter: equality on category with the
+// transactionDate-desc sort served straight from the index (no in-memory sort).
+TransactionSchema.index({ userId: 1, category: 1, transactionDate: -1 });
 TransactionSchema.index({ userId: 1, workflowId: 1 }, { sparse: true });
 TransactionSchema.index({ userId: 1, bankName: 1, accountNumber: 1 }, { sparse: true });
+
+// Supports fixed-expense propagation: marking one transaction updates every
+// other row for the user that shares the same (category, amount, merchant).
+TransactionSchema.index({ userId: 1, category: 1, amount: 1, merchant: 1 });
+
+// Supports the monthly recurring job's cross-tenant scan for the previous
+// month's recurrent rows (distinct users, then per-user paging).
+TransactionSchema.index({ isRecurrent: 1, transactionDate: 1, userId: 1 });
 
 // Supports findRecentDuplicate — exact-match dedup query during pipeline storage.
 TransactionSchema.index(

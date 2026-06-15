@@ -27,6 +27,13 @@ export interface UserInterface extends Document {
   email: string;
   displayName?: string;
   emailVerified?: boolean;
+  /**
+   * Preferred UI language as a BCP-47 language code (currently 'en' | 'es').
+   * Absent means the user has never chosen one — clients fall back to the
+   * device locale, then English. Stored per-account so the choice follows
+   * the user across devices.
+   */
+  language?: string;
   lastLoginAt?: Date;
   tenantId?: Types.ObjectId;
   createdAt: Date;
@@ -45,6 +52,7 @@ const UserSchema = new Schema<UserInterface>({
   email: { type: String, required: true, lowercase: true, trim: true, index: true },
   displayName: { type: String },
   emailVerified: { type: Boolean, default: false },
+  language: { type: String, enum: ['en', 'es'] },
   lastLoginAt: { type: Date },
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', index: true },
 }, {

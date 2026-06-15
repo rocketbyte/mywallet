@@ -7,6 +7,7 @@ import {
   type EmailProviderInterface,
 } from '../providers';
 import { Tenant, User } from '../../../temporal-workflows/src/models';
+import type { UserInterface } from '../../../temporal-workflows/src/models';
 import { logger } from '../utils/logger';
 import {
   renderAutoLinkedPage,
@@ -14,8 +15,28 @@ import {
   renderErrorPage,
   renderManualTokenPage,
 } from './auth.views';
-import { EMAIL_REGEX, type ConnectInput, type MeDTO } from '../types/auth.types';
+import {
+  EMAIL_REGEX,
+  SUPPORTED_LANGUAGES,
+  isLanguage,
+  type ConnectInput,
+  type MeDTO,
+} from '../types/auth.types';
 import { BadRequestError } from '../types/errors';
+
+/** A user document read with `.lean()` — a plain object, not a Mongoose doc. */
+type LeanUser = Pick<
+  UserInterface,
+  | '_id'
+  | 'email'
+  | 'displayName'
+  | 'emailVerified'
+  | 'identities'
+  | 'lastLoginAt'
+  | 'createdAt'
+  | 'tenantId'
+  | 'language'
+>;
 
 export class AuthController {
   constructor(private readonly registry: EmailProviderRegistry) {}
@@ -29,31 +50,76 @@ export class AuthController {
         return;
       }
 
-      const tenant = doc.tenantId ? await Tenant.findById(doc.tenantId).lean() : null;
-      const isPrimary = !!tenant && String(tenant.primaryUserId) === String(doc._id);
-      const role: MeDTO['role'] = isPrimary ? 'admin' : 'guest';
-
-      const me: MeDTO = {
-        id: String(doc._id),
-        email: doc.email,
-        displayName: doc.displayName,
-        emailVerified: doc.emailVerified ?? false,
-        provider: req.user!.provider,
-        identities: (doc.identities ?? []).map((i) => ({
-          provider: i.provider,
-          subject: i.subject,
-          linkedAt: i.linkedAt,
-        })),
-        lastLoginAt: doc.lastLoginAt,
-        createdAt: doc.createdAt,
-        tenantId: tenant ? String(tenant._id) : undefined,
-        role,
-      };
+      const me = await this.toMeDTO(doc, req.user!.provider);
       res.json({ user: me });
     } catch (error) {
       logger.error('Failed to get current user', { error });
       res.status(500).json({ error: 'Failed to fetch current user' });
     }
+  }
+
+  /**
+   * Update mutable fields on the authenticated user. Currently only the UI
+   * `language` preference is editable. Validates the value against the
+   * supported-language set and rejects anything else deterministically.
+   */
+  async updateMe(req: Request, res: Response): Promise<void> {
+    try {
+      const id = getUserId(req);
+      const { language } = (req.body ?? {}) as { language?: unknown };
+
+      if (language === undefined) {
+        res.status(400).json({ error: 'No updatable fields provided' });
+        return;
+      }
+      if (!isLanguage(language)) {
+        res.status(400).json({
+          error: `Unsupported language. Expected one of: ${SUPPORTED_LANGUAGES.join(', ')}`,
+        });
+        return;
+      }
+
+      const doc = await User.findByIdAndUpdate(
+        id,
+        { $set: { language } },
+        { new: true },
+      ).lean();
+      if (!doc) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const me = await this.toMeDTO(doc, req.user!.provider);
+      res.json({ user: me });
+    } catch (error) {
+      logger.error('Failed to update current user', { error });
+      res.status(500).json({ error: 'Failed to update current user' });
+    }
+  }
+
+  /** Serialize a user document (plus its tenant/role) into the public MeDTO. */
+  private async toMeDTO(doc: LeanUser, provider: string): Promise<MeDTO> {
+    const tenant = doc.tenantId ? await Tenant.findById(doc.tenantId).lean() : null;
+    const isPrimary = !!tenant && String(tenant.primaryUserId) === String(doc._id);
+    const role: MeDTO['role'] = isPrimary ? 'admin' : 'guest';
+
+    return {
+      id: String(doc._id),
+      email: doc.email,
+      displayName: doc.displayName,
+      emailVerified: doc.emailVerified ?? false,
+      provider,
+      identities: (doc.identities ?? []).map((i) => ({
+        provider: i.provider,
+        subject: i.subject,
+        linkedAt: i.linkedAt,
+      })),
+      lastLoginAt: doc.lastLoginAt,
+      createdAt: doc.createdAt,
+      tenantId: tenant ? String(tenant._id) : undefined,
+      role,
+      language: isLanguage(doc.language) ? doc.language : undefined,
+    };
   }
 
   connect(req: Request, res: Response): void {

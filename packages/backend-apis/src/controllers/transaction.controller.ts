@@ -1,39 +1,53 @@
 import { Request, Response } from 'express';
-import { TransactionService } from '../services/transaction.service';
-import { getDataOwnerId } from '../auth';
-import { parsePagination } from '../utils/request.utils';
+import { TransactionService, FixedExpenseOnIncomeError } from '../services/transaction.service';
+import { BudgetService } from '../services/budget.service';
+import { getDataOwnerId, isBudgetHidden } from '../auth';
+import { parsePagination, scalarParam } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 import {
   isTransactionCategoryKey,
   isTransactionType,
+  isTransactionSource,
+  TRANSACTION_SOURCES,
 } from '../../../temporal-workflows/src/shared/categories';
 
 /**
- * Validates the category/transactionType fields of a write payload. Returns an
- * error message when a supplied value is invalid, or `null` when the payload is
- * acceptable. Absent fields are allowed (partial updates).
+ * Validates the category/transactionType/source fields of a write payload.
+ * Returns an error message when a supplied value is invalid, or `null` when the
+ * payload is acceptable. Absent fields are allowed (partial updates); `source`
+ * defaults to `manual` in the service when omitted on create.
  */
-function validateClassification(body: any): string | null {
+function validateWritePayload(body: any): string | null {
   if (body.category !== undefined && !isTransactionCategoryKey(body.category)) {
     return 'category must be one of the supported category keys';
   }
   if (body.transactionType !== undefined && !isTransactionType(body.transactionType)) {
     return "transactionType must be 'debit' or 'credit'";
   }
+  if (body.source !== undefined && !isTransactionSource(body.source)) {
+    return `source must be one of: ${TRANSACTION_SOURCES.join(', ')}`;
+  }
+  if (body.isFixedExpense !== undefined && typeof body.isFixedExpense !== 'boolean') {
+    return 'isFixedExpense must be a boolean';
+  }
+  if (body.isRecurrent !== undefined && typeof body.isRecurrent !== 'boolean') {
+    return 'isRecurrent must be a boolean';
+  }
   return null;
 }
 
 export class TransactionController {
   private service = new TransactionService();
+  private budgetService = new BudgetService();
 
   async getTransactions(req: Request, res: Response) {
     try {
       const result = await this.service.list(getDataOwnerId(req), {
         ...parsePagination(req.query),
-        category: req.query.category as string,
-        search: req.query.search as string,
-        startDate: req.query.startDate as string,
-        endDate: req.query.endDate as string,
+        category: scalarParam(req.query.category),
+        search: scalarParam(req.query.search),
+        startDate: scalarParam(req.query.startDate),
+        endDate: scalarParam(req.query.endDate),
       });
       res.json(result);
     } catch (error) {
@@ -51,14 +65,17 @@ export class TransactionController {
     if (!merchant || amount === undefined || !category || !transactionDate) {
       return res.status(400).json({ error: 'merchant, amount, category, and transactionDate are required' });
     }
-    const classificationError = validateClassification(req.body);
-    if (classificationError) {
-      return res.status(400).json({ error: classificationError });
+    const validationError = validateWritePayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
     try {
       const transaction = await this.service.create(getDataOwnerId(req), req.body);
       res.status(201).json({ transaction });
     } catch (error) {
+      if (error instanceof FixedExpenseOnIncomeError) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error('Failed to create transaction', { error });
       res.status(500).json({ error: 'Failed to create transaction' });
     }
@@ -76,15 +93,18 @@ export class TransactionController {
   }
 
   async updateTransaction(req: Request, res: Response) {
-    const classificationError = validateClassification(req.body);
-    if (classificationError) {
-      return res.status(400).json({ error: classificationError });
+    const validationError = validateWritePayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
     try {
       const transaction = await this.service.update(getDataOwnerId(req), req.params.id, req.body);
       if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
       res.json({ transaction });
     } catch (error) {
+      if (error instanceof FixedExpenseOnIncomeError) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error('Failed to update transaction', { error });
       res.status(500).json({ error: 'Failed to update transaction' });
     }
@@ -101,11 +121,54 @@ export class TransactionController {
     }
   }
 
+  async getFixedExpensesSummary(req: Request, res: Response) {
+    try {
+      const summary = await this.service.getFixedExpensesSummary(getDataOwnerId(req));
+      res.json(summary);
+    } catch (error) {
+      logger.error('Failed to compute fixed-expense summary', { error });
+      res.status(500).json({ error: 'Failed to compute fixed-expense summary' });
+    }
+  }
+
+  async getSpendingPace(req: Request, res: Response) {
+    try {
+      const userId = getDataOwnerId(req);
+      const budget = await this.budgetService.getCurrent(userId);
+      const pace = await this.service.getSpendingPace(
+        userId,
+        {
+          startDate: scalarParam(req.query.startDate),
+          endDate: scalarParam(req.query.endDate),
+        },
+        budget?.totalBudget ?? 0,
+      );
+      // Members of a wallet that hides budget values get the pace status
+      // and spend-derived figures, but every budget-derived number is
+      // nulled — any of them would let the budget be back-derived.
+      if (isBudgetHidden(req)) {
+        return res.json({
+          ...pace,
+          variableBudget: null,
+          expectedDailyAverage: null,
+          variancePct: null,
+          safeToSpendRemaining: null,
+          safeToSpendPerDay: null,
+          budgetHidden: true,
+        });
+      }
+      res.json(pace);
+    } catch (error) {
+      logger.error('Failed to compute spending pace', { error });
+      res.status(500).json({ error: 'Failed to compute spending pace' });
+    }
+  }
+
   async getBalance(req: Request, res: Response) {
     try {
       const balance = await this.service.getBalance(getDataOwnerId(req), {
-        startDate: req.query.startDate as string | undefined,
-        endDate: req.query.endDate as string | undefined,
+        startDate: scalarParam(req.query.startDate),
+        endDate: scalarParam(req.query.endDate),
       });
       res.json(balance);
     } catch (error) {

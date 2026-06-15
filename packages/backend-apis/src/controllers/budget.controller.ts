@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { BudgetService } from '../services/budget.service';
-import { getDataOwnerId } from '../auth';
+import { getDataOwnerId, isBudgetHidden } from '../auth';
+import { maskBudgetForMember } from '../utils/budget-visibility';
 import { logger } from '../utils/logger';
 
 export class BudgetController {
@@ -9,7 +10,8 @@ export class BudgetController {
   async getCurrentBudget(req: Request, res: Response) {
     try {
       const budget = await this.service.getCurrent(getDataOwnerId(req));
-      res.json({ budget });
+      const masked = budget && isBudgetHidden(req) ? maskBudgetForMember(budget) : budget;
+      res.json({ budget: masked });
     } catch (error) {
       logger.error('Failed to get current budget', { error });
       res.status(500).json({ error: 'Failed to fetch budget' });

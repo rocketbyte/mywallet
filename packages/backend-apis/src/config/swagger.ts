@@ -172,6 +172,15 @@ This API provides powerful tools to interact with your financial data, automate 
         },
       },
       responses: {
+        BadRequestError: {
+          description: 'The request body or parameters were invalid.',
+          content: {
+            'application/json': {
+              schema: { '$ref': '#/components/schemas/ErrorResponse' },
+              example: { error: 'Unsupported language. Expected one of: en, es' },
+            },
+          },
+        },
         UnauthorizedError: {
           description: 'Missing or invalid Firebase ID token.',
           content: {

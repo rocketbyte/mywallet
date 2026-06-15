@@ -23,8 +23,10 @@ export interface TransactionRepositoryInterface {
 
   /**
    * Find a recently-stored transaction matching the same exact amount, currency,
-   * and direction for the same tenant. Used to skip duplicate ingestion (e.g.
-   * the bank sends the same notification twice, or two providers deliver it).
+   * and direction for the same tenant, within the window. Used to skip duplicate
+   * ingestion of the same purchase (e.g. the bank sends an auth then a posted
+   * notification, or two providers deliver one message). The tight window keeps
+   * this from suppressing a legitimate repeat charge of the same amount.
    */
   findRecentDuplicate(criteria: RecentDuplicateCriteria): Promise<Transaction | null>;
 
@@ -46,8 +48,8 @@ export interface RecentDuplicateCriteria {
   transactionType: 'debit' | 'credit';
   /** Anchor date for the lookback window — typically the new transaction's date. */
   near: Date;
-  /** Window size in hours, applied symmetrically around `near`. */
-  windowHours: number;
+  /** Window size in minutes, applied symmetrically around `near`. */
+  windowMinutes: number;
 }
 
 export interface TransactionFilters {

@@ -39,6 +39,13 @@ router.get('/', controller.getTransactions.bind(controller));
  * /transactions:
  *   post:
  *     summary: Create a transaction
+ *     description: |
+ *       Manually record a transaction (e.g. cash spending, or any entry not
+ *       ingested from email). `category` must be one of the keys from
+ *       `GET /transactions/categories`; `transactionType` ('credit' = income,
+ *       'debit' = expense) sets the direction. `source` defaults to 'manual'
+ *       when omitted. An unknown `category`, an invalid `transactionType`, or an
+ *       unrecognized `source` is rejected with 400.
  *     tags: [Transactions]
  *     requestBody:
  *       required: true
@@ -46,17 +53,18 @@ router.get('/', controller.getTransactions.bind(controller));
  *         application/json:
  *           schema:
  *             type: object
- *             required: [merchant, amount, category, date]
+ *             required: [merchant, amount, category, transactionDate]
  *             properties:
  *               merchant: { type: string }
- *               amount: { type: number }
- *               category: { type: string }
- *               date: { type: string, format: date }
- *               time: { type: string, example: '14:30' }
- *               source: { type: string, enum: [email, sms, manual, chat] }
+ *               amount: { type: number, description: Non-negative; direction comes from transactionType. }
+ *               category: { type: string, example: food }
+ *               transactionDate: { type: string, format: date-time }
+ *               transactionType: { type: string, enum: [debit, credit] }
+ *               currency: { type: string, example: USD }
+ *               source: { type: string, enum: [email, sms, manual, chat], default: manual }
  *               account: { type: string }
  *               note: { type: string }
- *               isIncome: { type: boolean }
+ *               isIncome: { type: boolean, deprecated: true, description: Legacy; prefer transactionType. }
  *     responses:
  *       201:
  *         description: Created transaction.
@@ -98,6 +106,15 @@ router.post('/', controller.createTransaction.bind(controller));
  *                 debits:  { type: number, example: 1875.42 }
  *                 balance: { type: number, example: 2374.58 }
  *                 count:   { type: integer, example: 37 }
+ *                 byCategory:
+ *                   type: array
+ *                   description: Debit totals grouped by category (sorted desc); sums to `debits`.
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       category: { type: string, example: food }
+ *                       spent:    { type: number, example: 612.80 }
+ *                 variableExpenses: { type: number, example: 600.00, description: Sum of in-range debit transactions NOT flagged isFixedExpense (variable/discretionary spend); 0 when none. }
  *                 startDate: { type: string, format: date, nullable: true }
  *                 endDate:   { type: string, format: date, nullable: true }
  *       500:
@@ -135,6 +152,76 @@ router.get('/balance', controller.getBalance.bind(controller));
  *         $ref: '#/components/responses/ServerError'
  */
 router.get('/categories', controller.getCategories.bind(controller));
+
+/**
+ * @openapi
+ * /transactions/fixed-expenses:
+ *   get:
+ *     summary: Recurring fixed-expense summary
+ *     description: |
+ *       Returns the user's currently-active recurring fixed-expense total as
+ *       `{ total }`. The total is the sum over distinct fixed-expense signatures
+ *       (category + amount + merchant) of `isFixedExpense` debit transactions
+ *       across the previous and current calendar month, each counted once
+ *       (an expense recurring in both months is not double-counted). Anchored on
+ *       the server date; this is a rolling view of committed costs, not tied to a
+ *       date range.
+ *     tags: [Transactions]
+ *     responses:
+ *       200:
+ *         description: Fixed-expense summary.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total: { type: number, example: 1260.00 }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/fixed-expenses', controller.getFixedExpensesSummary.bind(controller));
+
+/**
+ * @openapi
+ * /transactions/spending-pace:
+ *   get:
+ *     summary: Spending pace (projected spend + status) for a period
+ *     description: |
+ *       Backend-computed spending pace over an optional date range: the variable
+ *       (non-fixed) daily average, the projected month-end spend, the variable
+ *       budget, and a status (`under` | `near` | `over` | `none`) that drives the
+ *       dashboard's daily-average colour. Honors `startDate`/`endDate`.
+ *     tags: [Transactions]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Spending pace.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 dailyAverage:         { type: number, example: 42.50 }
+ *                 expectedDailyAverage: { type: number, example: 50.00 }
+ *                 projectedExpenses:    { type: number, example: 1275.00 }
+ *                 variableBudget:       { type: number, example: 1500.00 }
+ *                 variancePct:          { type: integer, nullable: true, example: 20, description: Signed % the daily average is over (+) / under (-) the expected; null when no budget. }
+ *                 safeToSpendRemaining: { type: number, nullable: true, example: 31293.00, description: Variable budget still available this month; null when no budget. }
+ *                 safeToSpendPerDay:    { type: number, nullable: true, example: 1304.00, description: Variable budget still available ÷ days remaining (today included); 0 when spent, null when no budget. }
+ *                 reservedForFixed:     { type: number, example: 6760.00, description: Fixed costs still pending to pay this month; budget-independent; 0 when none. }
+ *                 status:               { type: string, enum: [under, near, over, none] }
+ *                 daysElapsed:          { type: integer, example: 7 }
+ *                 daysInMonth:          { type: integer, example: 30 }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/spending-pace', controller.getSpendingPace.bind(controller));
 
 /**
  * @openapi
@@ -189,6 +276,8 @@ router.get('/:id', controller.getTransactionById.bind(controller));
  *               transactionType: { type: string, enum: [debit, credit] }
  *               note: { type: string }
  *               transactionDate: { type: string, format: date-time }
+ *               isFixedExpense: { type: boolean, description: Marks the transaction as a recurring fixed expense; the value is propagated to every transaction sharing the same category/amount/merchant. }
+ *               isRecurrent: { type: boolean, description: Marks the transaction recurrent; it is re-created each month by the recurring-transactions job. Set on the target row only. }
  *     responses:
  *       200:
  *         description: Updated transaction.
