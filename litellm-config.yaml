@@ -28,6 +28,15 @@ model_list:
       model: gemini/gemini-2.5-flash-lite
       api_key: os.environ/GEMINI_API_KEY
 
+  # ── Cloudflare Workers AI — Kimi K2.7 Code (second fallback) ──────────────
+  # 1T-param MoE, 262k context, structured outputs. Independent Cloudflare quota
+  # — covers a simultaneous Groq+Gemini rate-limit. Reuses CLOUDFLARE_* creds.
+  - model_name: cf/kimi-k2.7-code
+    litellm_params:
+      model: openai/@cf/moonshotai/kimi-k2.7-code
+      api_key: os.environ/CLOUDFLARE_API_TOKEN
+      api_base: os.environ/CLOUDFLARE_API_BASE
+
   # ── Ollama (k8s: ollama.llm.svc.cluster.local:11434) ─────────────────────
   - model_name: qwen3:4b
     litellm_params:
@@ -66,11 +75,12 @@ model_list:
 router_settings:
   routing_strategy: simple-shuffle  # or: least-busy, latency-based-routing
   # When the Groq primary errors (rate limits, or json_validate_failed on the
-  # reasoning model), fall back to Gemini, then local Ollama. Use qwen3:4b — the
-  # 8b variant needs ~5.5 GiB and won't load on the Pi (5.2 GiB free), so it can
-  # never serve as a real last resort.
+  # reasoning model), fall back to Gemini, then Kimi K2.7 Code on Cloudflare
+  # (independent quota), then local Ollama. Use qwen3:4b — the 8b variant needs
+  # ~5.5 GiB and won't load on the Pi (5.2 GiB free), so it can never serve as a
+  # real last resort.
   fallbacks:
-    - groq/gpt-oss-120b: ["gemini-2.5-flash-lite", "qwen3:4b"]
+    - groq/gpt-oss-120b: ["gemini-2.5-flash-lite", "cf/kimi-k2.7-code", "qwen3:4b"]
   num_retries: 2
 
 # General settings
