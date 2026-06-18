@@ -1,0 +1,39 @@
+name: OpenSpec Sync Check
+
+on:
+  pull_request:
+    paths:
+      - 'openspec/**'
+      - 'scripts/openspec-sync.mjs'
+  push:
+    branches: [main]
+    paths:
+      - 'openspec/**'
+      - 'scripts/openspec-sync.mjs'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (backend)
+        uses: actions/checkout@v4
+        with:
+          path: mywallet
+
+      - name: Checkout sibling (frontend)
+        uses: actions/checkout@v4
+        with:
+          # TODO: replace <ORG> with the GitHub owner of the mintly-app repo.
+          repository: <ORG>/mintly-app
+          path: mintly-app
+          ref: ${{ github.base_ref || 'main' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: openspec-sync check
+        working-directory: mywallet
+        env:
+          OPENSPEC_SIBLING: ${{ github.workspace }}/mintly-app
+        run: node scripts/openspec-sync.mjs check
