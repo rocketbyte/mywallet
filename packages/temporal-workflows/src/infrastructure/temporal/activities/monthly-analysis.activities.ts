@@ -8,9 +8,10 @@
  *                              short summaries, the prior month's note, a
  *                              stable sourceHash, and the existing row (if any)
  *                              so the workflow can skip an unchanged month.
- *   analyzeMonthlyContext    — single AI call via the gateway producing
- *                              { note }. Skipped by the workflow when the
- *                              month is unchanged.
+ *   analyzeMonthlyContext    — delegates to the 'monthly' analyzer strategy
+ *                              (tool-driven AI call, localized output)
+ *                              producing { note }. Skipped by the workflow
+ *                              when the month is unchanged.
  *   persistMonthlyAnalysis   — upsert one MonthlyAnalysis row keyed by
  *                              (userId, year, month).
  *
@@ -28,7 +29,7 @@ import { Budget } from '../../../models/budget.model';
 import { TransactionAnalysis } from '../../../models/transaction-analysis.model';
 import { MonthlyAnalysis } from '../../../models/monthly-analysis.model';
 import { Tenant } from '../../../models/tenant.model';
-import { AIGatewayInterface } from '../../../application/interfaces/gateways/ai-gateway.interface';
+import { FinancialAnalyzerRegistry } from '../../../application/interfaces/analysis/financial-analyzer.interface';
 import { PipelineStepRepositoryInterface } from '../../../application/interfaces/repositories/pipeline-step-repository.interface';
 import {
   MonthlyAnalysisAIResult,
@@ -40,12 +41,9 @@ import {
 import {
   PIPELINE_STEP_KEYS,
   MONTHLY_MAX_DAILY_SUMMARIES,
-  MONTHLY_NOTE_MAX_CHARS,
 } from '../../../shared/constants';
-
-function renderTemplate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
-}
+import { resolveAnalysisLanguage } from '../../../shared/analysis-i18n';
+import { resolveUserLanguage } from './analysis.activities';
 
 /** Current calendar year/month (month 1-based) in UTC. */
 function currentYearMonthUTC(): { year: number; month: number } {
@@ -96,31 +94,32 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function truncateNote(s: string, max = MONTHLY_NOTE_MAX_CHARS): string {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd();
-}
-
-/** Stable hash over the only things that should force a recompute. */
+/**
+ * Stable hash over the only things that should force a recompute. Language
+ * and prompt version are part of it: a tenant who switches language (or an
+ * admin who edits the prompt) must get a regenerated note, not a stale skip.
+ */
 function computeSourceHash(parts: {
   dailySummaries: string[];
   totals: { income: number; expenses: number; net: number };
   balance: number;
   budgetSnapshot: MonthlyAnalysisBudgetSnapshot | null;
+  language: string;
+  promptVersion: number;
 }): string {
   const payload = JSON.stringify({
     s: parts.dailySummaries,
     t: parts.totals,
     b: parts.balance,
     g: parts.budgetSnapshot,
+    l: parts.language,
+    v: parts.promptVersion,
   });
   return createHash('sha256').update(payload).digest('hex');
 }
 
 export function createMonthlyAnalysisActivities(container: DependencyContainer) {
-  const aiGateway = container.resolve<AIGatewayInterface>('AIGatewayInterface');
+  const analyzerRegistry = container.resolve<FinancialAnalyzerRegistry>('FinancialAnalyzerRegistry');
   const pipelineStepRepo = container.resolve<PipelineStepRepositoryInterface>(
     'PipelineStepRepositoryInterface'
   );
@@ -147,6 +146,7 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
 
       const tenant = await Tenant.findOne({ primaryUserId: userId }).lean();
       const currency = tenant?.currency ?? 'USD';
+      const language = await resolveUserLanguage(userId);
 
       // Month totals via aggregation — numeric only, no model involvement.
       const totalRows = await Transaction.aggregate<{ _id: 'credit' | 'debit'; total: number }>([
@@ -218,7 +218,16 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
           ? priorDoc.note
           : null;
 
-      const sourceHash = computeSourceHash({ dailySummaries, totals, balance, budgetSnapshot });
+      const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.ANALYZE_MONTH);
+
+      const sourceHash = computeSourceHash({
+        dailySummaries,
+        totals,
+        balance,
+        budgetSnapshot,
+        language,
+        promptVersion: step.version,
+      });
 
       // Existing row for this month — lets the workflow skip an unchanged run.
       const existingDoc = await MonthlyAnalysis.findOne({ userId, year, month })
@@ -232,13 +241,12 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
           }
         : null;
 
-      const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.ANALYZE_MONTH);
-
       return {
         userId,
         year,
         month,
         currency,
+        language,
         dailyCount: dailySummaries.length,
         dailySummaries,
         totals,
@@ -252,91 +260,31 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
     },
 
     /**
-     * Step 2: Call the AI with the rendered prompt.
+     * Step 2: Delegate to the 'monthly' analyzer strategy.
      *
-     * Heartbeats every 20s while the call is in flight. Produces a single
-     * short `note`, truncated to MONTHLY_NOTE_MAX_CHARS on a word boundary.
+     * The activity owns the Temporal concerns (heartbeat cadence); the
+     * analyzer owns the deterministic budget verdict, prompting, the bounded
+     * tool loop, localization, and note truncation. All tools are read-only,
+     * so a retried attempt restarts the loop safely.
      */
     async analyzeMonthlyContext(context: MonthlyAnalysisContext): Promise<MonthlyAnalysisAIResult> {
       Context.current().heartbeat('analyze-start');
 
-      const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.ANALYZE_MONTH);
-
-      // Deterministic budget verdict computed in code — the model MUST NOT do
-      // this arithmetic itself. `overBudget`/`status` are the only basis the
-      // prompt is allowed to use for any "exceeded/on-track" statement.
-      const snap = context.budgetSnapshot;
-      const hasBudget = snap !== null && snap.totalBudget > 0;
-      const remainingBudget = hasBudget ? round2(snap!.totalBudget - context.totals.expenses) : 0;
-      const overBudget = hasBudget && context.totals.expenses > snap!.totalBudget;
-      const percentUsed = hasBudget ? round2((context.totals.expenses / snap!.totalBudget) * 100) : 0;
-      const budgetStatus = !hasBudget
-        ? 'no_budget'
-        : overBudget
-          ? 'over_budget'
-          : percentUsed >= 80
-            ? 'near_limit'
-            : 'under_budget';
-      // Whether we have enough to produce an accurate report at all.
-      const hasData = context.dailyCount > 0 || context.totals.expenses > 0 || context.totals.income > 0 || hasBudget;
-
-      const userMessage = renderTemplate(step.userPromptTemplate, {
-        year: String(context.year),
-        month: String(context.month),
-        currency: context.currency,
-        daily_count: String(context.dailyCount),
-        daily_summaries_json: JSON.stringify(context.dailySummaries),
-        totals_income: String(context.totals.income),
-        totals_expenses: String(context.totals.expenses),
-        totals_net: String(context.totals.net),
-        balance: String(context.balance),
-        budget_snapshot_json: JSON.stringify(context.budgetSnapshot),
-        days_remaining: String(context.budgetSnapshot?.daysRemainingInPeriod ?? ''),
-        prior_month_note: context.priorMonthNote ?? '',
-        // Pre-computed verdict — the model only narrates these.
-        has_budget: String(hasBudget),
-        budget_total: hasBudget ? String(snap!.totalBudget) : '',
-        budget_spent: hasBudget ? String(context.totals.expenses) : '',
-        budget_remaining: hasBudget ? String(remainingBudget) : '',
-        budget_percent_used: hasBudget ? String(percentUsed) : '',
-        over_budget: String(overBudget),
-        budget_status: budgetStatus,
-        has_data: String(hasData),
-      });
+      const analyzer = analyzerRegistry.get<MonthlyAnalysisContext, MonthlyAnalysisAIResult>('monthly');
 
       const heartbeat = setInterval(() => {
         try { Context.current().heartbeat('ai-call-in-progress'); } catch {}
       }, 20_000);
 
-      let result;
       try {
-        result = await aiGateway.extractStructuredData({
-          systemPrompt: step.systemPrompt,
-          userPrompt: userMessage,
-          temperature: step.temperature,
-          maxTokens: step.maxTokens,
-          responseFormat: 'json',
+        return await analyzer.analyze(context, {
+          heartbeat: () => {
+            try { Context.current().heartbeat('tool-loop'); } catch {}
+          },
         });
       } finally {
         clearInterval(heartbeat);
       }
-
-      const data = (result.data ?? {}) as Record<string, unknown>;
-      const rawNote = typeof data.note === 'string' ? data.note.trim() : '';
-      if (!rawNote) {
-        throw new Error('analyze_month produced empty payload');
-      }
-      const note = truncateNote(rawNote);
-
-      return {
-        note,
-        modelMeta: {
-          model: aiGateway.getModelName(),
-          promptVersion: step.version,
-          tokensIn: 0,
-          tokensOut: result.tokensUsed ?? 0,
-        },
-      };
     },
 
     /**
@@ -356,6 +304,7 @@ export function createMonthlyAnalysisActivities(container: DependencyContainer) 
         year: input.year,
         month: input.month,
         currency: input.currency,
+        language: resolveAnalysisLanguage(input.language),
         inputs: input.inputs,
         status: input.status,
         generatedAt: new Date(),

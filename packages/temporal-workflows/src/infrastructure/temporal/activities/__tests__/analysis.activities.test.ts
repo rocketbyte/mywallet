@@ -22,6 +22,10 @@ import { Transaction } from '../../../../models/transaction.model';
 import { Budget } from '../../../../models/budget.model';
 import { Tenant } from '../../../../models/tenant.model';
 import { TransactionAnalysis } from '../../../../models/transaction-analysis.model';
+import { ToolsUnsupportedError } from '../../../../application/interfaces/gateways/ai-gateway.interface';
+import { FinancialAnalyzerRegistry } from '../../../../application/interfaces/analysis/financial-analyzer.interface';
+import { DailyFinancialAnalyzer } from '../../../analysis/daily-financial.analyzer';
+import { MonthlyFinancialAnalyzer } from '../../../analysis/monthly-financial.analyzer';
 
 // Activity Context.heartbeat needs a context — patch it with a no-op so the
 // production code can call heartbeat() without a Temporal runtime.
@@ -65,6 +69,11 @@ function buildContainer(promptVersion = 1) {
         tokensUsed: 0,
         rawResponse: {},
       }),
+      // The stub model has no tool support — analyzers exercise the
+      // single-shot fallback path in these tests.
+      chatWithTools: async () => {
+        throw new ToolsUnsupportedError('stub-model');
+      },
       getProviderName: () => 'stub',
       getModelName: () => 'stub-model',
       getEndpoint: () => 'http://stub',
@@ -80,6 +89,14 @@ function buildContainer(promptVersion = 1) {
         maxTokens: 100,
         version: promptVersion,
       }),
+    },
+  });
+  c.register('FinancialAnalyzerRegistry', {
+    useFactory: (dc) => {
+      const registry = new FinancialAnalyzerRegistry();
+      registry.register(new DailyFinancialAnalyzer(dc.resolve('AIGatewayInterface'), dc.resolve('PipelineStepRepositoryInterface')));
+      registry.register(new MonthlyFinancialAnalyzer(dc.resolve('AIGatewayInterface'), dc.resolve('PipelineStepRepositoryInterface')));
+      return registry;
     },
   });
   return c;
@@ -237,6 +254,7 @@ test('persistDailyAnalysis upserts; second call for same day overwrites, no dupl
     userId,
     analysisDate: '2026-05-20',
     currency: 'USD',
+    language: 'en',
     inputs: baseInputs,
     ai: baseAi,
     status: 'ready',
@@ -246,6 +264,7 @@ test('persistDailyAnalysis upserts; second call for same day overwrites, no dupl
     userId,
     analysisDate: '2026-05-20',
     currency: 'USD',
+    language: 'es',
     inputs: baseInputs,
     ai: { ...baseAi, summary: 'second', fullSummary: 'full second' },
     status: 'ready',
@@ -257,6 +276,7 @@ test('persistDailyAnalysis upserts; second call for same day overwrites, no dupl
   assert.equal(all.length, 1, 'no duplicate row');
   assert.equal(all[0].summary, 'second');
   assert.equal(all[0].fullSummary, 'full second');
+  assert.equal(all[0].language, 'es', 'row records the language it was written in');
 });
 
 test('persistDailyAnalysis writes a failed row with reason when ai is null', async () => {
@@ -267,6 +287,7 @@ test('persistDailyAnalysis writes a failed row with reason when ai is null', asy
     userId,
     analysisDate: '2026-05-20',
     currency: 'USD',
+    language: 'en',
     inputs: { transactionCount: 0, totals: { income: 0, expenses: 0, net: 0 }, balance: 0, budgetSnapshot: null },
     ai: null,
     status: 'failed',

@@ -4,9 +4,10 @@
  * Three activities driving `dailyTransactionAnalysisWorkflow`:
  *
  *   aggregateDailyContext  — read-only DB pull of yesterday's transactions,
- *                            balance, current-month budget snapshot, and
- *                            recent prior short summaries.
- *   analyzeDailyContext    — single AI call via the gateway producing
+ *                            balance, current-month budget snapshot, recent
+ *                            prior short summaries, and the tenant's language.
+ *   analyzeDailyContext    — delegates to the 'daily' analyzer strategy
+ *                            (tool-driven AI call, localized output) producing
  *                            { summary, fullSummary, suggestions }.
  *   persistDailyAnalysis   — upsert one TransactionAnalysis row keyed by
  *                            (userId, analysisDate).
@@ -17,13 +18,13 @@
  */
 import { Context } from '@temporalio/activity';
 import { DependencyContainer } from 'tsyringe';
-import { randomUUID } from 'node:crypto';
 
 import { Transaction } from '../../../models/transaction.model';
 import { Budget } from '../../../models/budget.model';
 import { TransactionAnalysis } from '../../../models/transaction-analysis.model';
 import { Tenant } from '../../../models/tenant.model';
-import { AIGatewayInterface } from '../../../application/interfaces/gateways/ai-gateway.interface';
+import { User } from '../../../models/user.model';
+import { FinancialAnalyzerRegistry } from '../../../application/interfaces/analysis/financial-analyzer.interface';
 import { PipelineStepRepositoryInterface } from '../../../application/interfaces/repositories/pipeline-step-repository.interface';
 import {
   DailyAnalysisAIResult,
@@ -32,9 +33,19 @@ import {
   PersistDailyAnalysisResult,
 } from '../../../shared/types';
 import { PIPELINE_STEP_KEYS, ANALYSIS_PRIOR_SUMMARIES } from '../../../shared/constants';
+import { resolveAnalysisLanguage } from '../../../shared/analysis-i18n';
 
-function renderTemplate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
+/**
+ * Tenant's preferred report language. userId is the User _id; an invalid id
+ * or a missing/unset user degrades to English rather than failing the run.
+ */
+export async function resolveUserLanguage(userId: string): Promise<'en' | 'es'> {
+  try {
+    const user = await User.findById(userId).select({ language: 1 }).lean();
+    return resolveAnalysisLanguage(user?.language);
+  } catch {
+    return 'en';
+  }
 }
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -87,7 +98,7 @@ function round2(n: number): number {
 }
 
 export function createAnalysisActivities(container: DependencyContainer) {
-  const aiGateway = container.resolve<AIGatewayInterface>('AIGatewayInterface');
+  const analyzerRegistry = container.resolve<FinancialAnalyzerRegistry>('FinancialAnalyzerRegistry');
   const pipelineStepRepo = container.resolve<PipelineStepRepositoryInterface>(
     'PipelineStepRepositoryInterface'
   );
@@ -113,6 +124,7 @@ export function createAnalysisActivities(container: DependencyContainer) {
 
       const tenant = await Tenant.findOne({ primaryUserId: userId }).lean();
       const currency = tenant?.currency ?? 'USD';
+      const language = await resolveUserLanguage(userId);
 
       const transactionsDocs = await Transaction.find({
         userId,
@@ -186,6 +198,7 @@ export function createAnalysisActivities(container: DependencyContainer) {
         userId,
         analysisDate,
         currency,
+        language,
         transactions,
         totals,
         balance,
@@ -196,94 +209,31 @@ export function createAnalysisActivities(container: DependencyContainer) {
     },
 
     /**
-     * Step 2: Call the AI with the rendered prompt.
+     * Step 2: Delegate to the daily analyzer strategy.
      *
-     * Heartbeats every 20s while the AI call is in flight so Temporal can
-     * detect a hung worker via heartbeatTimeout rather than waiting for
-     * startToCloseTimeout.
+     * The activity owns the Temporal concerns (heartbeat cadence so a hung
+     * worker is detected via heartbeatTimeout); the analyzer owns prompting,
+     * the bounded tool loop, localization, and output validation. All tools
+     * are read-only, so a retried attempt restarts the loop safely.
      */
     async analyzeDailyContext(context: DailyAnalysisContext): Promise<DailyAnalysisAIResult> {
       Context.current().heartbeat('analyze-start');
 
-      // Token discipline: a day with no transactions has nothing for the model
-      // to reason about. Return a deterministic empty-day result and skip the
-      // AI call entirely (the prior behaviour burned ~700 tokens to restate
-      // "no transactions occurred"). The row is still persisted as `ready` so
-      // the dashboard and the monthly rollup see a continuous daily series.
-      if (context.transactions.length === 0) {
-        return {
-          summary: 'No transactions yesterday.',
-          fullSummary: `No transactions were recorded on ${context.analysisDate}. Nothing to act on today.`,
-          suggestions: [],
-          modelMeta: { model: 'none', promptVersion: 0, tokensIn: 0, tokensOut: 0 },
-        };
-      }
-
-      const step = await pipelineStepRepo.getActiveStep(PIPELINE_STEP_KEYS.ANALYZE_DAY);
-
-      const userMessage = renderTemplate(step.userPromptTemplate, {
-        today: new Date().toISOString().slice(0, 10),
-        analysis_date: context.analysisDate,
-        currency: context.currency,
-        transaction_count: String(context.transactions.length),
-        transactions_json: JSON.stringify(context.transactions),
-        totals_income: String(context.totals.income),
-        totals_expenses: String(context.totals.expenses),
-        totals_net: String(context.totals.net),
-        balance: String(context.balance),
-        budget_snapshot_json: JSON.stringify(context.budgetSnapshot),
-        days_remaining: String(context.budgetSnapshot?.daysRemainingInPeriod ?? ''),
-        prior_summaries_json: JSON.stringify(context.priorSummaries),
-      });
+      const analyzer = analyzerRegistry.get<DailyAnalysisContext, DailyAnalysisAIResult>('daily');
 
       const heartbeat = setInterval(() => {
         try { Context.current().heartbeat('ai-call-in-progress'); } catch {}
       }, 20_000);
 
-      let result;
       try {
-        result = await aiGateway.extractStructuredData({
-          systemPrompt: step.systemPrompt,
-          userPrompt: userMessage,
-          temperature: step.temperature,
-          maxTokens: step.maxTokens,
-          responseFormat: 'json',
+        return await analyzer.analyze(context, {
+          heartbeat: () => {
+            try { Context.current().heartbeat('tool-loop'); } catch {}
+          },
         });
       } finally {
         clearInterval(heartbeat);
       }
-
-      const data = (result.data ?? {}) as Partial<DailyAnalysisAIResult>;
-      const summary = typeof data.summary === 'string' ? data.summary.slice(0, 200) : '';
-      const fullSummary = typeof data.fullSummary === 'string' ? data.fullSummary : '';
-      const suggestions = Array.isArray(data.suggestions)
-        ? data.suggestions
-            .filter((s: any) => s && typeof s.title === 'string' && typeof s.body === 'string')
-            .slice(0, 4)
-            .map((s: any) => ({
-              id: typeof s.id === 'string' && s.id.length > 0 ? s.id : randomUUID(),
-              title: String(s.title).slice(0, 96),
-              body: String(s.body),
-              urgency: (['info', 'warn', 'urgent'] as const).includes(s.urgency) ? s.urgency : 'info',
-              category: typeof s.category === 'string' && s.category.length > 0 ? s.category : undefined,
-            }))
-        : [];
-
-      if (!summary && !fullSummary && suggestions.length === 0) {
-        throw new Error('analyze_day produced empty payload');
-      }
-
-      return {
-        summary,
-        fullSummary,
-        suggestions,
-        modelMeta: {
-          model: aiGateway.getModelName(),
-          promptVersion: step.version,
-          tokensIn: 0,
-          tokensOut: result.tokensUsed ?? 0,
-        },
-      };
     },
 
     /**
@@ -304,6 +254,7 @@ export function createAnalysisActivities(container: DependencyContainer) {
         userId: input.userId,
         analysisDate,
         currency: input.currency,
+        language: resolveAnalysisLanguage(input.language),
         inputs: input.inputs,
         status: input.status,
         generatedAt: new Date(),

@@ -8,6 +8,8 @@ export interface MonthlyAnalysisDTO {
   year: number;
   month: number;
   currency: string;
+  /** Language the note text was written in ('en' | 'es'). */
+  language: string;
   inputs: any;
   note: string;
   modelMeta: any;
@@ -23,6 +25,7 @@ function toDTO(doc: any): MonthlyAnalysisDTO {
     year: doc.year,
     month: doc.month,
     currency: doc.currency,
+    language: doc.language ?? 'en',
     inputs: doc.inputs,
     note: doc.note ?? '',
     modelMeta: doc.modelMeta,

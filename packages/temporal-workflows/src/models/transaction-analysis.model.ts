@@ -23,11 +23,19 @@ export interface AnalysisInputs {
   } | null;
 }
 
+export interface AnalysisToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  ms: number;
+}
+
 export interface AnalysisModelMeta {
   model: string;
   promptVersion: number;
   tokensIn: number;
   tokensOut: number;
+  /** Tool calls the model made while producing this report (observability). */
+  toolCalls?: AnalysisToolCall[];
 }
 
 export interface TransactionAnalysisInterface extends Document {
@@ -35,6 +43,8 @@ export interface TransactionAnalysisInterface extends Document {
   userId: string;
   analysisDate: Date;
   currency: string;
+  /** Language the report text was written in ('en' | 'es'). */
+  language: string;
   inputs: AnalysisInputs;
   summary: string;
   fullSummary: string;
@@ -85,12 +95,22 @@ const InputsSchema = new Schema(
   { _id: false }
 );
 
+const ToolCallSchema = new Schema<AnalysisToolCall>(
+  {
+    name: { type: String, required: true },
+    args: { type: Schema.Types.Mixed, default: {} },
+    ms: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const ModelMetaSchema = new Schema<AnalysisModelMeta>(
   {
     model: { type: String, required: true },
     promptVersion: { type: Number, required: true },
     tokensIn: { type: Number, default: 0 },
     tokensOut: { type: Number, default: 0 },
+    toolCalls: { type: [ToolCallSchema], default: undefined },
   },
   { _id: false }
 );
@@ -100,6 +120,7 @@ const TransactionAnalysisSchema = new Schema<TransactionAnalysisInterface>(
     userId: { type: String, required: true, index: true },
     analysisDate: { type: Date, required: true },
     currency: { type: String, required: true, default: 'USD' },
+    language: { type: String, enum: ['en', 'es'], default: 'en' },
     inputs: { type: InputsSchema, required: true },
     summary: { type: String, default: '' },
     fullSummary: { type: String, default: '' },

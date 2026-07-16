@@ -20,6 +20,10 @@ import { container as rootContainer } from 'tsyringe';
 
 import { createMonthlyAnalysisActivities, type MonthlyAnalysisActivities } from '../monthly-analysis.activities';
 import { shouldSkipMonthlyNote } from '../../../../shared/monthly-note';
+import { ToolsUnsupportedError } from '../../../../application/interfaces/gateways/ai-gateway.interface';
+import { FinancialAnalyzerRegistry } from '../../../../application/interfaces/analysis/financial-analyzer.interface';
+import { DailyFinancialAnalyzer } from '../../../analysis/daily-financial.analyzer';
+import { MonthlyFinancialAnalyzer } from '../../../analysis/monthly-financial.analyzer';
 import { Transaction } from '../../../../models/transaction.model';
 import { Budget } from '../../../../models/budget.model';
 import { Tenant } from '../../../../models/tenant.model';
@@ -62,6 +66,9 @@ function buildContainer(opts: { note?: string; fail?: boolean; counter: { calls:
         if (opts.fail) throw new Error('AI gateway down');
         return { data: { note: opts.note ?? 'monthly note' }, confidence: 1, tokensUsed: 5, rawResponse: {} };
       },
+      chatWithTools: async () => {
+        throw new ToolsUnsupportedError('stub-model');
+      },
       getProviderName: () => 'stub',
       getModelName: () => 'stub-model',
       getEndpoint: () => 'http://stub',
@@ -77,6 +84,14 @@ function buildContainer(opts: { note?: string; fail?: boolean; counter: { calls:
         maxTokens: 180,
         version: 1,
       }),
+    },
+  });
+  c.register('FinancialAnalyzerRegistry', {
+    useFactory: (dc) => {
+      const registry = new FinancialAnalyzerRegistry();
+      registry.register(new DailyFinancialAnalyzer(dc.resolve('AIGatewayInterface'), dc.resolve('PipelineStepRepositoryInterface')));
+      registry.register(new MonthlyFinancialAnalyzer(dc.resolve('AIGatewayInterface'), dc.resolve('PipelineStepRepositoryInterface')));
+      return registry;
     },
   });
   return c;
@@ -103,13 +118,13 @@ async function runMonthlyNote(
   try {
     const ai = await acts.analyzeMonthlyContext(ctx);
     const { analysisId } = await acts.persistMonthlyAnalysis({
-      userId: input.userId, year: ctx.year, month: ctx.month, currency: ctx.currency, inputs, ai, status: 'ready',
+      userId: input.userId, year: ctx.year, month: ctx.month, currency: ctx.currency, language: ctx.language, inputs, ai, status: 'ready',
     });
     return { status: 'ready', analysisId };
   } catch (err: any) {
     const reason = err?.message ?? 'analyze step failed';
     const { analysisId } = await acts.persistMonthlyAnalysis({
-      userId: input.userId, year: ctx.year, month: ctx.month, currency: ctx.currency, inputs, ai: null, status: 'failed', failureReason: reason,
+      userId: input.userId, year: ctx.year, month: ctx.month, currency: ctx.currency, language: ctx.language, inputs, ai: null, status: 'failed', failureReason: reason,
     });
     return { status: 'failed', analysisId, reason };
   }

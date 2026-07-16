@@ -14,6 +14,8 @@ export interface AnalysisDTO {
   userId: string;
   analysisDate: string;
   currency: string;
+  /** Language the report text was written in ('en' | 'es'). */
+  language: string;
   inputs: any;
   summary: string;
   fullSummary: string;
@@ -30,6 +32,7 @@ function toDTO(doc: any): AnalysisDTO {
     userId: doc.userId,
     analysisDate: new Date(doc.analysisDate).toISOString().slice(0, 10),
     currency: doc.currency,
+    language: doc.language ?? 'en',
     inputs: doc.inputs,
     summary: doc.summary ?? '',
     fullSummary: doc.fullSummary ?? '',
