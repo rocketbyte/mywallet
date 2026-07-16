@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-import { AnalysisStatus } from './transaction-analysis.model';
+import { AnalysisStatus, AnalysisToolCall } from './transaction-analysis.model';
 
 export interface MonthlyAnalysisBudgetSnapshot {
   totalBudget: number;
@@ -27,6 +27,8 @@ export interface MonthlyAnalysisModelMeta {
   promptVersion: number;
   tokensIn: number;
   tokensOut: number;
+  /** Tool calls the model made while producing this note (observability). */
+  toolCalls?: AnalysisToolCall[];
 }
 
 export interface MonthlyAnalysisInterface extends Document {
@@ -36,6 +38,8 @@ export interface MonthlyAnalysisInterface extends Document {
   /** 1-based calendar month (1–12). */
   month: number;
   currency: string;
+  /** Language the note text was written in ('en' | 'es'). */
+  language: string;
   inputs: MonthlyAnalysisInputs;
   /** Short markdown paragraph rendered by the dashboard MONTHLY NOTE card. */
   note: string;
@@ -75,12 +79,22 @@ const InputsSchema = new Schema(
   { _id: false }
 );
 
+const ToolCallSchema = new Schema<AnalysisToolCall>(
+  {
+    name: { type: String, required: true },
+    args: { type: Schema.Types.Mixed, default: {} },
+    ms: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const ModelMetaSchema = new Schema<MonthlyAnalysisModelMeta>(
   {
     model: { type: String, required: true },
     promptVersion: { type: Number, required: true },
     tokensIn: { type: Number, default: 0 },
     tokensOut: { type: Number, default: 0 },
+    toolCalls: { type: [ToolCallSchema], default: undefined },
   },
   { _id: false }
 );
@@ -91,6 +105,7 @@ const MonthlyAnalysisSchema = new Schema<MonthlyAnalysisInterface>(
     year: { type: Number, required: true },
     month: { type: Number, required: true, min: 1, max: 12 },
     currency: { type: String, required: true, default: 'USD' },
+    language: { type: String, enum: ['en', 'es'], default: 'en' },
     inputs: { type: InputsSchema, required: true },
     note: { type: String, default: '' },
     modelMeta: { type: ModelMetaSchema, required: true },

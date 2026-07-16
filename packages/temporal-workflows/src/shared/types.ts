@@ -16,10 +16,19 @@ export interface DailyAnalysisWorkflowResult {
   reason?: string;
 }
 
+/** One executed analysis tool call, recorded on modelMeta for observability. */
+export interface AnalysisToolCallMeta {
+  name: string;
+  args: Record<string, unknown>;
+  ms: number;
+}
+
 export interface DailyAnalysisContext {
   userId: string;
   analysisDate: string;
   currency: string;
+  /** Tenant's preferred report language ('en' | 'es'), resolved at aggregate time. */
+  language: string;
   transactions: Array<{
     id: string;
     merchant: string;
@@ -56,6 +65,7 @@ export interface DailyAnalysisAIResult {
     promptVersion: number;
     tokensIn: number;
     tokensOut: number;
+    toolCalls?: AnalysisToolCallMeta[];
   };
 }
 
@@ -63,6 +73,8 @@ export interface PersistDailyAnalysisInput {
   userId: string;
   analysisDate: string;
   currency: string;
+  /** Language the report text was written in ('en' | 'es'). */
+  language: string;
   inputs: {
     transactionCount: number;
     totals: { income: number; expenses: number; net: number };
@@ -110,6 +122,8 @@ export interface MonthlyAnalysisContext {
   year: number;
   month: number;
   currency: string;
+  /** Tenant's preferred report language ('en' | 'es'), resolved at aggregate time. */
+  language: string;
   dailyCount: number;
   /** Daily short summaries for the month, oldest-first. The only narrative input. */
   dailySummaries: string[];
@@ -132,6 +146,7 @@ export interface MonthlyAnalysisAIResult {
     promptVersion: number;
     tokensIn: number;
     tokensOut: number;
+    toolCalls?: AnalysisToolCallMeta[];
   };
 }
 
@@ -140,6 +155,8 @@ export interface PersistMonthlyAnalysisInput {
   year: number;
   month: number;
   currency: string;
+  /** Language the note text was written in ('en' | 'es'). */
+  language: string;
   inputs: {
     dailyCount: number;
     totals: { income: number; expenses: number; net: number };

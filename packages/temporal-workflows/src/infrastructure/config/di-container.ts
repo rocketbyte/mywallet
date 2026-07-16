@@ -7,7 +7,7 @@
  * DB_PROVIDER=prisma   → PrismaXxxRepository (Supabase)
  */
 import 'reflect-metadata';
-import { container, DependencyContainer } from 'tsyringe';
+import { container, DependencyContainer, instanceCachingFactory } from 'tsyringe';
 import { OAuth2Client } from 'google-auth-library';
 import { Connection } from 'mongoose';
 import { PrismaClient } from '@prisma/client';
@@ -47,6 +47,11 @@ import { PrismaPipelineStepRepository } from '../persistence/prisma/repositories
 
 // Layer 2 - Use Cases
 import { ProcessEmailUseCase } from '../../application/use-cases/process-email/process-email.use-case';
+
+// Layer 2/3 - Financial Analyzer Strategies
+import { FinancialAnalyzerRegistry } from '../../application/interfaces/analysis/financial-analyzer.interface';
+import { DailyFinancialAnalyzer } from '../analysis/daily-financial.analyzer';
+import { MonthlyFinancialAnalyzer } from '../analysis/monthly-financial.analyzer';
 
 export interface DIContainerConfig {
   emailProvider: 'gmail';        // 'outlook' can be added later
@@ -114,6 +119,20 @@ export class DIContainer {
       container.register<PatternRepositoryInterface>('PatternRepositoryInterface', { useClass: MongoDBPatternRepository });
       container.register<PipelineStepRepositoryInterface>('PipelineStepRepositoryInterface', { useClass: MongoDBPipelineStepRepository });
     }
+
+    // ==================== FINANCIAL ANALYZERS ====================
+    // Strategy registry: activities resolve their analyzer by kind. New
+    // analysis kinds register here — workflows/activities never change.
+    container.register<FinancialAnalyzerRegistry>('FinancialAnalyzerRegistry', {
+      useFactory: instanceCachingFactory((c) => {
+        const aiGateway = c.resolve<AIGatewayInterface>('AIGatewayInterface');
+        const stepRepo = c.resolve<PipelineStepRepositoryInterface>('PipelineStepRepositoryInterface');
+        const registry = new FinancialAnalyzerRegistry();
+        registry.register(new DailyFinancialAnalyzer(aiGateway, stepRepo));
+        registry.register(new MonthlyFinancialAnalyzer(aiGateway, stepRepo));
+        return registry;
+      }),
+    });
 
     // ==================== USE CASES ====================
     container.register(ProcessEmailUseCase, { useClass: ProcessEmailUseCase });

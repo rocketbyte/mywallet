@@ -22,6 +22,23 @@ import { Budget } from '../../../../models/budget.model';
 import { Tenant } from '../../../../models/tenant.model';
 import { TransactionAnalysis } from '../../../../models/transaction-analysis.model';
 import { MonthlyAnalysis } from '../../../../models/monthly-analysis.model';
+import { User } from '../../../../models/user.model';
+import { ToolsUnsupportedError } from '../../../../application/interfaces/gateways/ai-gateway.interface';
+import { FinancialAnalyzerRegistry } from '../../../../application/interfaces/analysis/financial-analyzer.interface';
+import { DailyFinancialAnalyzer } from '../../../analysis/daily-financial.analyzer';
+import { MonthlyFinancialAnalyzer } from '../../../analysis/monthly-financial.analyzer';
+
+/** Registers the analyzer registry against whatever gateway/repo stubs `c` holds. */
+function registerAnalyzers(c: ReturnType<typeof rootContainer.createChildContainer>) {
+  c.register('FinancialAnalyzerRegistry', {
+    useFactory: (dc) => {
+      const registry = new FinancialAnalyzerRegistry();
+      registry.register(new DailyFinancialAnalyzer(dc.resolve('AIGatewayInterface'), dc.resolve('PipelineStepRepositoryInterface')));
+      registry.register(new MonthlyFinancialAnalyzer(dc.resolve('AIGatewayInterface'), dc.resolve('PipelineStepRepositoryInterface')));
+      return registry;
+    },
+  });
+}
 
 import { Context } from '@temporalio/activity';
 (Context as any).current = () => ({ heartbeat: () => {} });
@@ -45,6 +62,7 @@ beforeEach(async () => {
     Tenant.deleteMany({}),
     TransactionAnalysis.deleteMany({}),
     MonthlyAnalysis.deleteMany({}),
+    User.deleteMany({}),
   ]);
 });
 
@@ -55,6 +73,11 @@ function buildContainer(opts: { note?: string; promptVersion?: number } = {}) {
   c.register('AIGatewayInterface', {
     useValue: {
       extractStructuredData: async () => ({ data: { note }, confidence: 1, tokensUsed: 0, rawResponse: {} }),
+      // The stub model has no tool support — the analyzer exercises the
+      // single-shot fallback path in these tests.
+      chatWithTools: async () => {
+        throw new ToolsUnsupportedError('stub-model');
+      },
       getProviderName: () => 'stub',
       getModelName: () => 'stub-model',
       getEndpoint: () => 'http://stub',
@@ -72,6 +95,7 @@ function buildContainer(opts: { note?: string; promptVersion?: number } = {}) {
       }),
     },
   });
+  registerAnalyzers(c);
   return c;
 }
 
@@ -173,7 +197,7 @@ test('aggregateMonthlyContext sourceHash is stable for equal inputs and detects 
   assert.equal(a.sourceHash, b.sourceHash, 'hash stable for identical inputs');
 
   await persistMonthlyAnalysis({
-    userId, year: 2026, month: 5, currency: 'USD',
+    userId, year: 2026, month: 5, currency: 'USD', language: 'en',
     inputs: { dailyCount: a.dailyCount, totals: a.totals, balance: a.balance, budgetSnapshot: a.budgetSnapshot, sourceHash: a.sourceHash },
     ai: { note: 'n', modelMeta: { model: 'm', promptVersion: 1, tokensIn: 0, tokensOut: 0 } },
     status: 'ready',
@@ -183,6 +207,22 @@ test('aggregateMonthlyContext sourceHash is stable for equal inputs and detects 
   assert.ok(c.existing, 'existing row detected');
   assert.equal(c.existing!.status, 'ready');
   assert.equal(c.existing!.sourceHash, a.sourceHash, 'stored hash matches → workflow would skip');
+});
+
+test('aggregateMonthlyContext sourceHash changes when the tenant switches language', async () => {
+  const userId = await seedTenant();
+  await User.create({ _id: new mongoose.Types.ObjectId(userId), authUid: `uid-${userId}`, email: `${userId}@t.io`, language: 'en' });
+  await seedDailySummary(userId, '2026-05-01', 'day-1');
+
+  const { aggregateMonthlyContext } = createMonthlyAnalysisActivities(buildContainer());
+  const before = await aggregateMonthlyContext({ userId, year: 2026, month: 5 });
+  assert.equal(before.language, 'en');
+
+  await User.updateOne({ _id: userId }, { $set: { language: 'es' } });
+  const after = await aggregateMonthlyContext({ userId, year: 2026, month: 5 });
+
+  assert.equal(after.language, 'es');
+  assert.notEqual(after.sourceHash, before.sourceHash, 'language switch must bust the unchanged-inputs skip');
 });
 
 test('aggregateMonthlyContext defaults to the current month when year/month omitted', async () => {
@@ -203,7 +243,7 @@ test('analyzeMonthlyContext truncates an oversized note on a word boundary', asy
   const { analyzeMonthlyContext } = createMonthlyAnalysisActivities(buildContainer({ note: longNote }));
 
   const ctx: any = {
-    userId: 'u', year: 2026, month: 5, currency: 'USD', dailyCount: 0,
+    userId: 'u', year: 2026, month: 5, currency: 'USD', language: 'en', dailyCount: 0,
     dailySummaries: [], totals: { income: 0, expenses: 0, net: 0 }, balance: 0,
     budgetSnapshot: null, priorMonthNote: null, sourceHash: 'h', existing: null, promptVersion: 1,
   };
@@ -223,6 +263,9 @@ test('analyzeMonthlyContext renders a deterministic budget verdict (under budget
         captured = args.userPrompt;
         return { data: { note: 'ok' }, confidence: 1, tokensUsed: 0, rawResponse: {} };
       },
+      chatWithTools: async () => {
+        throw new ToolsUnsupportedError('stub-model');
+      },
       getProviderName: () => 'stub',
       getModelName: () => 'stub-model',
       getEndpoint: () => 'http://stub',
@@ -241,10 +284,11 @@ test('analyzeMonthlyContext renders a deterministic budget verdict (under budget
       }),
     },
   });
+  registerAnalyzers(c);
 
   const { analyzeMonthlyContext } = createMonthlyAnalysisActivities(c);
   const ctx: any = {
-    userId: 'u', year: 2026, month: 6, currency: 'USD', dailyCount: 0,
+    userId: 'u', year: 2026, month: 6, currency: 'USD', language: 'en', dailyCount: 0,
     dailySummaries: [], totals: { income: 0, expenses: 83118.63, net: -83118.63 }, balance: 0,
     budgetSnapshot: { totalBudget: 170000, totalSpent: 83118.63, percentUsed: 48.89, daysRemainingInPeriod: 26 },
     priorMonthNote: null, sourceHash: 'h', existing: null, promptVersion: 1,
@@ -260,7 +304,7 @@ test('analyzeMonthlyContext renders a deterministic budget verdict (under budget
 test('analyzeMonthlyContext rejects an empty note', async () => {
   const { analyzeMonthlyContext } = createMonthlyAnalysisActivities(buildContainer({ note: '   ' }));
   const ctx: any = {
-    userId: 'u', year: 2026, month: 5, currency: 'USD', dailyCount: 0,
+    userId: 'u', year: 2026, month: 5, currency: 'USD', language: 'en', dailyCount: 0,
     dailySummaries: [], totals: { income: 0, expenses: 0, net: 0 }, balance: 0,
     budgetSnapshot: null, priorMonthNote: null, sourceHash: 'h', existing: null, promptVersion: 1,
   };
@@ -277,13 +321,14 @@ test('persistMonthlyAnalysis upserts; second call for same month overwrites, no 
   const inputs = { dailyCount: 1, totals: { income: 0, expenses: 10, net: -10 }, balance: 100, budgetSnapshot: null, sourceHash: 'h1' };
   const baseAi = { note: 'first', modelMeta: { model: 'm', promptVersion: 1, tokensIn: 0, tokensOut: 0 } };
 
-  const first = await persistMonthlyAnalysis({ userId, year: 2026, month: 5, currency: 'USD', inputs, ai: baseAi, status: 'ready' });
-  const second = await persistMonthlyAnalysis({ userId, year: 2026, month: 5, currency: 'USD', inputs, ai: { ...baseAi, note: 'second' }, status: 'ready' });
+  const first = await persistMonthlyAnalysis({ userId, year: 2026, month: 5, currency: 'USD', language: 'en', inputs, ai: baseAi, status: 'ready' });
+  const second = await persistMonthlyAnalysis({ userId, year: 2026, month: 5, currency: 'USD', language: 'es', inputs, ai: { ...baseAi, note: 'second' }, status: 'ready' });
 
   assert.equal(first.analysisId, second.analysisId, 'same row id on upsert');
   const all = await MonthlyAnalysis.find({ userId }).lean();
   assert.equal(all.length, 1, 'no duplicate row');
   assert.equal(all[0].note, 'second');
+  assert.equal(all[0].language, 'es', 'row records the language it was written in');
 });
 
 test('persistMonthlyAnalysis writes a failed row with reason and empty note when ai is null', async () => {
@@ -291,7 +336,7 @@ test('persistMonthlyAnalysis writes a failed row with reason and empty note when
   const { persistMonthlyAnalysis } = createMonthlyAnalysisActivities(buildContainer());
 
   await persistMonthlyAnalysis({
-    userId, year: 2026, month: 5, currency: 'USD',
+    userId, year: 2026, month: 5, currency: 'USD', language: 'en',
     inputs: { dailyCount: 0, totals: { income: 0, expenses: 0, net: 0 }, balance: 0, budgetSnapshot: null, sourceHash: 'h' },
     ai: null, status: 'failed', failureReason: 'AI gateway timed out',
   });

@@ -4,7 +4,14 @@
  * Supports remote Ollama servers
  */
 import { injectable, inject } from 'tsyringe';
-import { AIGatewayInterface, ExtractionRequest, ExtractionResult } from '../../../../application/interfaces/gateways/ai-gateway.interface';
+import {
+  AIGatewayInterface,
+  ExtractionRequest,
+  ExtractionResult,
+  ToolChatRequest,
+  ToolChatResult,
+  ToolsUnsupportedError,
+} from '../../../../application/interfaces/gateways/ai-gateway.interface';
 import { OllamaClient } from './ollama-client';
 
 @injectable()
@@ -54,6 +61,15 @@ export class OllamaGateway implements AIGatewayInterface {
       tokensUsed: response.usage?.total_tokens,
       rawResponse: response
     };
+  }
+
+  /**
+   * OllamaClient's chat wrapper does not pass the `tools` parameter through,
+   * so tool calling is declared unsupported — callers fall back to the
+   * single-shot extractStructuredData path.
+   */
+  async chatWithTools(_request: ToolChatRequest): Promise<ToolChatResult> {
+    throw new ToolsUnsupportedError(this.modelName, 'ollama client has no tools passthrough');
   }
 
   getProviderName(): string {

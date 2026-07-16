@@ -63,6 +63,7 @@ export async function dailyTransactionAnalysisWorkflow(
       userId: input.userId,
       analysisDate,
       currency: context.currency,
+      language: context.language,
       inputs: {
         transactionCount: context.transactions.length,
         totals: context.totals,
@@ -83,6 +84,7 @@ export async function dailyTransactionAnalysisWorkflow(
       userId: input.userId,
       analysisDate,
       currency: context.currency,
+      language: context.language,
       inputs: {
         transactionCount: context.transactions.length,
         totals: context.totals,

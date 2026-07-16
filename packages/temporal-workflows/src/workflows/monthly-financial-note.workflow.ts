@@ -88,6 +88,7 @@ export async function monthlyFinancialNoteWorkflow(
       year,
       month,
       currency: context.currency,
+      language: context.language,
       inputs: {
         dailyCount: context.dailyCount,
         totals: context.totals,
@@ -115,6 +116,7 @@ export async function monthlyFinancialNoteWorkflow(
       year,
       month,
       currency: context.currency,
+      language: context.language,
       inputs: {
         dailyCount: context.dailyCount,
         totals: context.totals,
