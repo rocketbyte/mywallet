@@ -26,9 +26,19 @@ const controller = new TransactionController();
  *       - in: query
  *         name: endDate
  *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: isFixedExpense
+ *         description: Restrict to rows whose fixed-expense flag equals this value.
+ *         schema: { type: boolean }
+ *       - in: query
+ *         name: isRecurrent
+ *         description: Restrict to rows whose recurrent flag equals this value.
+ *         schema: { type: boolean }
  *     responses:
  *       200:
  *         description: Paginated list of transactions.
+ *       400:
+ *         description: isFixedExpense or isRecurrent is not 'true' or 'false'.
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */

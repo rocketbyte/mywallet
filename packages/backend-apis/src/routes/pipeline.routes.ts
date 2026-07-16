@@ -150,6 +150,10 @@ router.put('/steps/:stepKey', upsertPipelineStep);
  *       Useful for reprocessing, testing, or backfilling transactions without waiting for a
  *       new Gmail notification.
  *
+ *       The sender watchlist is enforced here too: if the email's sender is not
+ *       in the user's watchlist the request is rejected with 403 — add the
+ *       sender via `POST /senders` first, then reprocess.
+ *
  *       The pipeline runs 3 steps asynchronously via Temporal:
  *       1. **classify_email** — AI determines if it's a bank transaction
  *       2. **extract_transaction** — AI extracts merchant, amount, currency, date, etc.
@@ -187,6 +191,8 @@ router.put('/steps/:stepKey', upsertPipelineStep);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: The email's sender is not in the user's watchlist.
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  *       500:

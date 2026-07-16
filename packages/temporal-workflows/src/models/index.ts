@@ -11,6 +11,12 @@ export {
   TenantMembershipStatus,
 } from './tenant-membership.model';
 export { Email, EmailInterface } from './email.model';
+export {
+  WatchedSender,
+  WatchedSenderInterface,
+  WatchedSenderKind,
+  WatchedSenderSource,
+} from './watched-sender.model';
 export { PipelineStep, PipelineStepInterface } from './pipeline-step.model';
 export {
   TransactionAnalysis,
