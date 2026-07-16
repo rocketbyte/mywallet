@@ -100,6 +100,22 @@ export async function runPipelineForEmail(req: Request, res: Response): Promise<
       return;
     }
 
+    // Sender-watchlist invariant: the AI must never receive email from an
+    // unwatched sender, including via this manual trigger. To reprocess a
+    // skipped email, add its sender to the watchlist first (POST /senders).
+    const { WatchedSender } = await import('../../../temporal-workflows/src/models');
+    const { senderMatchesWatchlist } = await import(
+      '../../../temporal-workflows/src/shared/sender-match'
+    );
+    const entries = await WatchedSender.find({ userId }).lean();
+    if (!senderMatchesWatchlist(email.from, entries)) {
+      res.status(403).json({
+        error: 'SENDER_NOT_WATCHED',
+        message: `Sender "${email.from}" is not in the user's watchlist. Add it via POST /senders before reprocessing.`,
+      });
+      return;
+    }
+
     const client = await getTemporalClient();
     const workflowId = `${WORKFLOW_IDS.PIPELINE_PREFIX}-${emailId}-manual`;
 
