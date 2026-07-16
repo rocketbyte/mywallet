@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { TransactionService, FixedExpenseOnIncomeError } from '../services/transaction.service';
 import { BudgetService } from '../services/budget.service';
 import { getDataOwnerId, isBudgetHidden } from '../auth';
-import { parsePagination, scalarParam } from '../utils/request.utils';
+import { boolParam, parsePagination, scalarParam } from '../utils/request.utils';
 import { logger } from '../utils/logger';
 import {
   isTransactionCategoryKey,
@@ -41,6 +41,14 @@ export class TransactionController {
   private budgetService = new BudgetService();
 
   async getTransactions(req: Request, res: Response) {
+    const isFixedExpense = boolParam(req.query.isFixedExpense);
+    if (isFixedExpense === 'invalid') {
+      return res.status(400).json({ error: "isFixedExpense must be 'true' or 'false'" });
+    }
+    const isRecurrent = boolParam(req.query.isRecurrent);
+    if (isRecurrent === 'invalid') {
+      return res.status(400).json({ error: "isRecurrent must be 'true' or 'false'" });
+    }
     try {
       const result = await this.service.list(getDataOwnerId(req), {
         ...parsePagination(req.query),
@@ -48,6 +56,8 @@ export class TransactionController {
         search: scalarParam(req.query.search),
         startDate: scalarParam(req.query.startDate),
         endDate: scalarParam(req.query.endDate),
+        isFixedExpense,
+        isRecurrent,
       });
       res.json(result);
     } catch (error) {

@@ -19,3 +19,16 @@ export function escapeRegex(value: string): string {
 export function scalarParam(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
+
+/**
+ * Parses an optional boolean query param. Absent → undefined; the exact strings
+ * "true"/"false" → the boolean. Anything else — other strings, arrays, objects —
+ * returns 'invalid' so the caller can reject with HTTP 400 instead of silently
+ * dropping a filter the client asked for.
+ */
+export function boolParam(value: unknown): boolean | undefined | 'invalid' {
+  if (value === undefined) return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return 'invalid';
+}

@@ -129,10 +129,20 @@ function toDTO(tx: any): TransactionDTO {
 
 export class TransactionService {
   async list(userId: string, filters: TransactionFilters) {
-    const { limit, offset, category, search, startDate, endDate } = filters;
+    const { limit, offset, category, search, startDate, endDate, isFixedExpense, isRecurrent } =
+      filters;
     const query: Record<string, any> = { userId };
 
     if (category && category !== 'all') query.category = category;
+
+    // Rows persisted before the flags existed have no field at all — `$ne: true`
+    // makes a `false` filter match them, while `true` naturally excludes them.
+    if (isFixedExpense !== undefined) {
+      query.isFixedExpense = isFixedExpense ? true : { $ne: true };
+    }
+    if (isRecurrent !== undefined) {
+      query.isRecurrent = isRecurrent ? true : { $ne: true };
+    }
 
     const dateRange = utcDayRange(startDate, endDate);
     if (dateRange) query.transactionDate = dateRange;

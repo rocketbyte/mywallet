@@ -25,6 +25,8 @@ export interface TransactionFilters {
   search?: string;
   startDate?: string;
   endDate?: string;
+  isFixedExpense?: boolean;
+  isRecurrent?: boolean;
 }
 
 export interface BalanceFilters {
