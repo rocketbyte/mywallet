@@ -170,6 +170,8 @@ export interface EmailProcessingInput {
 export interface EmailProcessingResult {
   totalEmails: number;
   processedCount: number;
+  /** Emails gated by the sender watchlist — never sent to the AI pipeline. */
+  skippedCount: number;
   failedCount: number;
   transactions: SavedTransaction[];
   errors: Array<{

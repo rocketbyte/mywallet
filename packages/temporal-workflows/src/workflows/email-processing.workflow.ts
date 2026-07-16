@@ -6,6 +6,7 @@ import {
   EmailProcessingResult
 } from '../shared/types';
 import { ACTIVITY_TIMEOUTS, RETRY_POLICIES, TASK_QUEUES, WORKFLOW_IDS } from '../shared/constants';
+import { senderMatchesWatchlist } from '../shared/sender-match';
 import { transactionPipelineWorkflow } from './transaction-pipeline.workflow';
 
 // Proxy activities with their respective configurations
@@ -41,6 +42,7 @@ export async function emailProcessingWorkflow(
   const result: EmailProcessingResult = {
     totalEmails: 0,
     processedCount: 0,
+    skippedCount: 0,
     failedCount: 0,
     transactions: [],
     errors: []
@@ -79,6 +81,12 @@ export async function emailProcessingWorkflow(
       return result;
     }
 
+    // Sender gate: load the tenant's watchlist ONCE per batch (activity result
+    // is recorded in history, so replays and mid-batch edits stay consistent).
+    // Only emails from watched senders reach the AI pipeline; an empty
+    // watchlist sends nothing.
+    const watchedSenders = await emailActivities.getWatchedSenders(input.userId);
+
     // Step 2: Process each email
     const isSyncPath = !!(input.emailIds && input.emailIds.length > 0);
 
@@ -110,6 +118,26 @@ export async function emailProcessingWorkflow(
             snippet: email.snippet,
             fetchedBy: input.workflowId
           });
+        }
+
+        // Sender gate: only watched senders reach the AI. The raw email stays
+        // persisted (and unprocessed) so it can be reprocessed if the user adds
+        // the sender later; it is not an error and Gmail is not marked.
+        if (!senderMatchesWatchlist(email.from, watchedSenders)) {
+          log.info('Skipping email — sender not in watchlist', {
+            emailId: gmailMessageId,
+            from: email.from
+          });
+          await emailActivities.updateEmailProcessing({
+            userId: input.userId,
+            emailId: gmailMessageId,
+            isProcessed: false,
+            processedAt: new Date(),
+            processingWorkflowId: input.workflowId,
+            processingError: 'skipped: sender not in watchlist'
+          });
+          result.skippedCount++;
+          continue;
         }
 
         // Run the 3-step AI pipeline as a child workflow.
@@ -206,6 +234,7 @@ export async function emailProcessingWorkflow(
     log.info('Email processing workflow completed', {
       total: result.totalEmails,
       processed: result.processedCount,
+      skipped: result.skippedCount,
       failed: result.failedCount
     });
 

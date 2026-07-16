@@ -1,6 +1,7 @@
 import { Context } from '@temporalio/activity';
 import { Connection } from 'mongoose';
-import { Email } from '../../models';
+import { Email, WatchedSender } from '../../models';
+import type { SenderEntry } from '../../shared/sender-match';
 import {
   SaveEmailInput,
   SavedEmail,
@@ -221,6 +222,18 @@ export const createEmailActivities = (mongoConnection: Connection) => {
         createdAt: email.createdAt,
         updatedAt: email.updatedAt
       };
+    },
+
+    /**
+     * The tenant's sender watchlist, normalized. Loaded once per processing
+     * batch by the email-processing workflow so the sender gate is recorded in
+     * workflow history (deterministic on replay).
+     */
+    async getWatchedSenders(userId: string): Promise<SenderEntry[]> {
+      Context.current().heartbeat();
+
+      const rows = await WatchedSender.find({ userId }).sort({ value: 1 }).lean();
+      return rows.map(row => ({ value: row.value, kind: row.kind }));
     },
 
     /**
