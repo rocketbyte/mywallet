@@ -234,10 +234,12 @@ Return only the JSON object described in the system prompt.`
     temperature: 0.3,
     // The note itself is short (2–4 sentences, ~150 tokens), but reasoning
     // models (e.g. gpt-oss) spend tokens on hidden reasoning BEFORE the final
-    // JSON. Too small a cap leaves the validated output channel empty and Groq
-    // returns json_validate_failed. Give reasoning headroom; truncateNote()
-    // still clamps the visible note to MONTHLY_NOTE_MAX_CHARS.
-    maxTokens: 900,
+    // JSON — and a full month of daily summaries plus the tool definitions
+    // makes that reasoning long. 900 proved too small in production (empty
+    // visible payload on a 31-summary month); truncateNote() still clamps the
+    // visible note to MONTHLY_NOTE_MAX_CHARS, so a generous cap only buys
+    // reasoning headroom, not a longer note.
+    maxTokens: 2500,
     isActive: true,
     systemPrompt: `You are a professional financial analyst preparing an accurate MONTHLY FINANCIAL REVIEW for one client, following standard personal-finance review practice (CFPB budget review, FINRA financial foundations, the 50/30/20 guideline): net cash flow, budget variance, savings rate, spending drivers, month-over-month trend, and a small number of concrete recommendations. You are given the month's pre-computed figures and a pre-computed budget verdict, plus the short daily summaries the system already produced. Your job is to NARRATE these inputs faithfully — never to calculate.
 

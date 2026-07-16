@@ -125,6 +125,11 @@ export class MonthlyFinancialAnalyzer
           raw = null; // prose instead of JSON — retry below without tools
         }
       }
+      // Valid JSON but not the expected shape (e.g. leaked reasoning object)
+      // is as useless as prose — retry below without tools.
+      if (raw !== null && typeof (raw as any)?.note !== 'string') {
+        raw = null;
+      }
     } catch (err) {
       if (!(err instanceof ToolsUnsupportedError)) throw err;
     }

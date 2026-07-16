@@ -104,6 +104,13 @@ export class DailyFinancialAnalyzer
           raw = null; // prose instead of JSON — retry below without tools
         }
       }
+      // Valid JSON but not the expected shape (e.g. leaked reasoning object)
+      // is as useless as prose — retry below without tools.
+      if (raw !== null) {
+        const d = raw as any;
+        const usable = typeof d?.summary === 'string' || typeof d?.fullSummary === 'string' || Array.isArray(d?.suggestions);
+        if (!usable) raw = null;
+      }
     } catch (err) {
       if (!(err instanceof ToolsUnsupportedError)) throw err;
     }
