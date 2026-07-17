@@ -15,6 +15,14 @@ export function isLanguage(value: unknown): value is Language {
   return typeof value === 'string' && (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
 }
 
+/** UI color themes the system supports. */
+export const SUPPORTED_THEMES = ['light', 'dark'] as const;
+export type Theme = (typeof SUPPORTED_THEMES)[number];
+
+export function isTheme(value: unknown): value is Theme {
+  return typeof value === 'string' && (SUPPORTED_THEMES as readonly string[]).includes(value);
+}
+
 export interface MeDTO {
   id: string;
   email: string;
@@ -31,4 +39,9 @@ export interface MeDTO {
    * chosen one — clients fall back to the device locale, then English.
    */
   language?: Language;
+  /**
+   * Preferred UI color theme ('light' | 'dark'). Absent when the user has
+   * never chosen one — clients render light (the dark switch defaults off).
+   */
+  theme?: Theme;
 }

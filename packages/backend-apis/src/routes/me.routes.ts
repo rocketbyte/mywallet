@@ -74,10 +74,12 @@ router.get('/', controller.getMe.bind(controller));
  *   patch:
  *     summary: Update the authenticated user's preferences
  *     description: |
- *       Updates mutable fields on the caller's account. Currently only the UI
- *       `language` preference is editable. The value MUST be one of the
- *       supported languages (`en`, `es`); anything else is rejected with 400.
- *       Returns the full, updated user record (same shape as `GET /me`).
+ *       Updates mutable fields on the caller's account. The editable UI
+ *       preferences are `language` and `theme`; supply either or both. Each
+ *       value MUST be one of its supported set (`language`: `en`, `es`;
+ *       `theme`: `light`, `dark`); anything else is rejected with 400 and no
+ *       write. An absent `theme` preference means light. Returns the full,
+ *       updated user record (same shape as `GET /me`).
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -92,6 +94,10 @@ router.get('/', controller.getMe.bind(controller));
  *                 type: string
  *                 enum: [en, es]
  *                 description: Preferred UI language.
+ *               theme:
+ *                 type: string
+ *                 enum: [light, dark]
+ *                 description: Preferred UI color theme. Absent means light.
  *     responses:
  *       200:
  *         description: The updated user.

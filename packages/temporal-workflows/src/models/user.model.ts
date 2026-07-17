@@ -34,6 +34,12 @@ export interface UserInterface extends Document {
    * the user across devices.
    */
   language?: string;
+  /**
+   * Preferred UI color theme ('light' | 'dark'). Absent means the user has
+   * never chosen one — clients render light (the dark switch defaults off).
+   * Stored per-account so the choice follows the user across devices.
+   */
+  theme?: string;
   lastLoginAt?: Date;
   tenantId?: Types.ObjectId;
   createdAt: Date;
@@ -53,6 +59,7 @@ const UserSchema = new Schema<UserInterface>({
   displayName: { type: String },
   emailVerified: { type: Boolean, default: false },
   language: { type: String, enum: ['en', 'es'] },
+  theme: { type: String, enum: ['light', 'dark'] },
   lastLoginAt: { type: Date },
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', index: true },
 }, {

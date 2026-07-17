@@ -18,7 +18,9 @@ import {
 import {
   EMAIL_REGEX,
   SUPPORTED_LANGUAGES,
+  SUPPORTED_THEMES,
   isLanguage,
+  isTheme,
   type ConnectInput,
   type MeDTO,
 } from '../types/auth.types';
@@ -36,6 +38,7 @@ type LeanUser = Pick<
   | 'createdAt'
   | 'tenantId'
   | 'language'
+  | 'theme'
 >;
 
 export class AuthController {
@@ -59,29 +62,49 @@ export class AuthController {
   }
 
   /**
-   * Update mutable fields on the authenticated user. Currently only the UI
-   * `language` preference is editable. Validates the value against the
-   * supported-language set and rejects anything else deterministically.
+   * Update mutable fields on the authenticated user. The editable UI
+   * preferences are `language` and `theme`; either or both may be supplied.
+   * Each provided value is validated against its supported set and anything
+   * else is rejected deterministically with no write.
    */
   async updateMe(req: Request, res: Response): Promise<void> {
     try {
       const id = getUserId(req);
-      const { language } = (req.body ?? {}) as { language?: unknown };
+      const { language, theme } = (req.body ?? {}) as {
+        language?: unknown;
+        theme?: unknown;
+      };
 
-      if (language === undefined) {
+      if (language === undefined && theme === undefined) {
         res.status(400).json({ error: 'No updatable fields provided' });
         return;
       }
-      if (!isLanguage(language)) {
-        res.status(400).json({
-          error: `Unsupported language. Expected one of: ${SUPPORTED_LANGUAGES.join(', ')}`,
-        });
-        return;
+
+      const update: { language?: string; theme?: string } = {};
+
+      if (language !== undefined) {
+        if (!isLanguage(language)) {
+          res.status(400).json({
+            error: `Unsupported language. Expected one of: ${SUPPORTED_LANGUAGES.join(', ')}`,
+          });
+          return;
+        }
+        update.language = language;
+      }
+
+      if (theme !== undefined) {
+        if (!isTheme(theme)) {
+          res.status(400).json({
+            error: `Unsupported theme. Expected one of: ${SUPPORTED_THEMES.join(', ')}`,
+          });
+          return;
+        }
+        update.theme = theme;
       }
 
       const doc = await User.findByIdAndUpdate(
         id,
-        { $set: { language } },
+        { $set: update },
         { new: true },
       ).lean();
       if (!doc) {
@@ -119,6 +142,7 @@ export class AuthController {
       tenantId: tenant ? String(tenant._id) : undefined,
       role,
       language: isLanguage(doc.language) ? doc.language : undefined,
+      theme: isTheme(doc.theme) ? doc.theme : undefined,
     };
   }
 
