@@ -20,6 +20,11 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 3
+  # Bound the whole hook (across retries) so it always reaches a terminal state
+  # well before Helm's hook wait — a stuck attempt fails the release fast and
+  # clearly instead of hanging with an opaque "timed out waiting for the
+  # condition". Each individual attempt is bounded by the pod deadline below.
+  activeDeadlineSeconds: 480
   ttlSecondsAfterFinished: 600
   template:
     metadata:
@@ -28,6 +33,9 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       restartPolicy: Never
+      # Per-attempt cap: bounds the init wait + seed run so no single pod can
+      # block indefinitely.
+      activeDeadlineSeconds: 150
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -43,7 +51,15 @@ spec:
             - sh
             - -c
             - |
+              # Bounded wait: give the frontend up to ~90s to open its port,
+              # then give up so the pod fails fast and the Job can retry, rather
+              # than looping forever and stalling the whole release.
+              i=0
               until nc -z temporal-frontend.rocket.svc.cluster.local 7233; do
+                i=$((i+1))
+                if [ "$i" -ge 45 ]; then
+                  echo "Temporal still unavailable after $((i*2))s - giving up"; exit 1
+                fi
                 echo "Temporal unavailable - sleeping"; sleep 2
               done
               echo "Temporal ready"

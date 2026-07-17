@@ -9,7 +9,10 @@ export async function getTemporalClient(): Promise<Client> {
   }
 
   const connection = await Connection.connect({
-    address: config.temporal.address
+    address: config.temporal.address,
+    // Fail fast when the frontend isn't serving yet, rather than blocking
+    // forever (which previously hung the post-upgrade schedule-seed hook).
+    connectTimeout: config.temporal.connectTimeoutMs
   });
 
   client = new Client({

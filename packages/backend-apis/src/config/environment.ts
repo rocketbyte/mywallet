@@ -24,7 +24,11 @@ export const config = {
 
   temporal: {
     address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
-    namespace: process.env.TEMPORAL_NAMESPACE || 'default'
+    namespace: process.env.TEMPORAL_NAMESPACE || 'default',
+    // Bound the gRPC connection attempt so a frontend that accepts the TCP port
+    // but isn't yet serving can't make callers hang indefinitely (this is what
+    // stalled the deploy-time recurring-schedule seed hook). Fail fast instead.
+    connectTimeoutMs: parseInt(process.env.TEMPORAL_CONNECT_TIMEOUT_MS || '10000', 10)
   },
 
   logging: {

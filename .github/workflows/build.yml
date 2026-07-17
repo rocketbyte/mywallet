@@ -182,7 +182,8 @@ jobs:
             --set backend.image.tag="${IMAGE_TAG}" \
             --set worker.image.tag="${IMAGE_TAG}" \
             --set secrets.docs.user="${DOCS_USER}" \
-            --set secrets.docs.password="${DOCS_PASSWORD}"
+            --set secrets.docs.password="${DOCS_PASSWORD}" \
+            --timeout 10m
 
           rm /tmp/values-secrets.yaml
 
