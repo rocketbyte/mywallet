@@ -9,6 +9,7 @@ function toDTO(doc: any): AlertDTO {
     title: doc.title,
     body: doc.body,
     read: doc.read,
+    readAt: doc.readAt,
     createdAt: doc.createdAt,
   };
 }
@@ -25,8 +26,18 @@ export class AlertService {
   }
 
   async markRead(userId: string, id: string): Promise<AlertDTO | null> {
-    const doc = await Alert.findOneAndUpdate({ _id: id, userId }, { $set: { read: true } }, { new: true }).lean();
-    return doc ? toDTO(doc) : null;
+    // Set read + readAt only on the first transition, so re-marking an
+    // already-read alert is idempotent and does not advance readAt.
+    const transitioned = await Alert.findOneAndUpdate(
+      { _id: id, userId, read: false },
+      { $set: { read: true, readAt: new Date() } },
+      { new: true },
+    ).lean();
+    if (transitioned) return toDTO(transitioned);
+
+    // Already read (idempotent success) or not found.
+    const existing = await Alert.findOne({ _id: id, userId }).lean();
+    return existing ? toDTO(existing) : null;
   }
 
   async delete(userId: string, id: string): Promise<boolean> {

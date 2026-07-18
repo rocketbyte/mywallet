@@ -27,6 +27,7 @@ import {
 import { PIPELINE_STEP_KEYS, DUPLICATE_LOOKBACK_MINUTES } from '../../../shared/constants';
 import { normalizeMerchant } from '../../../shared/normalize-merchant';
 import { findInheritedFixedExpense } from '../../../shared/fixed-expense';
+import { evaluateBudgetAlert } from '../../../shared/budget-alert';
 
 // ---------------------------------------------------------------------------
 // Template interpolation helper
@@ -174,6 +175,15 @@ export function createPipelineActivities(container: DependencyContainer) {
       // 1. Idempotency check — same email re-processed.
       const existingByEmail = await transactionRepo.findByEmailId(input.userId, input.emailId);
       if (existingByEmail) {
+        // Re-evaluate on the idempotent path so a retry after the transaction
+        // was written but before the alert was created still generates it.
+        await evaluateBudgetAlert({
+          userId: input.userId,
+          category: input.rawData.category ?? 'Other',
+          transactionType: input.rawData.transactionType,
+          transactionDate: input.rawData.transactionDate,
+          currency: input.rawData.currency,
+        });
         return {
           transactionId: existingByEmail.id,
           merchant: existingByEmail.merchant,
@@ -261,6 +271,16 @@ export function createPipelineActivities(container: DependencyContainer) {
         confidence: input.rawData.confidence,
         matchedPatternId: input.patternId,
         matchedPatternName: input.patternName
+      });
+
+      // After a genuine insert, raise an over-budget alert if this debit pushed
+      // its category's month-to-date spend to or past its budget limit.
+      await evaluateBudgetAlert({
+        userId: input.userId,
+        category: transaction.category ?? 'Other',
+        transactionType: transaction.transactionType,
+        transactionDate: transaction.transactionDate,
+        currency: transaction.currency,
       });
 
       return {

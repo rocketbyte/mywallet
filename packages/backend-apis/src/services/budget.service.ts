@@ -1,5 +1,6 @@
 import { Budget, Transaction } from '../../../temporal-workflows/src/models';
 import type { BudgetInterface } from '../../../temporal-workflows/src/models/budget.model';
+import { resolveEffectiveBudget } from '../../../temporal-workflows/src/shared/budget-limit';
 import { periodStart, periodEnd } from '../utils/date.utils';
 import type { BudgetDTO, UpsertBudgetInput } from '../types/budget.types';
 
@@ -56,19 +57,12 @@ export class BudgetService {
     year: number,
     month: number,
   ): Promise<EffectiveBudget | null> {
-    const exact = await Budget.findOne({ userId, year, month }).lean<BudgetInterface>();
-    if (exact) return { doc: exact, isCarriedForward: false, year, month };
-
-    // Most recent row at or before the target month. Order by year then month desc.
-    const prior = await Budget.findOne({
-      userId,
-      $or: [{ year: { $lt: year } }, { year, month: { $lte: month } }],
-    })
-      .sort({ year: -1, month: -1 })
-      .lean<BudgetInterface>();
-    if (prior) return { doc: prior, isCarriedForward: true, year, month };
-
-    return null;
+    // Shared with the store-time alert evaluation so both sides resolve the
+    // exact same effective budget (carry-forward rule lives in one place).
+    const doc = await resolveEffectiveBudget(userId, year, month);
+    if (!doc) return null;
+    const isCarriedForward = !(doc.year === year && doc.month === month);
+    return { doc, isCarriedForward, year, month };
   }
 
   /**

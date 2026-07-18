@@ -1,4 +1,4 @@
-export { User, UserInterface } from './user.model';
+export { User, UserInterface, AlertPreferences, ALERT_PREFERENCE_KEYS } from './user.model';
 export { Transaction, TransactionInterface } from './transaction.model';
 export { EmailPattern, EmailPatternInterface } from './email-pattern.model';
 export { Budget, BudgetInterface } from './budget.model';

@@ -13,6 +13,24 @@ export interface UserIdentity {
 }
 
 /**
+ * Per-account opt-in flags for each kind of generated alert. Every key is
+ * optional; an absent key means the alert is enabled (the switches default on).
+ * Preferences are personal to the account that owns the data — in a shared
+ * wallet they govern only the owner's alerts, never the members'.
+ */
+export interface AlertPreferences {
+  overBudget?: boolean;
+  largeTransaction?: boolean;
+  lowBalance?: boolean;
+  weeklySummary?: boolean;
+}
+
+/** The alert-preference keys, in display order. */
+export const ALERT_PREFERENCE_KEYS: (keyof AlertPreferences)[] = [
+  'overBudget', 'largeTransaction', 'lowBalance', 'weeklySummary',
+];
+
+/**
  * Application user record. The `_id` is the canonical internal user
  * identifier used everywhere in the system. External IDP identities are
  * stored in `identities[]`; domain code must never key data on those
@@ -40,6 +58,11 @@ export interface UserInterface extends Document {
    * Stored per-account so the choice follows the user across devices.
    */
   theme?: string;
+  /**
+   * Per-account alert opt-in flags. Absent (or any absent key) means enabled;
+   * generation reads these for the data owner. See {@link AlertPreferences}.
+   */
+  alertPreferences?: AlertPreferences;
   lastLoginAt?: Date;
   tenantId?: Types.ObjectId;
   createdAt: Date;
@@ -60,6 +83,16 @@ const UserSchema = new Schema<UserInterface>({
   emailVerified: { type: Boolean, default: false },
   language: { type: String, enum: ['en', 'es'] },
   theme: { type: String, enum: ['light', 'dark'] },
+  alertPreferences: {
+    type: {
+      overBudget: { type: Boolean },
+      largeTransaction: { type: Boolean },
+      lowBalance: { type: Boolean },
+      weeklySummary: { type: Boolean },
+    },
+    _id: false,
+    default: undefined,
+  },
   lastLoginAt: { type: Date },
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', index: true },
 }, {

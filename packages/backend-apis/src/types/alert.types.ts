@@ -5,6 +5,7 @@ export interface AlertDTO {
   title: string;
   body: string;
   read: boolean;
+  readAt?: Date;
   createdAt: Date;
 }
 

@@ -3,6 +3,7 @@ import { Transaction } from '../../../temporal-workflows/src/models';
 import { normalizeMerchant } from '../../../temporal-workflows/src/shared/normalize-merchant';
 import { SUPPORTED_TRANSACTION_CATEGORIES } from '../../../temporal-workflows/src/shared/categories';
 import { findInheritedFixedExpense } from '../../../temporal-workflows/src/shared/fixed-expense';
+import { evaluateBudgetAlert } from '../../../temporal-workflows/src/shared/budget-alert';
 import { fixedExpenseWindowStart, utcDayRange } from '../utils/date.utils';
 import { escapeRegex } from '../utils/request.utils';
 import type {
@@ -207,6 +208,13 @@ export class TransactionService {
       isFixedExpense,
       isRecurrent: input.isRecurrent ?? false,
     });
+
+    // Raise an over-budget alert if this manual debit pushed its category's
+    // month-to-date spend to or past its limit — same rule and idempotency as
+    // the email-ingestion store step. No-op for credits, unbudgeted categories,
+    // or when the account opted out.
+    await evaluateBudgetAlert({ userId, category, transactionType, transactionDate, currency: input.currency ?? 'USD' });
+
     return toDTO(doc.toObject());
   }
 

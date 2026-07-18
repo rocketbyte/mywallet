@@ -21,6 +21,8 @@ import {
   SUPPORTED_THEMES,
   isLanguage,
   isTheme,
+  parseAlertPreferencesPatch,
+  resolveAlertPreferences,
   type ConnectInput,
   type MeDTO,
 } from '../types/auth.types';
@@ -39,6 +41,7 @@ type LeanUser = Pick<
   | 'tenantId'
   | 'language'
   | 'theme'
+  | 'alertPreferences'
 >;
 
 export class AuthController {
@@ -63,24 +66,28 @@ export class AuthController {
 
   /**
    * Update mutable fields on the authenticated user. The editable UI
-   * preferences are `language` and `theme`; either or both may be supplied.
-   * Each provided value is validated against its supported set and anything
-   * else is rejected deterministically with no write.
+   * preferences are `language`, `theme`, and `alertPreferences`; any subset may
+   * be supplied. Each provided value is validated and anything else is rejected
+   * deterministically with no write. A partial `alertPreferences` merges over
+   * the stored value, leaving unspecified keys unchanged.
    */
   async updateMe(req: Request, res: Response): Promise<void> {
     try {
       const id = getUserId(req);
-      const { language, theme } = (req.body ?? {}) as {
+      const { language, theme, alertPreferences } = (req.body ?? {}) as {
         language?: unknown;
         theme?: unknown;
+        alertPreferences?: unknown;
       };
 
-      if (language === undefined && theme === undefined) {
+      if (language === undefined && theme === undefined && alertPreferences === undefined) {
         res.status(400).json({ error: 'No updatable fields provided' });
         return;
       }
 
-      const update: { language?: string; theme?: string } = {};
+      // Dotted paths so a partial alertPreferences patch merges per-key without
+      // clobbering unspecified keys.
+      const update: Record<string, unknown> = {};
 
       if (language !== undefined) {
         if (!isLanguage(language)) {
@@ -100,6 +107,17 @@ export class AuthController {
           return;
         }
         update.theme = theme;
+      }
+
+      if (alertPreferences !== undefined) {
+        const parsed = parseAlertPreferencesPatch(alertPreferences);
+        if ('error' in parsed) {
+          res.status(400).json({ error: parsed.error });
+          return;
+        }
+        for (const [key, value] of Object.entries(parsed.patch)) {
+          update[`alertPreferences.${key}`] = value;
+        }
       }
 
       const doc = await User.findByIdAndUpdate(
@@ -143,6 +161,7 @@ export class AuthController {
       role,
       language: isLanguage(doc.language) ? doc.language : undefined,
       theme: isTheme(doc.theme) ? doc.theme : undefined,
+      alertPreferences: resolveAlertPreferences(doc.alertPreferences),
     };
   }
 
