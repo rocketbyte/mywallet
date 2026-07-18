@@ -139,6 +139,20 @@ test('does not alert when the category limit is zero', async () => {
   assert.equal(await Alert.countDocuments({ userId: USER }), 0);
 });
 
+test('renders the alert in the account preferred language (es)', async () => {
+  await setBudget('Shopping', 500);
+  await debit('Shopping', 600);
+  await User.create({ _id: USER, authUid: 'a', email: 'u@e.com', language: 'es' } as any);
+
+  await evaluateBudgetAlert({
+    userId: USER, category: 'Shopping', transactionType: 'debit', transactionDate: MAY, currency: 'USD',
+  });
+
+  const alert = await Alert.findOne({ userId: USER, kind: 'over' }).lean();
+  assert.equal(alert!.title, 'Presupuesto de Compras excedido');
+  assert.match(alert!.body ?? '', /Has gastado \$600\.00 de tu presupuesto de \$500\.00 para Compras/);
+});
+
 test('respects the account overBudget preference: false suppresses, true/unset generates', async () => {
   await setBudget('Shopping', 500);
   await debit('Shopping', 600); // over

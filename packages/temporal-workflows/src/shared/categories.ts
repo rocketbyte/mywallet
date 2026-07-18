@@ -33,6 +33,41 @@ export const SUPPORTED_TRANSACTION_CATEGORIES: readonly SupportedCategory[] = [
 export const SUPPORTED_CATEGORY_KEYS: readonly string[] =
   SUPPORTED_TRANSACTION_CATEGORIES.map((c) => c.key);
 
+/**
+ * Spanish display labels, keyed by category key. Kept in sync with the frontend
+ * `categories.*` i18n catalog. Used for backend-generated localized copy (e.g.
+ * alerts); the English labels live on {@link SUPPORTED_TRANSACTION_CATEGORIES}.
+ */
+const CATEGORY_LABELS_ES: Record<string, string> = {
+  food: 'Comida y restaurantes',
+  groceries: 'Supermercado',
+  transport: 'Transporte',
+  travel: 'Viajes',
+  shopping: 'Compras',
+  bills: 'Facturas y servicios',
+  housing: 'Vivienda y alquiler',
+  health: 'Salud',
+  entertainment: 'Entretenimiento',
+  subscriptions: 'Suscripciones',
+  education: 'Educación',
+  personal: 'Personal',
+  income: 'Ingresos',
+  transfer: 'Transferencia',
+  other: 'Otros',
+};
+
+/**
+ * Display label for a category key in the given language. Case-insensitive on
+ * the key (so a stored `"Other"` resolves), Spanish where available, English
+ * otherwise, and the raw value as a last resort for unknown categories.
+ */
+export function localizedCategoryLabel(key: string, language: 'en' | 'es'): string {
+  const k = (key ?? '').toLowerCase();
+  if (language === 'es' && CATEGORY_LABELS_ES[k]) return CATEGORY_LABELS_ES[k];
+  const found = SUPPORTED_TRANSACTION_CATEGORIES.find((c) => c.key === k);
+  return found?.label ?? key;
+}
+
 /** True when `value` is one of the canonical category keys. */
 export function isTransactionCategoryKey(value: unknown): value is string {
   return typeof value === 'string' && SUPPORTED_CATEGORY_KEYS.includes(value);

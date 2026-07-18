@@ -1,17 +1,7 @@
 import { Alert } from '../models/alert.model';
 import { User } from '../models/user.model';
 import { monthToDateCategorySpend, resolveCategoryLimit } from './budget-limit';
-
-/**
- * Whether the account (the data owner keyed by `userId`) wants over-budget
- * alerts. An account with no stored preference, or an unset `overBudget` key,
- * is treated as opted in — the switches default on. Only an explicit `false`
- * suppresses generation.
- */
-async function isOverBudgetAlertEnabled(userId: string): Promise<boolean> {
-  const user = await User.findById(userId).select('alertPreferences').lean();
-  return user?.alertPreferences?.overBudget !== false;
-}
+import { overBudgetAlertCopy, resolveLanguage } from './alert-i18n';
 
 /** A stored transaction relevant to over-budget evaluation. */
 export interface BudgetAlertCandidate {
@@ -22,17 +12,6 @@ export interface BudgetAlertCandidate {
   transactionDate: Date | string;
   /** Currency of the stored transaction, used only for display formatting. */
   currency?: string;
-}
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$', EUR: '€', GBP: '£', DOP: 'RD$', MXN: '$', CAD: '$', BRL: 'R$',
-};
-
-function formatMoney(amount: number, currency?: string): string {
-  const symbol = currency ? CURRENCY_SYMBOLS[currency.toUpperCase()] : undefined;
-  const value = amount.toFixed(2);
-  if (symbol) return `${symbol}${value}`;
-  return currency ? `${value} ${currency.toUpperCase()}` : value;
 }
 
 /** Idempotency key for a category's over-budget alert in a given month. */
@@ -67,14 +46,24 @@ export async function evaluateBudgetAlert(c: BudgetAlertCandidate): Promise<void
     const limit = await resolveCategoryLimit(c.userId, c.category, year, month);
     if (limit == null || limit <= 0) return;
 
-    // Respect the account's opt-out before doing the spend aggregation.
-    if (!(await isOverBudgetAlertEnabled(c.userId))) return;
+    // One read of the data owner: the opt-out gate and the language for the copy.
+    const user = await User.findById(c.userId).select('alertPreferences language').lean();
+    if (user?.alertPreferences?.overBudget === false) return;
 
     const spent = await monthToDateCategorySpend(c.userId, c.category, date);
     if (spent < limit) return;
 
     const percentage = Math.round((spent / limit) * 100);
     const dedupeKey = overBudgetDedupeKey(c.category, year, month);
+    // Copy is localized to the data owner's language at generation time; the
+    // dedupeKey stays on the raw category so idempotency is language-agnostic.
+    const { title, body } = overBudgetAlertCopy(resolveLanguage(user?.language), {
+      category: c.category,
+      spent,
+      limit,
+      percentage,
+      currency: c.currency,
+    });
 
     await Alert.updateOne(
       { userId: c.userId, dedupeKey },
@@ -82,10 +71,8 @@ export async function evaluateBudgetAlert(c: BudgetAlertCandidate): Promise<void
         $setOnInsert: {
           userId: c.userId,
           kind: 'over',
-          title: `${c.category} budget exceeded`,
-          body:
-            `You've spent ${formatMoney(spent, c.currency)} of your ` +
-            `${formatMoney(limit, c.currency)} ${c.category} budget this month (${percentage}%).`,
+          title,
+          body,
           read: false,
           dedupeKey,
         },
